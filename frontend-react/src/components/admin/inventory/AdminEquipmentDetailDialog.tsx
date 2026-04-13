@@ -22,6 +22,7 @@ import {
   EQUIPMENT_CATEGORY_OPTIONS,
   EQUIPMENT_STATUS_OPTIONS,
   MOVEABLE_OPTIONS,
+  SHAREABLE_OPTIONS,
 } from "@/constants/equipments";
 
 import { useDeleteEquipment } from "@/hooks/shared/resources/equipments";
@@ -163,6 +164,7 @@ export default function AdminEquipmentDetailDialog({
     status: "",
     roomId: "",
     isMoveable: "true",
+    isShareable: "false",
     description: "",
     imageId: null as string | number | null,
     imageFile: null as File | null,
@@ -209,6 +211,7 @@ export default function AdminEquipmentDetailDialog({
       status: equipment.status,
       roomId: equipment.roomId,
       isMoveable: String(equipment.isMoveable),
+      isShareable: String(equipment.isShareable),
       description: equipment.description,
       imageId: equipment.imageId,
       imageFile: null,
@@ -231,6 +234,7 @@ export default function AdminEquipmentDetailDialog({
       status: "",
       roomId: "",
       isMoveable: "true",
+      isShareable: "false",
       description: "",
       imageId: null,
       imageFile: null,
@@ -267,6 +271,7 @@ export default function AdminEquipmentDetailDialog({
       status: formData.status,
       roomId: formData.roomId,
       isMoveable: formData.isMoveable === "true",
+      isShareable: formData.isShareable === "true",
       description: formData.description,
       imageId: formData.imageId,
       imageFile: formData.imageFile,
@@ -302,6 +307,7 @@ export default function AdminEquipmentDetailDialog({
       roomId: equipment.roomId,
       status: nextChecked ? "Available" : "In Storage",
       isMoveable: equipment.isMoveable,
+      isShareable: equipment.isShareable,
       description: equipment.description,
       imageId: equipment.imageId,
     });
@@ -434,6 +440,21 @@ export default function AdminEquipmentDetailDialog({
                     setFormData((prev) => ({ ...prev, isMoveable: value }))
                   }
                 />
+                <SelectDetailField
+                  label="Shareable"
+                  value={
+                    isEditing
+                      ? formData.isShareable
+                      : equipment.isShareable
+                        ? "Ya"
+                        : "Tidak"
+                  }
+                  editable={isEditing}
+                  options={SHAREABLE_OPTIONS}
+                  onChange={(value) =>
+                    setFormData((prev) => ({ ...prev, isShareable: value }))
+                  }
+                />
                 {!isEditing ? (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-slate-700">Available</p>
@@ -559,6 +580,7 @@ export default function AdminEquipmentDetailDialog({
                       status: equipment.status,
                       roomId: equipment.roomId,
                       isMoveable: String(equipment.isMoveable),
+                      isShareable: String(equipment.isShareable),
                       description: equipment.description,
                       imageId: equipment.imageId,
                       imageFile: null,

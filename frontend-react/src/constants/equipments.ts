@@ -24,4 +24,9 @@ const MOVEABLE_OPTIONS = [
   { value: "false", label: "Tidak" },
 ];
 
-export { EQUIPMENT_CATEGORY_OPTIONS, EQUIPMENT_STATUS_OPTIONS, MOVEABLE_OPTIONS };
+const SHAREABLE_OPTIONS = [
+  { value: "true", label: "Ya" },
+  { value: "false", label: "Tidak" },
+];
+
+export { EQUIPMENT_CATEGORY_OPTIONS, EQUIPMENT_STATUS_OPTIONS, MOVEABLE_OPTIONS, SHAREABLE_OPTIONS };

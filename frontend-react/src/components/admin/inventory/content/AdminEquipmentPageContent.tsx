@@ -263,6 +263,7 @@ export default function AdminEquipmentsPage() {
       roomId: item.roomId,
       status: nextChecked ? "Available" : "In Storage",
       isMoveable: item.isMoveable,
+      isShareable: item.isShareable,
       description: item.description,
       imageId: item.imageId,
     });

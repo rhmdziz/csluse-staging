@@ -71,6 +71,7 @@ export default function EquipmentTable({
             <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Jumlah</th>
             <th className="w-[230px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
             <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Moveable</th>
+            <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Shareable</th>
             <th className="sticky right-0 z-10 relative w-[144px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
               Aksi
             </th>
@@ -79,7 +80,7 @@ export default function EquipmentTable({
         <tbody className="text-sm">
           {isLoading || !hasLoadedOnce ? (
             <tr>
-              <td colSpan={8} className="px-3 py-8 text-center">
+              <td colSpan={9} className="px-3 py-8 text-center">
                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin" />
                 </div>
@@ -134,6 +135,9 @@ export default function EquipmentTable({
                 <td className="px-3 py-2 align-middle text-muted-foreground">
                   {item.isMoveable ? "Ya" : "Tidak"}
                 </td>
+                <td className="px-3 py-2 align-middle text-muted-foreground">
+                  {item.isShareable ? "Ya" : "Tidak"}
+                </td>
                 <td className="sticky right-0 z-10 relative bg-card px-3 py-2 align-middle shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
                   <div className="flex justify-center gap-2">
                     <TableActionIconButton
@@ -176,7 +180,7 @@ export default function EquipmentTable({
             ))
           ) : (
             <tr>
-              <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
+              <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
                 Tidak ada data peralatan.
               </td>
             </tr>

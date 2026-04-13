@@ -4237,6 +4237,31 @@ def _booking_review_result(booking):
     if required_fields_complete:
         passed_indicators.append("Field penting untuk approval sudah terisi semua")
 
+    # Equipment stock overlap check per item
+    if booking.start_time and booking.end_time:
+        for item in booking.equipment_items.select_related("equipment").all():
+            eq = item.equipment
+            if getattr(eq, "is_shareable", False):
+                passed_indicators.append(f"{eq.name}: Alat bersifat shareable, tidak ada pembatasan stok berdasarkan waktu")
+                continue
+            result = _equipment_review_overlap_issues(
+                equipment_id=eq.pk,
+                requested_quantity=item.quantity,
+                stock_quantity=eq.quantity,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+                exclude_booking_id=booking.pk,
+            )
+            for issue in result.get("issues", []):
+                issues.append(
+                    _review_issue(
+                        f"Stok alat tidak mencukupi: {eq.name}",
+                        issue.get("detail", ""),
+                    )
+                )
+            for indicator in result.get("passed_indicators", []):
+                passed_indicators.append(f"{eq.name}: {indicator}")
+
     return _review_result(issues=issues, passed_indicators=passed_indicators, overlap_info=overlap_info)
 
 
@@ -4249,23 +4274,22 @@ def _equipment_review_overlap_issues(
     end_time,
     exclude_borrow_id=None,
     exclude_use_id=None,
+    exclude_booking_id=None,
 ):
     issues = []
     passed_indicators = []
     if not equipment_id or not start_time or not end_time:
         return _review_result(issues=issues, passed_indicators=passed_indicators)
 
-    booking_allocated_qty = (
-        Booking.objects.filter(
-            equipment_items__equipment_id=equipment_id,
-            status__in=["Pending", "Approved"],
-            start_time__lt=end_time,
-            end_time__gt=start_time,
-        )
-        .aggregate(total=Sum("equipment_items__quantity"))
-        .get("total")
-        or 0
+    booking_qs = Booking.objects.filter(
+        equipment_items__equipment_id=equipment_id,
+        status__in=["Pending", "Approved"],
+        start_time__lt=end_time,
+        end_time__gt=start_time,
     )
+    if exclude_booking_id is not None:
+        booking_qs = booking_qs.exclude(pk=exclude_booking_id)
+    booking_allocated_qty = booking_qs.aggregate(total=Sum("equipment_items__quantity")).get("total") or 0
 
     borrow_qs = Borrow.objects.filter(
         equipment_id=equipment_id,
@@ -4360,16 +4384,19 @@ def _use_review_result(use_item):
         else:
             stock_within_limit = True
 
-    overlap_result = _equipment_review_overlap_issues(
-        equipment_id=getattr(use_item, "equipment_id", None),
-        requested_quantity=use_item.quantity or 0,
-        stock_quantity=getattr(equipment, "quantity", 0) if equipment is not None else 0,
-        start_time=use_item.start_time,
-        end_time=use_item.end_time,
-        exclude_use_id=use_item.pk,
-    )
-    issues.extend(overlap_result["issues"])
-    passed_indicators.extend(overlap_result["passed_indicators"])
+    if equipment is not None and not getattr(equipment, "is_shareable", False):
+        overlap_result = _equipment_review_overlap_issues(
+            equipment_id=getattr(use_item, "equipment_id", None),
+            requested_quantity=use_item.quantity or 0,
+            stock_quantity=getattr(equipment, "quantity", 0),
+            start_time=use_item.start_time,
+            end_time=use_item.end_time,
+            exclude_use_id=use_item.pk,
+        )
+        issues.extend(overlap_result["issues"])
+        passed_indicators.extend(overlap_result["passed_indicators"])
+    elif equipment is not None and getattr(equipment, "is_shareable", False):
+        passed_indicators.append("Alat bersifat shareable, tidak ada pembatasan stok berdasarkan waktu")
 
     if equipment_available:
         passed_indicators.insert(0, "Status alat masih available")
@@ -4426,16 +4453,19 @@ def _borrow_review_result(borrow):
         else:
             stock_within_limit = True
 
-    overlap_result = _equipment_review_overlap_issues(
-        equipment_id=getattr(borrow, "equipment_id", None),
-        requested_quantity=borrow.quantity or 0,
-        stock_quantity=getattr(equipment, "quantity", 0) if equipment is not None else 0,
-        start_time=borrow.start_time,
-        end_time=borrow.end_time,
-        exclude_borrow_id=borrow.pk,
-    )
-    issues.extend(overlap_result["issues"])
-    passed_indicators.extend(overlap_result["passed_indicators"])
+    if equipment is not None and not getattr(equipment, "is_shareable", False):
+        overlap_result = _equipment_review_overlap_issues(
+            equipment_id=getattr(borrow, "equipment_id", None),
+            requested_quantity=borrow.quantity or 0,
+            stock_quantity=getattr(equipment, "quantity", 0),
+            start_time=borrow.start_time,
+            end_time=borrow.end_time,
+            exclude_borrow_id=borrow.pk,
+        )
+        issues.extend(overlap_result["issues"])
+        passed_indicators.extend(overlap_result["passed_indicators"])
+    elif equipment is not None and getattr(equipment, "is_shareable", False):
+        passed_indicators.append("Alat bersifat shareable, tidak ada pembatasan stok berdasarkan waktu")
 
     if equipment_available:
         passed_indicators.insert(0, "Status alat masih available")

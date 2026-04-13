@@ -319,6 +319,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "room",
             "room_detail",
             "is_moveable",
+            "is_shareable",
         ]
 
 
@@ -347,6 +348,7 @@ class EquipmentListSerializer(serializers.ModelSerializer):
             "room",
             "room_detail",
             "is_moveable",
+            "is_shareable",
             "image",
             "image_detail",
         ]
@@ -752,6 +754,51 @@ class BookingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"equipment_items": f"Jumlah {equipment.name} melebihi stok tersedia ({equipment.quantity})."}
                 )
+
+            # Time-overlap stock check: account for concurrent Booking/Use/Borrow allocations
+            if start_time and end_time and not equipment.is_shareable:
+                from .models import Borrow, Use
+
+                booking_allocated = (
+                    Booking.objects.filter(
+                        equipment_items__equipment_id=equipment.id,
+                        status__in=["Pending", "Approved"],
+                        start_time__lt=end_time,
+                        end_time__gt=start_time,
+                    )
+                    .exclude(pk=instance.pk if instance else None)
+                    .aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
+                )
+                use_allocated = (
+                    Use.objects.filter(
+                        equipment_id=equipment.id,
+                        status__in=["Pending", "Approved"],
+                        start_time__lt=end_time,
+                        end_time__gt=start_time,
+                    )
+                    .aggregate(total=Sum("quantity"))["total"] or 0
+                )
+                borrow_allocated = (
+                    Borrow.objects.filter(
+                        equipment_id=equipment.id,
+                        status__in=["Pending", "Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+                        start_time__lt=end_time,
+                        end_time__gt=start_time,
+                    )
+                    .aggregate(total=Sum("quantity"))["total"] or 0
+                )
+                allocated = booking_allocated + use_allocated + borrow_allocated
+                remaining = max(equipment.quantity - allocated, 0)
+                if quantity > remaining:
+                    raise serializers.ValidationError(
+                        {
+                            "equipment_items": (
+                                f"Stok {equipment.name} tidak mencukupi pada rentang waktu yang dipilih. "
+                                f"Stok total {equipment.quantity}, sudah teralokasi {allocated} unit "
+                                f"(sisa {remaining} unit)."
+                            )
+                        }
+                    )
 
         return attrs
 

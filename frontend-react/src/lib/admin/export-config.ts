@@ -114,6 +114,7 @@ export const EQUIPMENT_EXPORT_COLUMNS: ExportColumn<EquipmentRow>[] = [
   { header: "Jumlah", cell: (item) => item.quantity },
   { header: "Ruangan", cell: (item) => item.roomName || "-" },
   { header: "Moveable", cell: (item) => (item.isMoveable ? "Ya" : "Tidak") },
+  { header: "Shareable", cell: (item) => (item.isShareable ? "Ya" : "Tidak") },
 ];
 
 export const SOFTWARE_EXPORT_COLUMNS: ExportColumn<SoftwareRow>[] = [

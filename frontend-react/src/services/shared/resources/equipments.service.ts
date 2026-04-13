@@ -29,6 +29,7 @@ export type EquipmentRow = {
   roomId: string;
   roomName: string;
   isMoveable: boolean;
+  isShareable: boolean;
   imageId: string | number | null;
   imageUrl: string;
 };
@@ -43,6 +44,7 @@ type ApiEquipment = {
   status?: string | null;
   quantity?: number | string | null;
   is_moveable?: boolean | null;
+  is_shareable?: boolean | null;
   room_detail?: { name?: string | null } | null;
   room?: string | number | null;
   image?: string | number | null;
@@ -60,6 +62,7 @@ export type CreateEquipmentPayload = {
   category: string;
   roomId: string;
   isMoveable: boolean;
+  isShareable: boolean;
   description?: string;
   imageFile?: File | null;
 };
@@ -71,14 +74,16 @@ export type UpdateEquipmentPayload = {
   roomId: string;
   status?: string;
   isMoveable: boolean;
+  isShareable: boolean;
   description?: string;
   imageId?: string | number | null;
   imageFile?: File | null;
 };
 
-export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "imageFile"> & {
+export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "imageFile" | "isShareable"> & {
   index: number;
   roomId?: string;
+  isShareable?: boolean;
 };
 
 export type BulkEquipmentResult = {
@@ -125,6 +130,7 @@ export function mapEquipment(item: ApiEquipment): EquipmentRow {
     roomId: String(item.room ?? ""),
     roomName: String(item.room_detail?.name ?? item.room ?? "-"),
     isMoveable: Boolean(item.is_moveable),
+    isShareable: Boolean(item.is_shareable),
     imageId: item.image ?? null,
     imageUrl: resolveAssetUrl(item.image_detail?.url ?? ""),
   };
@@ -216,6 +222,7 @@ export const equipmentsService = {
       category: payload.category,
       room: payload.roomId,
       is_moveable: payload.isMoveable,
+      is_shareable: payload.isShareable,
     };
 
     if (payload.description?.trim()) body.description = payload.description.trim();
@@ -248,6 +255,7 @@ export const equipmentsService = {
       category: payload.category,
       room: payload.roomId,
       is_moveable: payload.isMoveable,
+      is_shareable: payload.isShareable,
       description: payload.description?.trim() || "",
     };
     if (payload.status?.trim()) body.status = payload.status.trim();
@@ -306,6 +314,7 @@ export const equipmentsService = {
           category: row.category,
           room: row.roomId || "",
           is_moveable: row.isMoveable,
+          is_shareable: row.isShareable ?? false,
           description: row.description?.trim() || "",
         })),
       }),
