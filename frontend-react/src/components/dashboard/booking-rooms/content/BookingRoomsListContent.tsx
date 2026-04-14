@@ -237,10 +237,12 @@ export default function BookingRoomsListContent({
       return false;
     }
 
-    if (
-      isWaitingForMentorApproval(booking) &&
-      booking.requesterMentorProfileId === currentProfileId
-    ) {
+    const isMentor = currentProfileId !== "" && booking.requesterMentorProfileId === currentProfileId;
+    const isPic = booking.roomPicIds.includes(currentProfileId);
+
+    // Jika user adalah dosen pembimbing tapi JUGA PIC ruangan → tetap tampilkan tombol.
+    // Jika hanya dosen pembimbing (bukan PIC) → sembunyikan, sudah ditangani di seksi mentor.
+    if (isMentor && !isPic) {
       return false;
     }
 

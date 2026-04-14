@@ -28,6 +28,7 @@ export type EquipmentRow = {
   quantity: string;
   roomId: string;
   roomName: string;
+  roomNumber: string;
   isMoveable: boolean;
   isShareable: boolean;
   imageId: string | number | null;
@@ -45,7 +46,7 @@ type ApiEquipment = {
   quantity?: number | string | null;
   is_moveable?: boolean | null;
   is_shareable?: boolean | null;
-  room_detail?: { name?: string | null } | null;
+  room_detail?: { name?: string | null; number?: string | null } | null;
   room?: string | number | null;
   image?: string | number | null;
   image_detail?: { url?: string | null } | null;
@@ -64,7 +65,6 @@ export type CreateEquipmentPayload = {
   isMoveable: boolean;
   isShareable: boolean;
   description?: string;
-  imageFile?: File | null;
 };
 
 export type UpdateEquipmentPayload = {
@@ -80,7 +80,7 @@ export type UpdateEquipmentPayload = {
   imageFile?: File | null;
 };
 
-export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "imageFile" | "isShareable"> & {
+export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "isShareable"> & {
   index: number;
   roomId?: string;
   isShareable?: boolean;
@@ -129,6 +129,7 @@ export function mapEquipment(item: ApiEquipment): EquipmentRow {
     quantity: String(item.quantity ?? "-"),
     roomId: String(item.room ?? ""),
     roomName: String(item.room_detail?.name ?? item.room ?? "-"),
+    roomNumber: String(item.room_detail?.number ?? ""),
     isMoveable: Boolean(item.is_moveable),
     isShareable: Boolean(item.is_shareable),
     imageId: item.image ?? null,
@@ -205,17 +206,6 @@ export const equipmentsService = {
   },
 
   async create(payload: CreateEquipmentPayload) {
-    let imageId: string | number | null = null;
-    if (payload.imageFile) {
-      const upload = await this.uploadImage(payload.imageFile);
-      if (!upload.ok) return upload;
-      const imagePayload = (upload.data ?? {}) as { id?: string | number };
-      if (!imagePayload.id) {
-        return { ok: false as const, status: 500, data: { detail: "Response gambar tidak valid." } };
-      }
-      imageId = imagePayload.id;
-    }
-
     const body: Record<string, string | number | boolean> = {
       name: payload.name.trim(),
       quantity: Number(payload.quantity),
@@ -226,7 +216,6 @@ export const equipmentsService = {
     };
 
     if (payload.description?.trim()) body.description = payload.description.trim();
-    if (imageId) body.image = imageId;
 
     const response = await authFetch(API_EQUIPMENTS, {
       method: "POST",

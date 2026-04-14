@@ -66,7 +66,9 @@ export function RequestReviewCard({
             <ClipboardCheck className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-900">Review Pengajuan</p>
+            <p className="text-sm font-semibold text-slate-900">
+              Review Pengajuan
+            </p>
             <p className="mt-1 text-xs font-medium tracking-wide text-slate-500">
               {code}
             </p>
@@ -87,7 +89,9 @@ export function RequestReviewCard({
               className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
             >
               <p className="text-xs text-slate-500">{item.label}</p>
-              <p className="text-xs leading-5 text-slate-800 break-words">{item.value || "-"}</p>
+              <p className="text-xs leading-5 text-slate-800 break-words">
+                {item.value || "-"}
+              </p>
             </div>
           ))}
         </div>
@@ -129,65 +133,78 @@ export function RequestReviewCard({
         ) : null}
         {showChecklistSection ? (
           <>
-        {checklistLoading ? (
-          <div className="mb-4 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3">
-            <p className="text-xs text-slate-500">Memeriksa catatan review...</p>
-          </div>
-        ) : null}
-
-        {!checklistLoading && checklist.length ? (
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Catatan Review
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Hanya item yang perlu perhatian approver yang ditampilkan.
-              </p>
-            </div>
-            <div className="grid gap-2">
-              {checklist.map((item) => (
-                <div
-                  key={`${item.label}-${item.value}`}
-                  className="rounded-md border border-amber-200 bg-amber-50/80 px-4 py-3"
-                >
-                  <p className="text-xs font-medium text-amber-800">{item.label}</p>
-                  <p className="mt-1 text-xs leading-5 text-amber-900">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {!checklistLoading && !checklist.length && checklistEmptyMessage ? (
-          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50/80 px-4 py-3">
-            <p className="text-xs text-emerald-800">{checklistEmptyMessage}</p>
-            {checklistPassedIndicators.length ? (
-              <div className="mt-2 space-y-1">
-                {checklistPassedIndicators.map((item) => (
-                  <p key={item} className="text-xs text-emerald-900">
-                    - {item}
-                  </p>
-                ))}
+            {checklistLoading ? (
+              <div className="mb-4 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3">
+                <p className="text-xs text-slate-500">
+                  Memeriksa catatan review...
+                </p>
               </div>
             ) : null}
-          </div>
-        ) : null}
+
+            {!checklistLoading && checklist.length ? (
+              <div className="space-y-3">
+                <div className="grid gap-2">
+                  {checklist.map((item) => (
+                    <div
+                      key={`${item.label}-${item.value}`}
+                      className="rounded-md border border-amber-200 bg-amber-50/80 px-4 py-3"
+                    >
+                      <p className="text-xs font-medium text-amber-800">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-amber-900">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {!checklistLoading && !checklist.length && checklistEmptyMessage ? (
+              <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50/80 px-4 py-3">
+                <p className="text-xs text-emerald-800">
+                  {checklistEmptyMessage}
+                </p>
+                {checklistPassedIndicators.length ? (
+                  <div className="mt-2 space-y-1">
+                    {checklistPassedIndicators.map((item) => (
+                      <p key={item} className="text-xs text-emerald-900">
+                        - {item}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </>
         ) : null}
 
         {statusHintMessage ? (
-          <div className={`mb-4 rounded-md border px-4 py-3 ${statusHintClassName}`}>
+          <div
+            className={`mb-4 rounded-md border px-4 py-3 ${statusHintClassName}`}
+          >
             {statusHintTitle ? (
-              <p className={`text-xs font-medium ${statusHintTitleClassName}`}>{statusHintTitle}</p>
+              <p className={`text-xs font-medium ${statusHintTitleClassName}`}>
+                {statusHintTitle}
+              </p>
             ) : null}
-            <p className={statusHintTitle ? `mt-1 text-xs ${statusHintTextClassName}` : `text-xs ${statusHintTitleClassName}`}>
+            <p
+              className={
+                statusHintTitle
+                  ? `mt-1 text-xs ${statusHintTextClassName}`
+                  : `text-xs ${statusHintTitleClassName}`
+              }
+            >
               {statusHintMessage}
             </p>
             {statusHintIndicators.length ? (
               <div className="mt-2 space-y-1">
                 {statusHintIndicators.map((item) => (
-                  <p key={item} className={`text-xs ${statusHintTextClassName}`}>
+                  <p
+                    key={item}
+                    className={`text-xs ${statusHintTextClassName}`}
+                  >
                     - {item}
                   </p>
                 ))}

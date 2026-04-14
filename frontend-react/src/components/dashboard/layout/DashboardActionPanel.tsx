@@ -95,10 +95,8 @@ type EquipmentFilterConfig = {
 type SoftwareFilterConfig = {
   keyword: string;
   equipment: string;
-  room: string;
   onKeywordChange: (value: string) => void;
   onEquipmentChange: (value: string) => void;
-  onRoomChange: (value: string) => void;
   onReset: () => void;
 };
 
@@ -225,6 +223,13 @@ export function DashboardActionPanel({
     "",
     menu.id === "use-equipment",
   );
+  const { equipments: softwareEquipmentOptionsList } = useEquipmentOptions(
+    "",
+    "",
+    menu.id === "use-equipment",
+    undefined,
+    "Computer",
+  );
   const { equipments: borrowEquipmentOptionsList } = useEquipmentOptions(
     "",
     "",
@@ -304,7 +309,6 @@ export function DashboardActionPanel({
   const equipmentRoom = searchParams.get("room") ?? "";
   const softwareKeyword = searchParams.get("q") ?? "";
   const softwareEquipment = searchParams.get("equipment") ?? "";
-  const softwareRoom = searchParams.get("room") ?? "";
   const isBookingRequestListPage = pathname === "/booking-rooms";
   const isBookingAllRequestsPage = pathname === "/booking-rooms/approval";
   const isRoomsListPage = pathname === "/rooms";
@@ -474,7 +478,7 @@ export function DashboardActionPanel({
   };
 
   const updateSoftwareFilter = (
-    key: "q" | "equipment" | "room",
+    key: "q" | "equipment",
     value: string,
   ) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -637,10 +641,8 @@ export function DashboardActionPanel({
   const renderSoftwareFilters = ({
     keyword,
     equipment,
-    room,
     onKeywordChange,
     onEquipmentChange,
-    onRoomChange,
     onReset,
   }: SoftwareFilterConfig) => (
     <FilterCard title="Filter Software">
@@ -659,23 +661,9 @@ export function DashboardActionPanel({
           className={FILTER_CONTROL_CLASS}
         >
           <option value="">Semua Peralatan</option>
-          {useEquipmentOptionsList.map((equipmentOption) => (
+          {softwareEquipmentOptionsList.map((equipmentOption) => (
             <option key={equipmentOption.id} value={equipmentOption.id}>
               {equipmentOption.label}
-            </option>
-          ))}
-        </select>
-      </FilterField>
-      <FilterField label="Ruangan">
-        <select
-          value={room}
-          onChange={(event) => onRoomChange(event.target.value)}
-          className={FILTER_CONTROL_CLASS}
-        >
-          <option value="">Semua Ruangan</option>
-          {rooms.map((roomOption) => (
-            <option key={roomOption.id} value={roomOption.id}>
-              {roomOption.label}
             </option>
           ))}
         </select>
@@ -1052,19 +1040,12 @@ export function DashboardActionPanel({
                       {renderSoftwareFilters({
                           keyword: softwareKeyword,
                           equipment: softwareEquipment,
-                          room: softwareRoom,
                           onKeywordChange: (value) =>
                             updateSoftwareFilter("q", value),
                           onEquipmentChange: (value) =>
                             updateSoftwareFilter("equipment", value),
-                          onRoomChange: (value) =>
-                            updateSoftwareFilter("room", value),
                           onReset: () =>
-                            resetFilters([
-                              "q",
-                              "equipment",
-                              "room",
-                            ]),
+                            resetFilters(["q", "equipment"]),
                         })}
                     </AnimatedFilterSection>
 

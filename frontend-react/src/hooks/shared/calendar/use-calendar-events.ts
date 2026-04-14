@@ -13,6 +13,7 @@ export type CalendarEvent = {
   end_time?: string | null;
   room_id?: string | null;
   room_name?: string | null;
+  room_number?: string | null;
   requested_by_name?: string | null;
   attendee_count?: number | null;
   purpose?: string | null;

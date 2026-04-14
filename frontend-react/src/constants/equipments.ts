@@ -13,7 +13,6 @@ const EQUIPMENT_CATEGORY_OPTIONS = [
 
 const EQUIPMENT_STATUS_OPTIONS = [
   { value: "Available", label: "Available" },
-  { value: "Borrowed", label: "Borrowed" },
   { value: "Under Maintenance", label: "Under Maintenance" },
   { value: "Broken", label: "Broken" },
   { value: "In Storage", label: "In Storage" },

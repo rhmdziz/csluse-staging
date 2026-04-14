@@ -11,7 +11,7 @@ import { DataPagination, TableActionIconButton } from "@/components/shared";
 
 import { useRooms } from "@/hooks/shared/resources/rooms";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export default function RoomsListPage() {
   const router = useRouter();
@@ -43,12 +43,12 @@ export default function RoomsListPage() {
         <table className="w-full min-w-[920px] table-fixed">
           <thead className="border-b border-slate-800 bg-slate-900">
             <tr className="text-left text-sm">
-              <th className="w-[200px] px-3 py-3 font-medium text-slate-50">Nama Ruangan</th>
+              <th className="w-[300px] px-3 py-3 font-medium text-slate-50">Nama Ruangan</th>
               <th className="w-[130px] px-3 py-3 font-medium text-slate-50">Nomor</th>
               <th className="w-[100px] px-3 py-3 font-medium text-slate-50">Lantai</th>
               <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Kapasitas</th>
-              <th className="w-[200px] px-3 py-3 font-medium text-slate-50">PIC</th>
-              <th className="w-[250px] px-3 py-3 font-medium text-slate-50">Deskripsi</th>
+              <th className="w-[120px] px-3 py-3 font-medium text-slate-50">PIC</th>
+              {/* <th className="w-[250px] px-3 py-3 font-medium text-slate-50">Deskripsi</th> */}
               <th className="sticky right-0 z-20 w-[150px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
                 Aksi
               </th>
@@ -57,7 +57,7 @@ export default function RoomsListPage() {
           <tbody className="text-sm">
             {isLoading || !hasLoadedOnce ? (
               <tr>
-                <td colSpan={7} className="px-3 py-5 text-center text-slate-500">
+                <td colSpan={6} className="px-3 py-5 text-center text-slate-500">
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Memuat data...
@@ -72,7 +72,7 @@ export default function RoomsListPage() {
                   <td className="truncate px-3 py-2.5">{room.floor}</td>
                   <td className="truncate px-3 py-2.5">{room.capacity}</td>
                   <td className="truncate px-3 py-2.5">{room.picName}</td>
-                  <td className="truncate px-3 py-2.5">{room.description || "-"}</td>
+                  {/* <td className="truncate px-3 py-2.5">{room.description || "-"}</td> */}
                   <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
                     <div className="flex justify-center gap-2">
                       <TableActionIconButton

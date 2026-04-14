@@ -96,9 +96,6 @@ function EquipmentDetailSkeleton() {
             <Skeleton className="h-14 w-full rounded-md" />
             <Skeleton className="h-20 w-full rounded-md" />
           </div>
-          <div className="mt-4">
-            <Skeleton className="h-64 w-full rounded-xl" />
-          </div>
         </div>
 
         <div className="space-y-4">
@@ -245,11 +242,6 @@ export default function EquipmentDetailPageContent() {
             <DetailMetaItem label="Deskripsi" value={equipment.description || "-"} />
           </DetailCard>
 
-          {equipment.imageUrl ? (
-            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
-              <img src={equipment.imageUrl} alt={equipment.name} className="h-72 w-full object-cover" />
-            </section>
-          ) : null}
         </div>
 
         <div className="space-y-4">

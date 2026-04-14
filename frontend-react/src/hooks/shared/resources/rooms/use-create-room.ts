@@ -16,7 +16,6 @@ function parseRoomError(data: unknown, fallback = "Gagal membuat ruangan.") {
     "number",
     "floor",
     "pics",
-    "image",
   ]);
 }
 

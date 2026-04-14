@@ -23,6 +23,7 @@ export type SoftwareRow = {
   equipmentId: string;
   equipmentName: string;
   roomName: string;
+  roomNumber: string;
 };
 
 export type SoftwareDetail = SoftwareRow;
@@ -37,7 +38,7 @@ type ApiSoftware = {
   equipment?: string | number | null;
   equipment_detail?: {
     name?: string | null;
-    room_detail?: { name?: string | null } | null;
+    room_detail?: { name?: string | null; number?: string | null } | null;
   } | null;
 };
 
@@ -90,6 +91,7 @@ export function mapSoftware(item: ApiSoftware): SoftwareRow {
     equipmentId: String(item.equipment ?? ""),
     equipmentName: String(item.equipment_detail?.name ?? item.equipment ?? "-"),
     roomName: String(item.equipment_detail?.room_detail?.name ?? "-"),
+    roomNumber: String(item.equipment_detail?.room_detail?.number ?? ""),
   };
 }
 

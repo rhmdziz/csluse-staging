@@ -166,20 +166,21 @@ export function HourlyScheduleTable({
                     <td
                       key={`${event.source}-${event.id}-${laneIndex}-${hour}`}
                       rowSpan={event.rowSpan}
-                      className={`border-b border-slate-200 bg-sky-50/60 px-3 py-3 align-top ${
+                      className={`h-px border-b border-slate-200 bg-sky-50/60 p-2 align-top ${
                         laneIndex < laneCount - 1 ? "border-r" : ""
                       }`}
                     >
                       <div
                         className={`relative h-full rounded-[18px] px-3 py-3 before:absolute before:left-1/2 before:top-2 before:h-4 before:w-14 before:-translate-x-1/2 before:rounded-sm after:absolute after:inset-0 after:rounded-[18px] after:content-[''] ${noteTone.card} ${noteTone.tape} ${noteTone.overlay}`}
-                        style={{ minHeight: `${event.rowSpan * 56}px` }}
                       >
                         <div className="relative z-10 flex flex-wrap gap-1">
                           {event.room_name ? (
                             <span
                               className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${noteTone.chip}`}
                             >
-                              {event.room_name}
+                              {event.room_number
+                                ? `${event.room_name} (${event.room_number})`
+                                : event.room_name}
                             </span>
                           ) : null}
                           {event.purpose ? (

@@ -354,15 +354,18 @@ export default function ScheduleBulkCreateDialog({
   };
 
   const updateRowRoom = (rowIndex: number, room: string) => {
+    const changedRow = previewRows.find((r) => r.index === rowIndex);
+    if (!changedRow) return;
+
+    const matchTitle = changedRow.title.trim().toLowerCase();
+    const matchClass = changedRow.className.trim().toLowerCase();
+
     setPreviewRows((current) =>
-      current.map((row) =>
-        row.index === rowIndex
-          ? {
-              ...row,
-              room,
-            }
-          : row,
-      ),
+      current.map((row) => {
+        const sameTitle = row.title.trim().toLowerCase() === matchTitle;
+        const sameClass = row.className.trim().toLowerCase() === matchClass;
+        return sameTitle && sameClass ? { ...row, room } : row;
+      }),
     );
   };
 
@@ -413,9 +416,9 @@ export default function ScheduleBulkCreateDialog({
             </span>
           </div>
 
-          <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
+          <div className="max-h-80 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
             <table className="w-full min-w-[1040px] text-left text-xs">
-              <thead className="bg-muted/40">
+              <thead className="sticky top-0 z-10 bg-muted/40">
                 <tr>
                   <th className="w-[56px] px-2 py-2 text-center font-medium">
                     <input

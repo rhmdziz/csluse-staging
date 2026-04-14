@@ -14,7 +14,7 @@ export type BorrowFilters = {
   createdBefore?: string;
 };
 
-export type BorrowListScope = "default" | "my" | "all";
+export type BorrowListScope = "default" | "my" | "all" | "admin-all";
 
 export type BorrowRow = {
   id: string | number;

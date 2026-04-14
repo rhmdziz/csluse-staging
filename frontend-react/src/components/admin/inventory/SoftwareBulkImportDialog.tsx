@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useMemo, useState } from "react";
 
 import * as XLSX from "xlsx";
@@ -20,7 +19,10 @@ import {
 
 const HEADER_MAP: Record<
   string,
-  keyof Pick<BulkSoftwareRow, "name" | "version" | "licenseInfo" | "licenseExpiration" | "description">
+  keyof Pick<
+    BulkSoftwareRow,
+    "name" | "version" | "licenseInfo" | "licenseExpiration" | "description"
+  >
 > = {
   nama: "name",
   "nama software": "name",
@@ -47,6 +49,34 @@ type SoftwareBulkImportDialogProps = {
   onCompleted: () => void;
 };
 
+function normalizeDateToISO(value: unknown): string {
+  if (!value && value !== 0) return "";
+
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  const str = String(value).trim();
+  if (!str) return "";
+
+  // "perpetual" / "permanen" → no expiration date
+  if (/^(perpetual|permanen)$/i.test(str)) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // MM/DD/YYYY (Excel US auto-format)
+  const mdyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdyMatch) {
+    const [, m, d, y] = mdyMatch;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  return str;
+}
+
 function normalizeHeader(value: unknown) {
   return String(value || "")
     .trim()
@@ -57,7 +87,13 @@ function normalizeHeader(value: unknown) {
 function buildTemplateWorkbook() {
   const headers = ["nama software", "versi", "lisensi", "expired", "deskripsi"];
   const sample = [
-    ["MATLAB", "R2025a", "Campus License", "2027-12-31", "Software komputasi numerik"],
+    [
+      "MATLAB",
+      "R2025a",
+      "Campus License",
+      "2027-12-31",
+      "Software komputasi numerik",
+    ],
     ["Visual Studio Code", "1.99", "Free", "", "Editor kode untuk praktikum"],
   ];
   const guideRows = [
@@ -68,11 +104,24 @@ function buildTemplateWorkbook() {
     ["expired", "Tidak", "Format YYYY-MM-DD.", "2027-12-31"],
     ["deskripsi", "Tidak", "Deskripsi software.", "Software komputasi numerik"],
     [],
-    ["Catatan", "", "Peralatan dipilih per baris pada tabel preview sebelum import.", ""],
+    [
+      "Catatan",
+      "",
+      "Peralatan dipilih per baris pada tabel preview sebelum import.",
+      "",
+    ],
   ];
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ...sample]), "Softwares");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(guideRows), "Guide");
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([headers, ...sample]),
+    "Softwares",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(guideRows),
+    "Guide",
+  );
   return workbook;
 }
 
@@ -87,7 +136,9 @@ export default function SoftwareBulkImportDialog({
     { index: number; status: "success" | "error"; message: string }[]
   >([]);
   const [selectedRowIndexes, setSelectedRowIndexes] = useState<number[]>([]);
-  const [rowEquipmentSelections, setRowEquipmentSelections] = useState<Record<number, string>>({});
+  const [rowEquipmentSelections, setRowEquipmentSelections] = useState<
+    Record<number, string>
+  >({});
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const { createSoftwares, isSubmitting } = useBulkCreateSoftwares();
@@ -129,7 +180,7 @@ export default function SoftwareBulkImportDialog({
 
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
         setErrorMessage("File tidak memiliki sheet.");
@@ -139,7 +190,10 @@ export default function SoftwareBulkImportDialog({
       }
 
       const sheet = workbook.Sheets[sheetName];
-      const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as unknown[][];
+      const raw = XLSX.utils.sheet_to_json(sheet, {
+        header: 1,
+        defval: "",
+      }) as unknown[][];
       const [headerRow, ...bodyRows] = raw;
       if (!headerRow?.length) {
         setErrorMessage("Header tidak ditemukan pada file.");
@@ -161,17 +215,30 @@ export default function SoftwareBulkImportDialog({
         const lineNumber = index + 2;
         const name = String(row[headerIndexes.name ?? -1] || "").trim();
         const version = String(row[headerIndexes.version ?? -1] || "").trim();
-        const licenseInfo = String(row[headerIndexes.licenseInfo ?? -1] || "").trim();
-        const licenseExpiration = String(row[headerIndexes.licenseExpiration ?? -1] || "").trim();
-        const description = String(row[headerIndexes.description ?? -1] || "").trim();
+        const licenseInfo = String(
+          row[headerIndexes.licenseInfo ?? -1] || "",
+        ).trim();
+        const licenseExpiration = normalizeDateToISO(
+          row[headerIndexes.licenseExpiration ?? -1] ?? "",
+        );
+        const description = String(
+          row[headerIndexes.description ?? -1] || "",
+        ).trim();
 
         const isCompletelyEmpty =
-          !name && !version && !licenseInfo && !licenseExpiration && !description;
+          !name &&
+          !version &&
+          !licenseInfo &&
+          !licenseExpiration &&
+          !description;
         if (isCompletelyEmpty) return;
 
         const reasons: string[] = [];
         if (!name) reasons.push("nama software wajib diisi");
-        if (licenseExpiration && !/^\d{4}-\d{2}-\d{2}$/.test(licenseExpiration)) {
+        if (
+          licenseExpiration &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(licenseExpiration)
+        ) {
           reasons.push("expired harus format YYYY-MM-DD");
         }
 
@@ -200,7 +267,9 @@ export default function SoftwareBulkImportDialog({
       if (!nextPreviewRows.length) {
         setErrorMessage("Tidak ada data valid untuk diproses.");
       } else if (nextSkippedRows.length) {
-        setErrorMessage("Sebagian baris dilewati. Periksa alasan pada ringkasan preview.");
+        setErrorMessage(
+          "Sebagian baris dilewati. Periksa alasan pada ringkasan preview.",
+        );
       }
     } catch (error) {
       console.error("Failed to parse software import file:", error);
@@ -250,7 +319,9 @@ export default function SoftwareBulkImportDialog({
     }
 
     const bulkResults = await createSoftwares(selectedRows, setResults);
-    const successCount = bulkResults.filter((row) => row.status === "success").length;
+    const successCount = bulkResults.filter(
+      (row) => row.status === "success",
+    ).length;
 
     if (successCount > 0) {
       onCompleted();
@@ -268,8 +339,8 @@ export default function SoftwareBulkImportDialog({
       title="Bulk Import Software"
       description={
         <>
-          Upload file Excel untuk membuat banyak software sekaligus. Pilih
-          baris yang akan diimport, lalu assign peralatan per baris.
+          Upload file Excel untuk membuat banyak software sekaligus. Pilih baris
+          yang akan diimport, lalu assign peralatan per baris.
         </>
       }
       onDownloadTemplate={handleDownloadTemplate}
@@ -282,13 +353,19 @@ export default function SoftwareBulkImportDialog({
       }
       footer={
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+          >
             Batal
           </Button>
           <Button
             type="button"
             onClick={() => void handleSubmitBulk()}
-            disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}
+            disabled={
+              !previewRows.length || !selectedRowIndexes.length || isSubmitting
+            }
           >
             {isSubmitting ? "Memproses..." : "Import Software"}
           </Button>
@@ -308,9 +385,9 @@ export default function SoftwareBulkImportDialog({
               Dilewati: {skippedRows.length}
             </span>
           </div>
-          <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
+          <div className="max-h-80 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
             <table className="w-full min-w-[1120px] text-left text-xs">
-              <thead className="bg-muted/40">
+              <thead className="sticky top-0 z-10 bg-muted/40">
                 <tr>
                   <th className="w-[56px] px-2 py-2 text-center font-medium">
                     <input
@@ -323,11 +400,11 @@ export default function SoftwareBulkImportDialog({
                   </th>
                   <th className="w-[64px] px-2 py-2 font-medium">Baris</th>
                   <th className="px-2 py-2 font-medium">Nama</th>
+                  <th className="w-[280px] px-2 py-2 font-medium">Peralatan</th>
                   <th className="w-[120px] px-2 py-2 font-medium">Versi</th>
                   <th className="w-[160px] px-2 py-2 font-medium">Lisensi</th>
                   <th className="w-[130px] px-2 py-2 font-medium">Expired</th>
                   <th className="px-2 py-2 font-medium">Deskripsi</th>
-                  <th className="w-[280px] px-2 py-2 font-medium">Peralatan</th>
                 </tr>
               </thead>
               <tbody>
@@ -338,16 +415,16 @@ export default function SoftwareBulkImportDialog({
                         type="checkbox"
                         className="h-4 w-4 rounded border-slate-300"
                         checked={selectedRowIndexes.includes(row.index)}
-                        onChange={(event) => toggleRowSelection(row.index, event.target.checked)}
+                        onChange={(event) =>
+                          toggleRowSelection(row.index, event.target.checked)
+                        }
                         aria-label={`Pilih baris ${row.index}`}
                       />
                     </td>
-                    <td className="px-2 py-2 text-muted-foreground">{row.index}</td>
+                    <td className="px-2 py-2 text-muted-foreground">
+                      {row.index}
+                    </td>
                     <td className="px-2 py-2">{row.name}</td>
-                    <td className="px-2 py-2">{row.version || "-"}</td>
-                    <td className="px-2 py-2">{row.licenseInfo || "-"}</td>
-                    <td className="px-2 py-2">{row.licenseExpiration || "-"}</td>
-                    <td className="px-2 py-2 text-muted-foreground">{row.description || "-"}</td>
                     <td className="px-2 py-2">
                       {selectedRowIndexes.includes(row.index) ? (
                         <select
@@ -362,7 +439,9 @@ export default function SoftwareBulkImportDialog({
                           disabled={isLoadingEquipments}
                         >
                           <option value="">
-                            {isLoadingEquipments ? "Memuat peralatan..." : "Pilih peralatan"}
+                            {isLoadingEquipments
+                              ? "Memuat peralatan..."
+                              : "Pilih peralatan"}
                           </option>
                           {equipmentOptions.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -376,18 +455,30 @@ export default function SoftwareBulkImportDialog({
                         </span>
                       )}
                     </td>
+                    <td className="px-2 py-2">{row.version || "-"}</td>
+                    <td className="px-2 py-2">{row.licenseInfo || "-"}</td>
+                    <td className="px-2 py-2">
+                      {row.licenseExpiration || "-"}
+                    </td>
+                    <td className="px-2 py-2 text-muted-foreground">
+                      {row.description || "-"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {equipmentError ? <p className="text-xs text-destructive">{equipmentError}</p> : null}
+          {equipmentError ? (
+            <p className="text-xs text-destructive">{equipmentError}</p>
+          ) : null}
         </div>
       ) : null}
 
       {skippedRows.length ? (
         <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/60 p-3">
-          <p className="text-xs font-medium text-amber-800">Baris dilewati: {skippedRows.length}</p>
+          <p className="text-xs font-medium text-amber-800">
+            Baris dilewati: {skippedRows.length}
+          </p>
           <div className="max-h-40 space-y-1 overflow-y-auto text-xs text-amber-900">
             {skippedRows.map((row) => (
               <p key={`skipped-software-${row.index}`}>
@@ -403,7 +494,14 @@ export default function SoftwareBulkImportDialog({
           <p className="text-xs font-medium">Hasil proses</p>
           <div className="max-h-40 space-y-1 overflow-y-auto text-xs">
             {results.map((row) => (
-              <p key={`${row.index}-${row.status}`} className={row.status === "success" ? "text-emerald-700" : "text-destructive"}>
+              <p
+                key={`${row.index}-${row.status}`}
+                className={
+                  row.status === "success"
+                    ? "text-emerald-700"
+                    : "text-destructive"
+                }
+              >
                 Baris {row.index}: {row.message}
               </p>
             ))}

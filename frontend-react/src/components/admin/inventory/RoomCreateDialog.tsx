@@ -1,9 +1,9 @@
 "use client";
 
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
-import { MapPinned, Plus, Trash2 } from "lucide-react";
+import { MapPinned, Plus } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -16,8 +16,6 @@ import { Button, Input, DialogFooter } from "@/components/ui";
 import { useCreateRoom } from "@/hooks/shared/resources/rooms";
 
 import { usePicUsers } from "@/hooks/shared/resources/users";
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 type RoomCreateDialogProps = {
   open: boolean;
@@ -37,7 +35,6 @@ export default function RoomCreateDialog({
     capacity: "",
     description: "",
     picIds: [] as string[],
-    imageFile: null as File | null,
   });
   const { picUsers, isLoading: isLoadingPics, error: picError } = usePicUsers();
   const { createRoom, isSubmitting, errorMessage, setErrorMessage } = useCreateRoom();
@@ -46,16 +43,6 @@ export default function RoomCreateDialog({
     () => picUsers.map((user) => ({ value: user.id, label: user.name })),
     [picUsers],
   );
-  const previewUrl = useMemo(
-    () => (formData.imageFile ? URL.createObjectURL(formData.imageFile) : ""),
-    [formData.imageFile],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
 
   const resetForm = () => {
     setErrorMessage("");
@@ -66,7 +53,6 @@ export default function RoomCreateDialog({
       capacity: "",
       description: "",
       picIds: [],
-      imageFile: null,
     });
   };
 
@@ -75,17 +61,6 @@ export default function RoomCreateDialog({
   ) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    if (file && file.size > MAX_IMAGE_SIZE) {
-      setErrorMessage("Ukuran gambar maksimal 5MB.");
-      return;
-    }
-
-    setErrorMessage("");
-    setFormData((prev) => ({ ...prev, imageFile: file }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -106,7 +81,6 @@ export default function RoomCreateDialog({
       capacity: formData.capacity,
       description: formData.description,
       picIds: formData.picIds,
-      imageFile: formData.imageFile,
     });
 
     if (result.ok) {
@@ -204,41 +178,6 @@ export default function RoomCreateDialog({
               className="w-full rounded-md border border-sky-300 bg-sky-50/60 px-3 py-2 text-sm shadow-sm outline-none focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-200"
             />
           </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium">Gambar Ruangan</label>
-            <label className="group flex cursor-pointer items-center justify-between gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:border-primary/50">
-              <span className="truncate text-muted-foreground">
-                {formData.imageFile ? formData.imageFile.name : "Pilih gambar (opsional)"}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-              {formData.imageFile ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Hapus gambar yang diunggah"
-                  className="rounded-full text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                  onClick={() => setFormData((prev) => ({ ...prev, imageFile: null }))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </label>
-          </div>
-
-          {previewUrl ? (
-            <div className="space-y-1">
-              <div className="overflow-hidden rounded-lg border bg-muted">
-                <img src={previewUrl} alt="Preview ruangan" className="h-56 w-full object-cover" />
-              </div>
-            </div>
-          ) : null}
 
           {errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
 

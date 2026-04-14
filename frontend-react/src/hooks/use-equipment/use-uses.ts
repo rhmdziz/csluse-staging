@@ -15,7 +15,7 @@ export type UseFilters = {
   requestedBy?: string;
 };
 
-export type UseListScope = "default" | "my" | "all";
+export type UseListScope = "default" | "my" | "all" | "admin-all";
 
 export type UseRow = {
   id: string | number;

@@ -61,7 +61,6 @@ export type CreateRoomPayload = {
   floor: string;
   description?: string;
   picIds?: string[];
-  imageFile?: File | null;
 };
 
 export type UpdateRoomPayload = {
@@ -75,7 +74,7 @@ export type UpdateRoomPayload = {
   imageFile?: File | null;
 };
 
-export type BulkRoomRow = Omit<CreateRoomPayload, "picIds" | "imageFile"> & {
+export type BulkRoomRow = Omit<CreateRoomPayload, "picIds"> & {
   index: number;
   picId?: string;
 };
@@ -95,6 +94,7 @@ export type RoomOption = {
 type ApiRoomOption = {
   id?: string | number | null;
   name?: string | null;
+  number?: string | null;
   capacity?: number | null;
 };
 
@@ -200,17 +200,6 @@ export const roomsService = {
   },
 
   async create(payload: CreateRoomPayload) {
-    let imageId: string | number | null = null;
-    if (payload.imageFile) {
-      const upload = await this.uploadImage(payload.imageFile);
-      if (!upload.ok) return upload;
-      const imagePayload = (upload.data ?? {}) as { id?: string | number };
-      if (!imagePayload.id) {
-        return { ok: false as const, status: 500, data: { detail: "Response gambar tidak valid." } };
-      }
-      imageId = imagePayload.id;
-    }
-
     const body: Record<string, string | number | string[]> = {
       name: payload.name.trim(),
       capacity: Number(payload.capacity),
@@ -220,7 +209,6 @@ export const roomsService = {
 
     if (payload.description?.trim()) body.description = payload.description.trim();
     if (payload.picIds?.length) body.pics = payload.picIds;
-    if (imageId) body.image = imageId;
 
     const response = await authFetch(API_ROOMS, {
       method: "POST",
@@ -325,7 +313,7 @@ export const roomsService = {
       .filter((room) => room.id)
       .map((room) => ({
         id: String(room.id),
-        label: String(room.name ?? "-"),
+        label: room.number ? `${room.name ?? "-"} (${room.number})` : String(room.name ?? "-"),
         capacity: Number(room.capacity ?? 0),
       }));
   },

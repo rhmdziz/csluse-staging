@@ -46,7 +46,7 @@ type SkippedPreviewRow = {
   reason: string;
 };
 
-type EquipmentBulkImportDialogProps = {
+type EquipmentBulkImportByRoomDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCompleted: () => void;
@@ -105,7 +105,7 @@ function buildTemplateWorkbook() {
     [
       "Catatan",
       "",
-      "Ruangan dipilih per baris pada tabel preview sebelum import.",
+      "Ruangan dipilih satu kali untuk semua peralatan saat import by ruangan.",
       "",
     ],
     ["Catatan", "", "Gambar peralatan belum perlu diisi saat bulk import.", ""],
@@ -124,20 +124,18 @@ function buildTemplateWorkbook() {
   return workbook;
 }
 
-export default function EquipmentBulkImportDialog({
+export default function EquipmentBulkImportByRoomDialog({
   open,
   onOpenChange,
   onCompleted,
-}: EquipmentBulkImportDialogProps) {
+}: EquipmentBulkImportByRoomDialogProps) {
   const [previewRows, setPreviewRows] = useState<BulkEquipmentRow[]>([]);
   const [skippedRows, setSkippedRows] = useState<SkippedPreviewRow[]>([]);
   const [results, setResults] = useState<
     { index: number; status: "success" | "error"; message: string }[]
   >([]);
   const [selectedRowIndexes, setSelectedRowIndexes] = useState<number[]>([]);
-  const [rowRoomSelections, setRowRoomSelections] = useState<
-    Record<number, string>
-  >({});
+  const [selectedRoomId, setSelectedRoomId] = useState("");
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const { createEquipments, isSubmitting } = useBulkCreateEquipments();
@@ -157,13 +155,16 @@ export default function EquipmentBulkImportDialog({
     setSkippedRows([]);
     setResults([]);
     setSelectedRowIndexes([]);
-    setRowRoomSelections({});
+    setSelectedRoomId("");
     setFileName("");
     setErrorMessage("");
   };
 
   const handleDownloadTemplate = () => {
-    XLSX.writeFile(buildTemplateWorkbook(), "template-bulk-equipments.xlsx");
+    XLSX.writeFile(
+      buildTemplateWorkbook(),
+      "template-bulk-equipments-by-ruangan.xlsx",
+    );
   };
 
   const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,7 +270,6 @@ export default function EquipmentBulkImportDialog({
 
       setPreviewRows(nextPreviewRows);
       setSelectedRowIndexes(nextPreviewRows.map((row) => row.index));
-      setRowRoomSelections({});
       setSkippedRows(nextSkippedRows);
       if (!nextPreviewRows.length) {
         setErrorMessage("Tidak ada data valid untuk diproses.");
@@ -297,16 +297,14 @@ export default function EquipmentBulkImportDialog({
     setSelectedRowIndexes((prev) =>
       checked ? [...prev, rowIndex] : prev.filter((item) => item !== rowIndex),
     );
-    if (!checked) {
-      setRowRoomSelections((prev) => {
-        const next = { ...prev };
-        delete next[rowIndex];
-        return next;
-      });
-    }
   };
 
   const handleSubmitBulk = async () => {
+    if (!selectedRoomId) {
+      setErrorMessage("Pilih ruangan terlebih dahulu sebelum import.");
+      return;
+    }
+
     if (!previewRows.length || !selectedRowIndexes.length) {
       setErrorMessage("Pilih minimal satu baris valid untuk diproses.");
       return;
@@ -316,14 +314,8 @@ export default function EquipmentBulkImportDialog({
       .filter((row) => selectedRowIndexes.includes(row.index))
       .map((row) => ({
         ...row,
-        roomId: rowRoomSelections[row.index] || "",
+        roomId: selectedRoomId,
       }));
-
-    const rowsWithoutRoom = selectedRows.filter((row) => !row.roomId);
-    if (rowsWithoutRoom.length) {
-      setErrorMessage("Semua baris yang dipilih harus memiliki ruangan.");
-      return;
-    }
 
     const bulkResults = await createEquipments(selectedRows, setResults);
     const successCount = bulkResults.filter(
@@ -343,11 +335,11 @@ export default function EquipmentBulkImportDialog({
       open={open}
       onOpenChange={onOpenChange}
       onReset={resetState}
-      title="Bulk Import Peralatan"
+      title="Bulk Import Peralatan by Ruangan"
       description={
         <>
-          Upload file Excel untuk membuat banyak peralatan sekaligus. Pilih
-          baris yang akan diimport, lalu assign ruangan per baris.
+          Upload file Excel untuk membuat banyak peralatan sekaligus ke satu
+          ruangan tertentu. Pilih ruangan, lalu pilih baris yang akan diimport.
         </>
       }
       onDownloadTemplate={handleDownloadTemplate}
@@ -371,7 +363,10 @@ export default function EquipmentBulkImportDialog({
             type="button"
             onClick={() => void handleSubmitBulk()}
             disabled={
-              !previewRows.length || !selectedRowIndexes.length || isSubmitting
+              !selectedRoomId ||
+              !previewRows.length ||
+              !selectedRowIndexes.length ||
+              isSubmitting
             }
           >
             {isSubmitting ? "Memproses..." : "Import Peralatan"}
@@ -379,6 +374,28 @@ export default function EquipmentBulkImportDialog({
         </DialogFooter>
       }
     >
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-slate-700">Ruangan</label>
+        <select
+          value={selectedRoomId}
+          onChange={(e) => setSelectedRoomId(e.target.value)}
+          className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-xs outline-none focus-visible:border-slate-500 focus-visible:ring-[3px] focus-visible:ring-slate-200"
+          disabled={isLoadingRooms}
+        >
+          <option value="">
+            {isLoadingRooms ? "Memuat ruangan..." : "Pilih ruangan"}
+          </option>
+          {roomOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {roomError ? (
+          <p className="text-xs text-destructive">{roomError}</p>
+        ) : null}
+      </div>
+
       {previewRows.length ? (
         <div className="min-w-0 space-y-2 rounded-md border p-3">
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -393,7 +410,7 @@ export default function EquipmentBulkImportDialog({
             </span>
           </div>
           <div className="max-h-80 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
-            <table className="w-full min-w-[1180px] text-left text-xs">
+            <table className="w-full min-w-[860px] text-left text-xs">
               <thead className="sticky top-0 z-10 bg-muted/40">
                 <tr>
                   <th className="w-[56px] px-2 py-2 text-center font-medium">
@@ -407,7 +424,6 @@ export default function EquipmentBulkImportDialog({
                   </th>
                   <th className="w-[64px] px-2 py-2 font-medium">Baris</th>
                   <th className="px-2 py-2 font-medium">Nama</th>
-                  <th className="w-[280px] px-2 py-2 font-medium">Ruangan</th>
                   <th className="w-[96px] px-2 py-2 font-medium">Jumlah</th>
                   <th className="w-[180px] px-2 py-2 font-medium">Kategori</th>
                   <th className="w-[110px] px-2 py-2 font-medium">Moveable</th>
@@ -432,36 +448,6 @@ export default function EquipmentBulkImportDialog({
                       {row.index}
                     </td>
                     <td className="px-2 py-2">{row.name}</td>
-                    <td className="px-2 py-2">
-                      {selectedRowIndexes.includes(row.index) ? (
-                        <select
-                          value={rowRoomSelections[row.index] || ""}
-                          onChange={(event) =>
-                            setRowRoomSelections((prev) => ({
-                              ...prev,
-                              [row.index]: event.target.value,
-                            }))
-                          }
-                          className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-xs outline-none focus-visible:border-slate-500 focus-visible:ring-[3px] focus-visible:ring-slate-200"
-                          disabled={isLoadingRooms}
-                        >
-                          <option value="">
-                            {isLoadingRooms
-                              ? "Memuat ruangan..."
-                              : "Pilih ruangan"}
-                          </option>
-                          {roomOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">
-                          Pilih baris untuk assign ruangan
-                        </span>
-                      )}
-                    </td>
                     <td className="px-2 py-2">{row.quantity}</td>
                     <td className="px-2 py-2">{row.category}</td>
                     <td className="px-2 py-2">
@@ -475,9 +461,6 @@ export default function EquipmentBulkImportDialog({
               </tbody>
             </table>
           </div>
-          {roomError ? (
-            <p className="text-xs text-destructive">{roomError}</p>
-          ) : null}
         </div>
       ) : null}
 
@@ -488,7 +471,7 @@ export default function EquipmentBulkImportDialog({
           </p>
           <div className="max-h-40 space-y-1 overflow-y-auto text-xs text-amber-900">
             {skippedRows.map((row) => (
-              <p key={`skipped-equipment-${row.index}`}>
+              <p key={`skipped-equipment-byroom-${row.index}`}>
                 Baris {row.index}: {row.reason}
               </p>
             ))}

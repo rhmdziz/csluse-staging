@@ -60,13 +60,6 @@ class Room(BaseModel):
         blank=True,
         related_name="rooms_as_pic",
     )
-    image = models.ForeignKey(
-        Image,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
-
     def __str__(self):
         return f"{self.name} - {self.number} - Floor {self.floor}"
 
@@ -74,7 +67,6 @@ class Room(BaseModel):
 class Equipment(BaseModel):
     STATUS_CHOICES = [
         ("Available", "Available"),
-        ("Borrowed", "Borrowed"),
         ("Under Maintenance", "Under Maintenance"),
         ("Broken", "Broken"),
         ("In Storage", "In Storage"),
@@ -97,12 +89,6 @@ class Equipment(BaseModel):
     quantity = models.PositiveIntegerField(default=1)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Available")
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="Other")
-    image = models.ForeignKey(
-        Image,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
     room = models.ForeignKey(
         Room,
         on_delete=models.SET_NULL,

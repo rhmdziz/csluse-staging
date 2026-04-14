@@ -122,7 +122,6 @@ export default function AssignRoomPicDialog({
       capacity: room.capacity,
       description: room.description,
       picIds: nextPicIds,
-      imageId: room.imageId,
     });
     if (!result.ok) return;
 

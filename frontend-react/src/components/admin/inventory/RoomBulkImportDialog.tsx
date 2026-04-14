@@ -355,9 +355,9 @@ export default function RoomBulkImportDialog({
               Dilewati: {skippedRows.length}
             </span>
           </div>
-          <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
+          <div className="max-h-80 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
             <table className="w-full min-w-[1040px] text-left text-xs">
-              <thead className="bg-muted/40">
+              <thead className="sticky top-0 z-10 bg-muted/40">
                 <tr>
                   <th className="w-[56px] px-2 py-2 text-center font-medium">
                     <input

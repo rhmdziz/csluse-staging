@@ -11,6 +11,7 @@ export type ScheduleTableRow = {
   source: "schedule" | "booking";
   title: string;
   roomName: string;
+  roomNumber?: string | null;
   startTime: string;
   endTime?: string | null;
   scheduleItem?: ScheduleItem;
@@ -128,7 +129,11 @@ export function SchedulesTable({
                   </span>
                 </td>
                 <td className="px-3 py-2 align-middle text-muted-foreground">
-                  {item.roomName || "-"}
+                  {item.roomName
+                    ? item.roomNumber
+                      ? `${item.roomName} (${item.roomNumber})`
+                      : item.roomName
+                    : "-"}
                 </td>
                 <td className="px-3 py-2 align-middle">
                   {new Date(item.startTime).toLocaleDateString("id-ID", {

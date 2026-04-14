@@ -187,7 +187,7 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 # region Inventory
 class RoomViewSet(viewsets.ModelViewSet):
-    queryset = Room.objects.prefetch_related('pics').select_related('image').order_by('-created_at')
+    queryset = Room.objects.prefetch_related('pics').order_by('-created_at')
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = DefaultPagination
@@ -240,8 +240,6 @@ class RoomViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_update(self, serializer):
-        instance = self.get_object()
-        old_image = instance.image
         new_instance = serializer.save()
         log_admin_action(
             self.request.user,
@@ -249,13 +247,6 @@ class RoomViewSet(viewsets.ModelViewSet):
             CHANGE,
             "Updated room via CSL Admin (inventory).",
         )
-
-        if old_image and (new_instance.image is None or old_image.id != new_instance.image.id):
-            try:
-                if old_image.image:
-                    old_image.image.delete(save=False)
-            finally:
-                old_image.delete()
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -329,14 +320,7 @@ class RoomViewSet(viewsets.ModelViewSet):
             DELETION,
             "Deleted room via CSL Admin (inventory).",
         )
-        image = instance.image
         super().perform_destroy(instance)
-        if image:
-            try:
-                if image.image:
-                    image.image.delete(save=False)
-            finally:
-                image.delete()
 
     def perform_destroy(self, instance):
         self._delete_room_instance(instance)
@@ -436,7 +420,7 @@ class RoomViewSet(viewsets.ModelViewSet):
 class EquipmentViewSet(viewsets.ModelViewSet):
     queryset = (
         Equipment.objects
-        .select_related('room', 'room__image', 'image')
+        .select_related('room')
         .prefetch_related('room__pics')
         .order_by('-created_at')
     )
@@ -509,8 +493,6 @@ class EquipmentViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_update(self, serializer):
-        instance = self.get_object()
-        old_image = instance.image
         new_instance = serializer.save()
         log_admin_action(
             self.request.user,
@@ -518,13 +500,6 @@ class EquipmentViewSet(viewsets.ModelViewSet):
             CHANGE,
             "Updated equipment via CSL Admin (inventory).",
         )
-
-        if old_image and (new_instance.image is None or old_image.id != new_instance.image.id):
-            try:
-                if old_image.image:
-                    old_image.image.delete(save=False)
-            finally:
-                old_image.delete()
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -598,14 +573,7 @@ class EquipmentViewSet(viewsets.ModelViewSet):
             DELETION,
             "Deleted equipment via CSL Admin (inventory).",
         )
-        image = instance.image
         super().perform_destroy(instance)
-        if image:
-            try:
-                if image.image:
-                    image.image.delete(save=False)
-            finally:
-                image.delete()
 
     def perform_destroy(self, instance):
         self._delete_equipment_instance(instance)
@@ -926,7 +894,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             'approved_by',
             'requester_mentor_profile',
         )
-        .prefetch_related('equipment_items__equipment')
+        .prefetch_related('equipment_items__equipment', 'room__pics')
         .order_by('-created_at')
     )
     serializer_class = BookingSerializer
@@ -1173,15 +1141,22 @@ class BookingViewSet(viewsets.ModelViewSet):
             qs = qs.filter(requested_by=profile)
             return self._apply_list_filters(qs, allow_requester_filter=False)
 
-        if self._can_manage_all_bookings():
-            return self._apply_list_filters(qs, allow_requester_filter=True)
-
         if profile is None:
             return qs.none()
 
+        # Admin: bypass filter PIC untuk action detail/aksi (retrieve, approve, dll)
+        # atau jika halaman admin mengirim ?unscoped=1.
+        _BOOKING_LIST_ACTIONS = {'list', 'all', 'export_all', 'requester_options'}
+        if self._can_manage_all_bookings() and (
+            self.request.query_params.get('unscoped') == '1'
+            or self.action not in _BOOKING_LIST_ACTIONS
+        ):
+            return self._apply_list_filters(qs, allow_requester_filter=True)
+
+        # Semua reviewer (termasuk admin di halaman dashboard): hanya tampilkan
+        # booking di mana mereka adalah PIC ruangan atau dosen pembimbing pemohon.
         qs = qs.filter(
-            Q(requested_by_id=profile.id)
-            | Q(room__pics__id=profile.id)
+            Q(room__pics__id=profile.id)
             | Q(requester_mentor_profile_id=profile.id)
         ).distinct()
         return self._apply_list_filters(qs, allow_requester_filter=False)
@@ -1421,10 +1396,12 @@ class BorrowViewSet(viewsets.ModelViewSet):
         Borrow.objects
         .select_related(
             'equipment',
+            'equipment__room',
             'requested_by',
             'approved_by',
             'requester_mentor_profile',
         )
+        .prefetch_related('equipment__room__pics')
         .order_by('-created_at')
     )
     serializer_class = BorrowSerializer
@@ -1659,18 +1636,17 @@ class BorrowViewSet(viewsets.ModelViewSet):
         if self.action in {"all", "export"}:
             if not self._can_access_borrow_approval():
                 return qs.none()
-            if not self._can_manage_all_borrows():
-                if profile is None:
-                    return qs.none()
-                qs = qs.filter(
-                    Q(equipment__room__pics__id=profile.id)
-                    | Q(requester_mentor_profile_id=profile.id)
-                ).distinct()
-            return self._apply_list_filters(
-                qs,
-                allow_requester_filter=self._can_manage_all_borrows(),
-                allow_pic_filter=self._can_manage_all_borrows(),
-            )
+            if profile is None:
+                return qs.none()
+            # Admin dengan ?unscoped=1 (halaman admin): tampilkan semua.
+            if self._can_manage_all_borrows() and self.request.query_params.get('unscoped') == '1':
+                return self._apply_list_filters(qs, allow_requester_filter=True, allow_pic_filter=True)
+            # Semua reviewer (termasuk admin di dashboard): hanya PIC/mentor.
+            qs = qs.filter(
+                Q(equipment__room__pics__id=profile.id)
+                | Q(requester_mentor_profile_id=profile.id)
+            ).distinct()
+            return self._apply_list_filters(qs, allow_requester_filter=False, allow_pic_filter=False)
 
         if self.action == "list":
             if not self._can_manage_all_borrows():
@@ -2410,13 +2386,14 @@ class ScheduleViewSet(viewsets.ModelViewSet):
 
         schedule_qs = (
             Schedule.objects
-            .select_related('room', 'created_by')
+            .select_related('room', 'created_by', 'created_by__user')
+            .prefetch_related('room__pics')
             .all()
         )
         booking_qs = (
             Booking.objects
             .filter(status__in=['Approved', 'Completed'])
-            .select_related('room', 'requested_by')
+            .select_related('room', 'requested_by', 'requested_by__user')
         )
 
         if room_id:
@@ -2442,18 +2419,22 @@ class ScheduleViewSet(viewsets.ModelViewSet):
 
         items = []
 
+        schedule_objects = {}
+
         if source in ['', 'schedule']:
             for item in schedule_qs:
+                schedule_objects[f'schedule-{item.id}'] = item
                 items.append({
                     'id': f'schedule-{item.id}',
                     'source': 'schedule',
                     'source_id': str(item.id),
                     'title': item.title,
                     'room_name': item.room.name if item.room else '-',
+                    'room_number': item.room.number if item.room else None,
                     'start_time': item.start_time,
                     'end_time': item.end_time,
                     'category_label': str(item.category),
-                    'schedule_item': ScheduleSerializer(item).data,
+                    'schedule_item': None,
                 })
 
         if source in ['', 'booking']:
@@ -2477,6 +2458,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
                     'source_id': str(item.id),
                     'title': title,
                     'room_name': item.room.name if item.room else '-',
+                    'room_number': item.room.number if item.room else None,
                     'start_time': item.start_time,
                     'end_time': item.end_time,
                     'category_label': 'Booking',
@@ -2494,6 +2476,14 @@ class ScheduleViewSet(viewsets.ModelViewSet):
 
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(items, request, view=self)
+
+        # Serialize schedule_item only for items on the current page
+        for feed_item in page:
+            if feed_item['source'] == 'schedule':
+                obj = schedule_objects.get(feed_item['id'])
+                if obj:
+                    feed_item['schedule_item'] = ScheduleSerializer(obj).data
+
         serializer = ScheduleFeedItemSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
@@ -2586,6 +2576,7 @@ class CalendarViewSet(viewsets.ViewSet):
                 'end_time': item.end_time,
                 'room_id': item.room_id,
                 'room_name': item.room.name if item.room else None,
+                'room_number': item.room.number if item.room else None,
                 'requested_by_name': item.class_name,
                 'attendee_count': None,
                 'purpose': None,
@@ -2602,6 +2593,7 @@ class CalendarViewSet(viewsets.ViewSet):
                 'end_time': item.end_time,
                 'room_id': item.room_id,
                 'room_name': item.room.name if item.room else None,
+                'room_number': item.room.number if item.room else None,
                 'requested_by_name': _profile_display_name(item.requested_by),
                 'attendee_count': item.attendee_count,
                 'purpose': item.purpose,
@@ -3538,8 +3530,6 @@ class UseViewSet(viewsets.ModelViewSet):
         .select_related(
             'equipment',
             'equipment__room',
-            'equipment__room__image',
-            'equipment__image',
             'requested_by',
             'approved_by',
             'requester_mentor_profile',
@@ -3773,14 +3763,21 @@ class UseViewSet(viewsets.ModelViewSet):
             qs = qs.filter(requested_by=profile)
             return self._apply_list_filters(qs, allow_requester_filter=False)
 
-        if self._can_manage_all_uses():
-            return self._apply_list_filters(qs, allow_requester_filter=True)
-
         if profile is None:
             return qs.none()
+
+        # Admin: bypass filter PIC untuk action detail/aksi (retrieve, approve, dll)
+        # atau jika halaman admin mengirim ?unscoped=1.
+        _USE_LIST_ACTIONS = {'list', 'all', 'export', 'requester_options'}
+        if self._can_manage_all_uses() and (
+            self.request.query_params.get('unscoped') == '1'
+            or self.action not in _USE_LIST_ACTIONS
+        ):
+            return self._apply_list_filters(qs, allow_requester_filter=True)
+
+        # Semua reviewer (termasuk admin di dashboard): hanya PIC/mentor.
         qs = qs.filter(
-            Q(requested_by_id=profile.id)
-            | Q(equipment__room__pics__id=profile.id)
+            Q(equipment__room__pics__id=profile.id)
             | Q(requester_mentor_profile_id=profile.id)
         ).distinct()
         return self._apply_list_filters(qs, allow_requester_filter=False)

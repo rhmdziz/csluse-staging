@@ -1,9 +1,9 @@
 "use client";
 
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { ArrowUpRight, MapPinned, Trash2 } from "lucide-react";
+import { ArrowUpRight, MapPinned } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -18,7 +18,7 @@ import {
   InlineErrorAlert,
 } from "@/components/shared";
 
-import { Button, Input } from "@/components/ui";
+import { Input } from "@/components/ui";
 
 import { useDeleteRoom } from "@/hooks/shared/resources/rooms";
 
@@ -28,7 +28,6 @@ import { useUpdateRoom } from "@/hooks/shared/resources/rooms";
 
 import { usePicUsers } from "@/hooks/shared/resources/users";
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const INVENTORY_MODAL_WIDTH_CLASS =
   "w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[50vw] sm:max-w-[960px] sm:min-w-[720px] sm:max-w-none";
 
@@ -108,8 +107,6 @@ export default function AdminRoomDetailDialog({
     capacity: "",
     description: "",
     picIds: [] as string[],
-    imageId: null as string | number | null,
-    imageFile: null as File | null,
   });
   const {
     picUsers,
@@ -133,17 +130,6 @@ export default function AdminRoomDetailDialog({
     () => picUsers.map((user) => ({ value: user.id, label: user.name })),
     [picUsers],
   );
-  const selectedPreviewUrl = useMemo(
-    () => (formData.imageFile ? URL.createObjectURL(formData.imageFile) : ""),
-    [formData.imageFile],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (selectedPreviewUrl) URL.revokeObjectURL(selectedPreviewUrl);
-    };
-  }, [selectedPreviewUrl]);
-
   useEffect(() => {
     if (!open || !room) return;
     setFormData({
@@ -153,8 +139,6 @@ export default function AdminRoomDetailDialog({
       capacity: room.capacity,
       description: room.description,
       picIds: room.picIds,
-      imageId: room.imageId,
-      imageFile: null,
     });
     setIsEditing(initialMode === "edit" && canManage);
     setConfirmDeleteOpen(false);
@@ -174,19 +158,7 @@ export default function AdminRoomDetailDialog({
       capacity: "",
       description: "",
       picIds: [],
-      imageId: null,
-      imageFile: null,
     });
-  };
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    if (file && file.size > MAX_IMAGE_SIZE) {
-      setUpdateErrorMessage("Ukuran gambar maksimal 5MB.");
-      return;
-    }
-    setUpdateErrorMessage("");
-    setFormData((prev) => ({ ...prev, imageFile: file }));
   };
 
   const handleSave = async () => {
@@ -209,12 +181,9 @@ export default function AdminRoomDetailDialog({
       capacity: formData.capacity,
       description: formData.description,
       picIds: formData.picIds,
-      imageId: formData.imageId,
-      imageFile: formData.imageFile,
     });
     if (!result.ok) return;
 
-    setFormData((prev) => ({ ...prev, imageFile: null }));
     setIsEditing(false);
     onUpdated();
     toast.success("Ruangan berhasil diperbarui.");
@@ -285,10 +254,6 @@ export default function AdminRoomDetailDialog({
                     <div className="h-24 rounded-md border border-slate-200 bg-slate-100 animate-pulse" />
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <div className="h-3 w-16 animate-pulse rounded bg-slate-100" />
-                    <div className="h-56 rounded-lg border border-slate-200 bg-slate-100 animate-pulse" />
-                  </div>
                 </div>
               </div>
             </div>
@@ -415,55 +380,6 @@ export default function AdminRoomDetailDialog({
                   )}
                 </div>
 
-                {isEditing ? (
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-medium text-slate-700">
-                      Gambar Ruangan
-                    </p>
-                    <label className="group flex cursor-pointer items-center justify-between gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:border-primary/50">
-                      <span className="truncate text-muted-foreground">
-                        {formData.imageFile
-                          ? formData.imageFile.name
-                          : "Pilih gambar (opsional)"}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={handleFileChange}
-                      />
-                      {formData.imageFile ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className="rounded-full text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              imageFile: null,
-                            }))
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </label>
-                  </div>
-                ) : null}
-
-                {selectedPreviewUrl || room.imageUrl ? (
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-medium text-slate-700">Gambar</p>
-                    <div className="overflow-hidden rounded-lg border bg-muted">
-                      <img
-                        src={selectedPreviewUrl || room.imageUrl}
-                        alt="Preview ruangan"
-                        className="h-56 w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               {updateErrorMessage ? (
@@ -490,8 +406,6 @@ export default function AdminRoomDetailDialog({
                       capacity: room.capacity,
                       description: room.description,
                       picIds: room.picIds,
-                      imageId: room.imageId,
-                      imageFile: null,
                     });
                   }}
                   onSave={() => void handleSave()}

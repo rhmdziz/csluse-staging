@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Box, FileUp, Plus } from "lucide-react";
+import { Box, ChevronDown, FileUp, Plus } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ import { AdminHistoryExportActions as AdminRecordExportActions } from "@/compone
 
 import {
   AdminSoftwareDetailDialog,
+  SoftwareBulkImportByEquipmentDialog,
   SoftwareBulkImportDialog,
   InventoryBulkActions,
   SoftwareCreateDialog,
@@ -28,7 +29,14 @@ import {
 
 import { ConfirmDeleteDialog, DataPagination, InlineErrorAlert } from "@/components/shared";
 
-import { Button, Input } from "@/components/ui";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from "@/components/ui";
 
 import { API_SOFTWARES_EXPORT } from "@/constants/api";
 
@@ -61,6 +69,7 @@ export default function AdminSoftwarePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkImportByEquipmentOpen, setBulkImportByEquipmentOpen] = useState(false);
   const [detailSoftware, setDetailSoftware] = useState<SoftwareRow | null>(
     null,
   );
@@ -366,15 +375,27 @@ export default function AdminSoftwarePage() {
                 isExportingPdf={isExportingPdf}
               />
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBulkImportOpen(true)}
-                >
-                  <FileUp className="h-4 w-4" />
-                  Bulk Import
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" size="sm" variant="outline">
+                      <FileUp className="h-4 w-4" />
+                      Bulk Import
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setBulkImportOpen(true)}>
+                      <FileUp className="h-4 w-4" />
+                      Bulk Import
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setBulkImportByEquipmentOpen(true)}
+                    >
+                      <Box className="h-4 w-4" />
+                      Bulk Import by Peralatan
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   type="button"
                   size="sm"
@@ -448,6 +469,12 @@ export default function AdminSoftwarePage() {
       <SoftwareBulkImportDialog
         open={bulkImportOpen}
         onOpenChange={setBulkImportOpen}
+        onCompleted={handleCreatedOrUpdated}
+      />
+
+      <SoftwareBulkImportByEquipmentDialog
+        open={bulkImportByEquipmentOpen}
+        onOpenChange={setBulkImportByEquipmentOpen}
         onCompleted={handleCreatedOrUpdated}
       />
 

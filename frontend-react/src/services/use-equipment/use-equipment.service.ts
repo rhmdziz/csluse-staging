@@ -20,7 +20,7 @@ export type UseServiceFilters = {
   requestedBy?: string;
 };
 
-export type UseServiceListScope = "default" | "my" | "all";
+export type UseServiceListScope = "default" | "my" | "all" | "admin-all";
 
 export type CreateUsePayload = {
   equipmentId: string;
@@ -70,8 +70,10 @@ export const useEquipmentService = {
     signal?: AbortSignal,
   ) {
     const listEndpoint =
-      scope === "my" ? API_USES_MY : scope === "all" ? API_USES_ALL : API_USES;
+      scope === "my" ? API_USES_MY : (scope === "all" || scope === "admin-all") ? API_USES_ALL : API_USES;
     const url = new URL(listEndpoint, window.location.origin);
+
+    if (scope === "admin-all") url.searchParams.set("unscoped", "1");
 
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));

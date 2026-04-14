@@ -12,6 +12,7 @@ export type ScheduleFeedRow = {
   source_id: string;
   title: string;
   room_name?: string | null;
+  room_number?: string | null;
   start_time: string;
   end_time?: string | null;
   category_label: string;

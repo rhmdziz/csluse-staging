@@ -131,7 +131,12 @@ export default function EquipmentTable({
                   </label>
                 </td>
                 <td className="px-3 py-2 align-middle text-muted-foreground">{item.quantity}</td>
-                <td className="truncate px-3 py-2 align-middle text-muted-foreground">{item.roomName}</td>
+                <td className="truncate px-3 py-2 align-middle text-muted-foreground">
+                  {item.roomName}
+                  {item.roomNumber && (
+                    <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 align-middle text-muted-foreground">
                   {item.isMoveable ? "Ya" : "Tidak"}
                 </td>

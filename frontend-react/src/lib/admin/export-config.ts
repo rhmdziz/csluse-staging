@@ -86,42 +86,44 @@ export const SAMPLE_TESTING_EXPORT_COLUMNS: ExportColumn<SampleTestingRow>[] = [
 ];
 
 export const USER_EXPORT_COLUMNS: ExportColumn<UserRow>[] = [
-  { header: "Nama", cell: (user) => user.name },
-  { header: "Inisial", cell: (user) => user.initials || "-" },
-  { header: "Email", cell: (user) => user.email },
-  { header: "Role", cell: (user) => user.role || "-" },
+  { header: "nama lengkap", cell: (user) => user.name },
+  { header: "email", cell: (user) => user.email },
+  { header: "role", cell: (user) => user.role || "-" },
+  { header: "initials", cell: (user) => user.initials || "-" },
+  { header: "department", cell: (user) => user.department || "-" },
+  { header: "batch", cell: (user) => user.batch || "-" },
+  { header: "id number", cell: (user) => user.idNumber || "-" },
+  { header: "institution", cell: (user) => user.institution || "-" },
   { header: "User Type", cell: (user) => user.userType || "-" },
-  { header: "Department", cell: (user) => user.department || "-" },
-  { header: "Batch", cell: (user) => user.batch || "-" },
-  { header: "ID Number", cell: (user) => user.idNumber || "-" },
-  { header: "Institusi", cell: (user) => user.institution || "-" },
   { header: "Verified", cell: (user) => (user.isVerified ? "Verified" : "Unverified") },
 ];
 
 export const ROOM_EXPORT_COLUMNS: ExportColumn<RoomRow>[] = [
-  { header: "Nama", cell: (room) => room.name },
-  { header: "No. Ruang", cell: (room) => room.number },
-  { header: "Lantai", cell: (room) => room.floor },
-  { header: "Kapasitas", cell: (room) => room.capacity },
-  { header: "Deskripsi", cell: (room) => room.description || "-" },
+  { header: "nama ruangan", cell: (room) => room.name },
+  { header: "nomor ruangan", cell: (room) => room.number },
+  { header: "lantai", cell: (room) => room.floor },
+  { header: "kapasitas", cell: (room) => room.capacity },
+  { header: "deskripsi", cell: (room) => room.description || "-" },
   { header: "PIC", cell: (room) => room.picName || "-" },
 ];
 
 export const EQUIPMENT_EXPORT_COLUMNS: ExportColumn<EquipmentRow>[] = [
-  { header: "Nama", cell: (item) => item.name },
-  { header: "Kategori", cell: (item) => item.category },
+  { header: "nama peralatan", cell: (item) => item.name },
+  { header: "jumlah", cell: (item) => item.quantity },
+  { header: "kategori", cell: (item) => item.category },
+  { header: "moveable", cell: (item) => (item.isMoveable ? "ya" : "tidak") },
+  { header: "deskripsi", cell: (item) => item.description || "-" },
   { header: "Status", cell: (item) => formatStatus(item.status) },
-  { header: "Jumlah", cell: (item) => item.quantity },
   { header: "Ruangan", cell: (item) => item.roomName || "-" },
-  { header: "Moveable", cell: (item) => (item.isMoveable ? "Ya" : "Tidak") },
   { header: "Shareable", cell: (item) => (item.isShareable ? "Ya" : "Tidak") },
 ];
 
 export const SOFTWARE_EXPORT_COLUMNS: ExportColumn<SoftwareRow>[] = [
-  { header: "Nama", cell: (item) => item.name },
-  { header: "Versi", cell: (item) => item.version || "-" },
-  { header: "Lisensi", cell: (item) => item.licenseInfo || "-" },
-  { header: "Expired", cell: (item) => item.licenseExpiration || "-" },
+  { header: "nama software", cell: (item) => item.name },
+  { header: "versi", cell: (item) => item.version || "-" },
+  { header: "lisensi", cell: (item) => item.licenseInfo || "-" },
+  { header: "expired", cell: (item) => item.licenseExpiration || "-" },
+  { header: "deskripsi", cell: (item) => item.description || "-" },
   { header: "Peralatan", cell: (item) => item.equipmentName || "-" },
   { header: "Ruangan", cell: (item) => item.roomName || "-" },
 ];

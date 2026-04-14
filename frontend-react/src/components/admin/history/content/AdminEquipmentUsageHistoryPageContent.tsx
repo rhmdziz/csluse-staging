@@ -124,7 +124,7 @@ export default function AdminEquipmentUsageHistoryPage() {
       ? formatDateKey(createdRange.from)
       : "";
   const { deleteRecord, deleteRecords, isDeleting } = useDeleteRecord();
-  const { requesters } = useHistoryRequesterOptions(API_USES_ALL_REQUESTERS);
+  const { requesters } = useHistoryRequesterOptions(`${API_USES_ALL_REQUESTERS}?unscoped=1`);
   const { equipments } = useEquipmentOptions("", "", true);
   const {
     exportPdf,
@@ -132,7 +132,7 @@ export default function AdminEquipmentUsageHistoryPage() {
     isExportingPdf,
     isExportingExcel,
   } = useAdminRecordExport({
-    endpoint: API_USES_EXPORT,
+    endpoint: `${API_USES_EXPORT}?unscoped=1`,
     filters: {
       q: debouncedSearch,
       status,
@@ -169,7 +169,7 @@ export default function AdminEquipmentUsageHistoryPage() {
       createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
     },
     reloadKey,
-    "all",
+    "admin-all",
   );
   const {
     useItem: detailUseItem,

@@ -19,7 +19,7 @@ export type BookingServiceFilters = {
   createdBefore?: string;
 };
 
-export type BookingServiceListScope = "default" | "my" | "all";
+export type BookingServiceListScope = "default" | "my" | "all" | "admin-all";
 
 export type CreateBookingRoomPayload = {
   roomId: string;
@@ -77,9 +77,10 @@ export const bookingRoomsService = {
     signal?: AbortSignal,
   ) {
     const listEndpoint =
-      scope === "my" ? API_BOOKINGS_MY : scope === "all" ? API_BOOKINGS_ALL : API_BOOKINGS;
+      scope === "my" ? API_BOOKINGS_MY : (scope === "all" || scope === "admin-all") ? API_BOOKINGS_ALL : API_BOOKINGS;
     const url = new URL(listEndpoint, window.location.origin);
 
+    if (scope === "admin-all") url.searchParams.set("unscoped", "1");
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));
     if (filters.q) url.searchParams.set("q", filters.q);

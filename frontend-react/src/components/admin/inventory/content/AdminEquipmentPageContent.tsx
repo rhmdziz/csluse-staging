@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { FileUp, Plus } from "lucide-react";
+import { Building2, ChevronDown, FileUp, Plus } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -18,6 +18,7 @@ import {
 
 import {
   EquipmentCreateDialog,
+  EquipmentBulkImportByRoomDialog,
   EquipmentBulkImportDialog,
   AdminEquipmentDetailDialog,
   EquipmentTable,
@@ -28,7 +29,14 @@ import { DataPagination, ConfirmDeleteDialog, InlineErrorAlert } from "@/compone
 
 import { AdminHistoryExportActions as AdminRecordExportActions } from "@/components/admin/history";
 
-import { Button, Input } from "@/components/ui";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from "@/components/ui";
 
 import {
   EQUIPMENT_CATEGORY_OPTIONS,
@@ -113,6 +121,7 @@ export default function AdminEquipmentsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkImportByRoomOpen, setBulkImportByRoomOpen] = useState(false);
   const [detailEquipment, setDetailEquipment] = useState<EquipmentRow | null>(
     null,
   );
@@ -265,7 +274,6 @@ export default function AdminEquipmentsPage() {
       isMoveable: item.isMoveable,
       isShareable: item.isShareable,
       description: item.description,
-      imageId: item.imageId,
     });
     setTogglingEquipmentId(null);
 
@@ -491,15 +499,27 @@ export default function AdminEquipmentsPage() {
                 isExportingPdf={isExportingPdf}
               />
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBulkImportOpen(true)}
-                >
-                  <FileUp className="h-4 w-4" />
-                  Bulk Import
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" size="sm" variant="outline">
+                      <FileUp className="h-4 w-4" />
+                      Bulk Import
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setBulkImportOpen(true)}>
+                      <FileUp className="h-4 w-4" />
+                      Bulk Import
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setBulkImportByRoomOpen(true)}
+                    >
+                      <Building2 className="h-4 w-4" />
+                      Bulk Import by Ruangan
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   type="button"
                   size="sm"
@@ -581,6 +601,12 @@ export default function AdminEquipmentsPage() {
       <EquipmentBulkImportDialog
         open={bulkImportOpen}
         onOpenChange={setBulkImportOpen}
+        onCompleted={handleCreatedOrUpdated}
+      />
+
+      <EquipmentBulkImportByRoomDialog
+        open={bulkImportByRoomOpen}
+        onOpenChange={setBulkImportByRoomOpen}
         onCompleted={handleCreatedOrUpdated}
       />
 

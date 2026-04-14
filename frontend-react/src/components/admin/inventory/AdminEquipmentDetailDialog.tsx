@@ -1,9 +1,9 @@
 "use client";
 
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 
-import { ArrowUpRight, Trash2, Wrench } from "lucide-react";
+import { ArrowUpRight, Wrench } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -16,7 +16,7 @@ import {
   InlineErrorAlert,
 } from "@/components/shared";
 
-import { Button, Input } from "@/components/ui";
+import { Input } from "@/components/ui";
 
 import {
   EQUIPMENT_CATEGORY_OPTIONS,
@@ -33,7 +33,6 @@ import { useUpdateEquipment } from "@/hooks/shared/resources/equipments";
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const INVENTORY_MODAL_WIDTH_CLASS =
   "w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[50vw] sm:max-w-[960px] sm:min-w-[720px] sm:max-w-none";
 
@@ -166,8 +165,6 @@ export default function AdminEquipmentDetailDialog({
     isMoveable: "true",
     isShareable: "false",
     description: "",
-    imageId: null as string | number | null,
-    imageFile: null as File | null,
   });
   const {
     rooms,
@@ -187,20 +184,7 @@ export default function AdminEquipmentDetailDialog({
     setErrorMessage: setDeleteErrorMessage,
   } = useDeleteEquipment();
 
-  const roomOptions = useMemo(
-    () => rooms.map((room) => ({ value: room.id, label: room.label })),
-    [rooms],
-  );
-  const previewUrl = useMemo(
-    () => (formData.imageFile ? URL.createObjectURL(formData.imageFile) : ""),
-    [formData.imageFile],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+  const roomOptions = rooms.map((room) => ({ value: room.id, label: room.label }));
 
   useEffect(() => {
     if (!open || !equipment) return;
@@ -213,8 +197,6 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: String(equipment.isMoveable),
       isShareable: String(equipment.isShareable),
       description: equipment.description,
-      imageId: equipment.imageId,
-      imageFile: null,
     });
     setIsEditing(initialMode === "edit" && canManage);
     setConfirmDeleteOpen(false);
@@ -236,19 +218,7 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: "true",
       isShareable: "false",
       description: "",
-      imageId: null,
-      imageFile: null,
     });
-  };
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    if (file && file.size > MAX_IMAGE_SIZE) {
-      setUpdateErrorMessage("Ukuran gambar maksimal 5MB.");
-      return;
-    }
-    setUpdateErrorMessage("");
-    setFormData((prev) => ({ ...prev, imageFile: file }));
   };
 
   const handleSave = async () => {
@@ -273,12 +243,9 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: formData.isMoveable === "true",
       isShareable: formData.isShareable === "true",
       description: formData.description,
-      imageId: formData.imageId,
-      imageFile: formData.imageFile,
     });
     if (!result.ok) return;
 
-    setFormData((prev) => ({ ...prev, imageFile: null }));
     setIsEditing(false);
     onUpdated();
     toast.success("Peralatan berhasil diperbarui.");
@@ -309,7 +276,6 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: equipment.isMoveable,
       isShareable: equipment.isShareable,
       description: equipment.description,
-      imageId: equipment.imageId,
     });
     if (!result.ok) return;
 
@@ -507,53 +473,6 @@ export default function AdminEquipmentDetailDialog({
                   )}
                 </div>
 
-                {isEditing ? (
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-medium text-slate-700">Gambar</p>
-                    <label className="group flex cursor-pointer items-center justify-between gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:border-primary/50">
-                      <span className="truncate text-muted-foreground">
-                        {formData.imageFile
-                          ? formData.imageFile.name
-                          : "Pilih gambar (opsional)"}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={handleFileChange}
-                      />
-                      {formData.imageFile ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className="rounded-full text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              imageFile: null,
-                            }))
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </label>
-                  </div>
-                ) : null}
-
-                {previewUrl || equipment.imageUrl ? (
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-medium text-slate-700">Gambar</p>
-                    <div className="overflow-hidden rounded-lg border bg-muted">
-                      <img
-                        src={previewUrl || equipment.imageUrl}
-                        alt="Preview peralatan"
-                        className="h-56 w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               {updateErrorMessage ? (
@@ -582,8 +501,6 @@ export default function AdminEquipmentDetailDialog({
                       isMoveable: String(equipment.isMoveable),
                       isShareable: String(equipment.isShareable),
                       description: equipment.description,
-                      imageId: equipment.imageId,
-                      imageFile: null,
                     });
                   }}
                   onSave={() => void handleSave()}

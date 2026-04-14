@@ -270,10 +270,12 @@ export default function BorrowEquipmentListContent({
       return false;
     }
 
-    if (
-      isWaitingForMentorApproval(item) &&
-      item.requesterMentorProfileId === currentProfileId
-    ) {
+    const isMentor = currentProfileId !== "" && item.requesterMentorProfileId === currentProfileId;
+    const isPic = item.roomPicIds.includes(currentProfileId);
+
+    // Jika hanya dosen pembimbing (bukan PIC) → sembunyikan, ditangani di seksi mentor.
+    // Jika mentor sekaligus PIC → tetap tampilkan tombol.
+    if (isMentor && !isPic) {
       return false;
     }
 

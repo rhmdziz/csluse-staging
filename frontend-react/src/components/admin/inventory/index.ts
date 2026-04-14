@@ -1,6 +1,7 @@
 export { default as AdminEquipmentDetailDialog } from "./AdminEquipmentDetailDialog";
 export { default as AdminRoomDetailDialog } from "./AdminRoomDetailDialog";
 export { default as AdminSoftwareDetailDialog } from "./AdminSoftwareDetailDialog";
+export { default as EquipmentBulkImportByRoomDialog } from "./EquipmentBulkImportByRoomDialog";
 export { default as EquipmentBulkImportDialog } from "./EquipmentBulkImportDialog";
 export { default as EquipmentCreateDialog } from "./EquipmentCreateDialog";
 export { default as EquipmentTable } from "./EquipmentTable";
@@ -10,6 +11,7 @@ export { default as RoomBulkImportDialog } from "./RoomBulkImportDialog";
 export { default as RoomCreateDialog } from "./RoomCreateDialog";
 export { default as RoomEquipmentsDialog } from "./RoomEquipmentsDialog";
 export { default as RoomTable } from "./RoomTable";
+export { default as SoftwareBulkImportByEquipmentDialog } from "./SoftwareBulkImportByEquipmentDialog";
 export { default as SoftwareBulkImportDialog } from "./SoftwareBulkImportDialog";
 export { default as SoftwareCreateDialog } from "./SoftwareCreateDialog";
 export { default as SoftwareTable } from "./SoftwareTable";

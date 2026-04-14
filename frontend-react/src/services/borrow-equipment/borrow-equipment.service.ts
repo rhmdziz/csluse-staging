@@ -23,7 +23,7 @@ export type BorrowServiceFilters = {
   createdBefore?: string;
 };
 
-export type BorrowServiceListScope = "default" | "my" | "all";
+export type BorrowServiceListScope = "default" | "my" | "all" | "admin-all";
 
 export type CreateBorrowPayload = {
   equipmentId: string;
@@ -80,8 +80,10 @@ export const borrowEquipmentService = {
     signal?: AbortSignal,
   ) {
     const listEndpoint =
-      scope === "my" ? API_BORROWS_MY : scope === "all" ? API_BORROWS_ALL : API_BORROWS;
+      scope === "my" ? API_BORROWS_MY : (scope === "all" || scope === "admin-all") ? API_BORROWS_ALL : API_BORROWS;
     const url = new URL(listEndpoint, window.location.origin);
+
+    if (scope === "admin-all") url.searchParams.set("unscoped", "1");
 
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));

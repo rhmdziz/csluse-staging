@@ -57,10 +57,10 @@ export default function SoftwareTable({
             </th>
             <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Nama</th>
             <th className="w-[100px] px-3 py-3 font-medium text-slate-50">Versi</th>
-            <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Lisensi</th>
+            <th className="w-[100px] px-3 py-3 font-medium text-slate-50">Lisensi</th>
             <th className="w-[160px] px-3 py-3 font-medium text-slate-50">Expired</th>
-            <th className="w-[210px] px-3 py-3 font-medium text-slate-50">Peralatan</th>
-            <th className="w-[170px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
+            <th className="w-[180px] px-3 py-3 font-medium text-slate-50">Peralatan</th>
+            <th className="w-[200px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
             <th className="sticky right-0 z-10 relative w-[144px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
               Aksi
             </th>
@@ -92,7 +92,12 @@ export default function SoftwareTable({
                 <td className="truncate px-3 py-2 align-middle text-muted-foreground">{item.licenseInfo || "-"}</td>
                 <td className="px-3 py-2 align-middle text-muted-foreground">{item.licenseExpiration || "-"}</td>
                 <td className="truncate px-3 py-2 align-middle text-muted-foreground">{item.equipmentName}</td>
-                <td className="truncate px-3 py-2 align-middle text-muted-foreground">{item.roomName}</td>
+                <td className="truncate px-3 py-2 align-middle text-muted-foreground">
+                  {item.roomName}
+                  {item.roomNumber && (
+                    <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
+                  )}
+                </td>
                 <td className="sticky right-0 z-10 relative bg-card px-3 py-2 align-middle shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
                   <div className="flex justify-center gap-2">
                     <TableActionIconButton

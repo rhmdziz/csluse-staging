@@ -92,7 +92,12 @@ export default function EquipmentListPage() {
                     </span>
                   </td>
                   <td className="truncate px-3 py-2.5">{item.quantity}</td>
-                  <td className="truncate px-3 py-2.5">{item.roomName}</td>
+                  <td className="truncate px-3 py-2.5">
+                    {item.roomName}
+                    {item.roomNumber && (
+                      <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
+                    )}
+                  </td>
                   <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
                     <div className="flex justify-center gap-2">
                       <TableActionIconButton

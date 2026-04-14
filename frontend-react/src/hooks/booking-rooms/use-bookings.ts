@@ -14,7 +14,7 @@ export type BookingFilters = {
   createdBefore?: string;
 };
 
-export type BookingListScope = "default" | "my" | "all";
+export type BookingListScope = "default" | "my" | "all" | "admin-all";
 
 export type BookingRow = {
   id: string | number;

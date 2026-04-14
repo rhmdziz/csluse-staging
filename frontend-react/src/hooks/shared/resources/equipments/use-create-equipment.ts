@@ -16,7 +16,6 @@ function parseEquipmentError(data: unknown, fallback = "Gagal membuat peralatan.
     "category",
     "room",
     "is_moveable",
-    "image",
   ]);
 }
 

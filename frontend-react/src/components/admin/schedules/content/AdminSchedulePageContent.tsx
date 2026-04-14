@@ -273,6 +273,7 @@ export default function AdminSchedulePage() {
         source: item.source,
         title: item.title,
         roomName: item.room_name ?? "-",
+        roomNumber: item.room_number ?? null,
         startTime: item.start_time,
         endTime: item.end_time,
         scheduleItem:

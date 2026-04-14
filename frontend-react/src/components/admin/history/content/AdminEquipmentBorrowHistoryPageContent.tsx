@@ -129,11 +129,11 @@ export default function AdminEquipmentBorrowHistoryPage() {
       ? formatDateKey(createdRange.from)
       : "";
   const { deleteRecord, deleteRecords, isDeleting } = useDeleteRecord();
-  const { requesters } = useHistoryRequesterOptions(API_BORROWS_ALL_REQUESTERS);
+  const { requesters } = useHistoryRequesterOptions(`${API_BORROWS_ALL_REQUESTERS}?unscoped=1`);
   const { equipments } = useEquipmentOptions("", "", true, true);
   const { exportPdf, exportExcel, isExportingPdf, isExportingExcel } =
     useAdminRecordExport({
-      endpoint: API_BORROWS_EXPORT,
+      endpoint: `${API_BORROWS_EXPORT}?unscoped=1`,
       filters: {
         q: debouncedSearch,
         status,
@@ -171,7 +171,7 @@ export default function AdminEquipmentBorrowHistoryPage() {
         createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
       },
       reloadKey,
-      "all",
+      "admin-all",
     );
   const {
     borrow: detailBorrow,

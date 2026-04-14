@@ -134,7 +134,7 @@ export default function AdminRoomBookingHistoryPage() {
       ? formatDateKey(createdRange.from)
       : "";
   const { deleteRecord, deleteRecords, isDeleting } = useDeleteRecord();
-  const { requesters } = useHistoryRequesterOptions(API_BOOKINGS_ALL_REQUESTERS);
+  const { requesters } = useHistoryRequesterOptions(`${API_BOOKINGS_ALL_REQUESTERS}?unscoped=1`);
   const { rooms } = useRoomOptions();
   const {
     exportPdf,
@@ -142,7 +142,7 @@ export default function AdminRoomBookingHistoryPage() {
     isExportingPdf,
     isExportingExcel,
   } = useAdminRecordExport({
-    endpoint: API_BOOKINGS_ALL_EXPORT,
+    endpoint: `${API_BOOKINGS_ALL_EXPORT}?unscoped=1`,
     filters: {
       q: debouncedSearch,
       status,
@@ -179,7 +179,7 @@ export default function AdminRoomBookingHistoryPage() {
       createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
     },
     reloadKey,
-    "all",
+    "admin-all",
   );
   const {
     booking: detailBooking,

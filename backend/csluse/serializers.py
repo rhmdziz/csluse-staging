@@ -240,7 +240,6 @@ class RoomSerializer(serializers.ModelSerializer):
         required=False,
     )
     pics_detail = RoomPicDetailSerializer(source="pics", many=True, read_only=True)
-    image_detail = ImageSerializer(source="image", read_only=True)
 
     def validate_pics(self, value):
         allowed_roles = {"LECTURER", "ADMIN"}
@@ -265,15 +264,12 @@ class RoomSerializer(serializers.ModelSerializer):
             "number",
             "floor",
             "pics",
-            "image",
             "pics_detail",
-            "image_detail",
         ]
 
 
 class RoomListSerializer(serializers.ModelSerializer):
     pics_detail = RoomPicListSerializer(source="pics", many=True, read_only=True)
-    image_detail = ImageSerializer(source="image", read_only=True)
 
     class Meta:
         model = Room
@@ -286,8 +282,6 @@ class RoomListSerializer(serializers.ModelSerializer):
             "floor",
             "pics",
             "pics_detail",
-            "image",
-            "image_detail",
         ]
 
 
@@ -297,12 +291,12 @@ class RoomDropdownSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "number",
             "capacity",
         ]
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
-    image_detail = ImageSerializer(source="image", read_only=True)
     room_detail = RoomSerializer(source="room", read_only=True)
 
     class Meta:
@@ -314,8 +308,6 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "quantity",
             "status",
             "category",
-            "image",
-            "image_detail",
             "room",
             "room_detail",
             "is_moveable",
@@ -329,12 +321,12 @@ class EquipmentRoomListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "number",
         ]
 
 
 class EquipmentListSerializer(serializers.ModelSerializer):
     room_detail = EquipmentRoomListSerializer(source="room", read_only=True)
-    image_detail = ImageSerializer(source="image", read_only=True)
 
     class Meta:
         model = Equipment
@@ -349,8 +341,6 @@ class EquipmentListSerializer(serializers.ModelSerializer):
             "room_detail",
             "is_moveable",
             "is_shareable",
-            "image",
-            "image_detail",
         ]
 
 
@@ -384,6 +374,14 @@ class SoftwareSerializer(serializers.ModelSerializer):
         source="equipment",
         read_only=True,
     )
+    license_expiration = serializers.DateField(
+        allow_null=True, required=False
+    )
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and data.get("license_expiration") == "":
+            data = {**data, "license_expiration": None}
+        return super().to_internal_value(data)
 
     class Meta:
         model = Software
@@ -440,6 +438,8 @@ class RecordProfileListSerializer(serializers.ModelSerializer):
 
 
 class RecordRoomListSerializer(serializers.ModelSerializer):
+    pics_detail = RoomPicListSerializer(source="pics", many=True, read_only=True)
+
     class Meta:
         model = Room
         fields = [
@@ -447,6 +447,7 @@ class RecordRoomListSerializer(serializers.ModelSerializer):
             "name",
             "number",
             "capacity",
+            "pics_detail",
         ]
 
 
@@ -456,6 +457,18 @@ class RecordEquipmentListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+        ]
+
+
+class RecordEquipmentWithRoomSerializer(serializers.ModelSerializer):
+    room_detail = RecordRoomListSerializer(source="room", read_only=True)
+
+    class Meta:
+        model = Equipment
+        fields = [
+            "id",
+            "name",
+            "room_detail",
         ]
 
 
@@ -685,6 +698,21 @@ class BookingSerializer(serializers.ModelSerializer):
             EXCLUSIVE_PURPOSES = {"Praktikum", "Workshop"}
 
             current_purpose = attrs.get("purpose") or (instance.purpose if instance else None)
+
+            if not self.context.get("allow_status_transition"):
+                overlapping_schedules = Schedule.objects.filter(
+                    room=room,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                )
+                if overlapping_schedules.exists():
+                    raise serializers.ValidationError(
+                        {
+                            "non_field_errors": [
+                                "Ruangan sudah memiliki jadwal praktikum pada rentang waktu tersebut."
+                            ]
+                        }
+                    )
 
             overlapping_approved = Booking.objects.filter(
                 room=room,
@@ -1120,7 +1148,7 @@ class BorrowListSerializer(serializers.ModelSerializer):
         source="requester_mentor_profile",
         read_only=True,
     )
-    equipment_detail = RecordEquipmentListSerializer(source="equipment", read_only=True)
+    equipment_detail = RecordEquipmentWithRoomSerializer(source="equipment", read_only=True)
 
     class Meta:
         model = Borrow
@@ -1248,6 +1276,11 @@ class CalendarEventSerializer(serializers.Serializer):
         allow_null=True,
         required=False,
     )
+    room_number = serializers.CharField(
+        allow_blank=True,
+        allow_null=True,
+        required=False,
+    )
     requested_by_name = serializers.CharField(
         allow_blank=True,
         allow_null=True,
@@ -1263,6 +1296,11 @@ class ScheduleFeedItemSerializer(serializers.Serializer):
     source_id = serializers.CharField()
     title = serializers.CharField()
     room_name = serializers.CharField(
+        allow_blank=True,
+        allow_null=True,
+        required=False,
+    )
+    room_number = serializers.CharField(
         allow_blank=True,
         allow_null=True,
         required=False,
@@ -1475,6 +1513,24 @@ class UseSerializer(serializers.ModelSerializer):
                 {"rejection_note": "Alasan penolakan wajib diisi."}
             )
 
+        if next_status in {"Pending", "Approved"} and start_time and end_time:
+            equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
+            room = getattr(equipment, "room", None) if equipment else None
+            if room and not self.context.get("allow_status_transition"):
+                overlapping_schedules = Schedule.objects.filter(
+                    room=room,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                )
+                if overlapping_schedules.exists():
+                    raise serializers.ValidationError(
+                        {
+                            "non_field_errors": [
+                                "Ruangan sudah memiliki jadwal praktikum pada rentang waktu tersebut."
+                            ]
+                        }
+                    )
+
         return attrs
 
     class Meta:
@@ -1502,7 +1558,7 @@ class UseListSerializer(serializers.ModelSerializer):
         source="requester_mentor_profile",
         read_only=True,
     )
-    equipment_detail = RecordEquipmentListSerializer(source="equipment", read_only=True)
+    equipment_detail = RecordEquipmentWithRoomSerializer(source="equipment", read_only=True)
 
     class Meta:
         model = Use

@@ -1,9 +1,9 @@
 "use client";
 
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 
-import { Plus, Trash2, Wrench } from "lucide-react";
+import { Plus, Wrench } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -16,8 +16,6 @@ import { EQUIPMENT_CATEGORY_OPTIONS, MOVEABLE_OPTIONS, SHAREABLE_OPTIONS } from 
 import { useCreateEquipment } from "@/hooks/shared/resources/equipments";
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 type EquipmentCreateDialogProps = {
   open: boolean;
@@ -38,21 +36,9 @@ export default function EquipmentCreateDialog({
     isMoveable: "true",
     isShareable: "false",
     description: "",
-    imageFile: null as File | null,
   });
   const { rooms, isLoading: isLoadingRooms, error: roomError } = useRoomOptions();
   const { createEquipment, isSubmitting, errorMessage, setErrorMessage } = useCreateEquipment();
-
-  const previewUrl = useMemo(
-    () => (formData.imageFile ? URL.createObjectURL(formData.imageFile) : ""),
-    [formData.imageFile],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
 
   const resetForm = () => {
     setErrorMessage("");
@@ -64,7 +50,6 @@ export default function EquipmentCreateDialog({
       isMoveable: "true",
       isShareable: "false",
       description: "",
-      imageFile: null,
     });
   };
 
@@ -73,16 +58,6 @@ export default function EquipmentCreateDialog({
   ) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    if (file && file.size > MAX_IMAGE_SIZE) {
-      setErrorMessage("Ukuran gambar maksimal 5MB.");
-      return;
-    }
-    setErrorMessage("");
-    setFormData((prev) => ({ ...prev, imageFile: file }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -104,7 +79,6 @@ export default function EquipmentCreateDialog({
       isMoveable: formData.isMoveable === "true",
       isShareable: formData.isShareable === "true",
       description: formData.description,
-      imageFile: formData.imageFile,
     });
 
     if (result.ok) {
@@ -228,41 +202,6 @@ export default function EquipmentCreateDialog({
               placeholder="Deskripsi (opsional)"
             />
           </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium">Gambar</label>
-            <label className="group flex cursor-pointer items-center justify-between gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:border-primary/50">
-              <span className="truncate text-muted-foreground">
-                {formData.imageFile ? formData.imageFile.name : "Pilih gambar (opsional)"}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-              {formData.imageFile ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Hapus gambar yang diunggah"
-                  className="rounded-full text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                  onClick={() => setFormData((prev) => ({ ...prev, imageFile: null }))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </label>
-          </div>
-
-          {previewUrl ? (
-            <div className="space-y-1">
-              <div className="overflow-hidden rounded-lg border bg-muted">
-                <img src={previewUrl} alt="Preview peralatan" className="h-56 w-full object-cover" />
-              </div>
-            </div>
-          ) : null}
 
           {errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
 

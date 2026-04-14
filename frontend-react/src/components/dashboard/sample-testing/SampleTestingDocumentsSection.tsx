@@ -298,12 +298,12 @@ export default function SampleTestingDocumentsSection({
                           <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
                             {canPreview ? "Lihat Dokumen" : "Lihat Detail Dokumen"}
                           </span>
-                          <span
+                          {/* <span
                             className="line-clamp-2 block text-sm font-medium text-slate-900"
                             title={document.originalName}
                           >
                             {document.originalName}
-                          </span>
+                          </span> */}
                         </span>
                       </span>
                     </Button>
