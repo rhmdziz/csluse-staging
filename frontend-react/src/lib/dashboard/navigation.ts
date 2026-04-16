@@ -91,6 +91,7 @@ export function getHeaderIcon(menuId: string, actionId: string | null) {
     if (actionId === "request-list" || actionId === "all-requests") {
       return ClipboardList;
     }
+    if (actionId === "materials") return FlaskConical;
     return Wrench;
   }
 
@@ -235,6 +236,13 @@ export const SIDEBAR_SHORTCUTS: SidebarShortcut[] = [
         label: "Peralatan yang Tersedia",
         description: "Lihat daftar peralatan yang tersedia untuk pengajuan penggunaan alat.",
         href: "/equipment",
+        allowedRoles: CATALOG_ACCESS_ROLES,
+      },
+      {
+        id: "materials",
+        label: "Bahan yang Tersedia",
+        description: "Lihat daftar bahan habis pakai yang tersedia di laboratorium.",
+        href: "/materials",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
       {
@@ -474,6 +482,9 @@ export function parseDashboardPath(pathname: string) {
   }
   if (parts[0] === "software") {
     return { menu: "use-equipment", action: "software" };
+  }
+  if (parts[0] === "materials") {
+    return { menu: "use-equipment", action: "materials" };
   }
   if (parts[0] === "sample-testing") {
     if (parts[1] === "approval") {

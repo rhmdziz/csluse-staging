@@ -7,6 +7,7 @@ import type { SampleTestingRow } from "@/hooks/sample-testing";
 import type { UserRow } from "@/hooks/shared/resources/users";
 import type { RoomRow } from "@/hooks/shared/resources/rooms";
 import type { EquipmentRow } from "@/hooks/shared/resources/equipments";
+import type { MaterialRow } from "@/hooks/shared/resources/materials";
 import type { SoftwareRow } from "@/hooks/shared/resources/softwares";
 import { formatDateTimeId } from "@/lib/date";
 import { getStatusDisplayLabel } from "@/lib/request";
@@ -116,6 +117,16 @@ export const EQUIPMENT_EXPORT_COLUMNS: ExportColumn<EquipmentRow>[] = [
   { header: "Status", cell: (item) => formatStatus(item.status) },
   { header: "Ruangan", cell: (item) => item.roomName || "-" },
   { header: "Shareable", cell: (item) => (item.isShareable ? "Ya" : "Tidak") },
+];
+
+export const MATERIAL_EXPORT_COLUMNS: ExportColumn<MaterialRow>[] = [
+  { header: "nama bahan", cell: (item) => item.name },
+  { header: "jumlah", cell: (item) => item.quantity },
+  { header: "satuan", cell: (item) => item.unit || "-" },
+  { header: "kategori", cell: (item) => item.category },
+  { header: "deskripsi", cell: (item) => item.description || "-" },
+  { header: "Status", cell: (item) => formatStatus(item.status) },
+  { header: "Ruangan", cell: (item) => item.roomName || "-" },
 ];
 
 export const SOFTWARE_EXPORT_COLUMNS: ExportColumn<SoftwareRow>[] = [

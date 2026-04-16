@@ -138,10 +138,11 @@ const adminMenuConfig: MenuConfig[] = [
     label: "Inventarisasi",
     icon: Package,
     tooltip: "Inventarisasi",
-    searchTerms: ["inventarisasi"],
+    searchTerms: ["inventarisasi", "bahan", "material"],
     items: [
       { label: "Ruangan", href: "/admin/inventory/rooms" },
       { label: "Peralatan", href: "/admin/inventory/equipment" },
+      { label: "Bahan", href: "/admin/inventory/materials" },
       { label: "Software", href: "/admin/inventory/software" },
     ],
   },

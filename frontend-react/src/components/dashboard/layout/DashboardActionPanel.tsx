@@ -32,6 +32,11 @@ import {
   EQUIPMENT_STATUS_OPTIONS,
 } from "@/constants/equipments";
 
+import {
+  MATERIAL_CATEGORY_OPTIONS,
+  MATERIAL_STATUS_OPTIONS,
+} from "@/constants/materials";
+
 import { useChangePassword } from "@/hooks/auth";
 
 import { useCalendarEvents } from "@/hooks/shared/calendar";
@@ -97,6 +102,18 @@ type SoftwareFilterConfig = {
   equipment: string;
   onKeywordChange: (value: string) => void;
   onEquipmentChange: (value: string) => void;
+  onReset: () => void;
+};
+
+type MaterialFilterConfig = {
+  keyword: string;
+  status: string;
+  category: string;
+  room: string;
+  onKeywordChange: (value: string) => void;
+  onStatusChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onRoomChange: (value: string) => void;
   onReset: () => void;
 };
 
@@ -316,6 +333,11 @@ export function DashboardActionPanel({
   const isUseAllRequestsPage = pathname === "/use-equipment/approval";
   const isEquipmentListPage = pathname === "/equipment";
   const isSoftwareListPage = pathname === "/software";
+  const isMaterialsListPage = pathname === "/materials";
+  const materialKeyword = searchParams.get("q") ?? "";
+  const materialStatus = searchParams.get("status") ?? "";
+  const materialCategory = searchParams.get("category") ?? "";
+  const materialRoom = searchParams.get("room") ?? "";
   const isBorrowRequestListPage = pathname === "/borrow-equipment";
   const isBorrowAllRequestsPage = pathname === "/borrow-equipment/approval";
   const isBorrowEquipmentListPage = pathname === "/borrow-equipment/equipment";
@@ -465,6 +487,19 @@ export function DashboardActionPanel({
   };
 
   const updateEquipmentFilter = (
+    key: "q" | "status" | "category" | "room",
+    value: string,
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    replaceCurrentPath(params);
+  };
+
+  const updateMaterialFilter = (
     key: "q" | "status" | "category" | "room",
     value: string,
   ) => {
@@ -674,6 +709,74 @@ export function DashboardActionPanel({
     </FilterCard>
   );
 
+  const renderMaterialFilters = ({
+    keyword,
+    status,
+    category,
+    room,
+    onKeywordChange,
+    onStatusChange,
+    onCategoryChange,
+    onRoomChange,
+    onReset,
+  }: MaterialFilterConfig) => (
+    <FilterCard title="Filter Bahan">
+      <FilterField label="Cari">
+        <DebouncedSearchInput
+          value={keyword}
+          onChange={onKeywordChange}
+          placeholder="Nama atau kategori"
+          className="h-8 text-xs placeholder:text-xs"
+        />
+      </FilterField>
+      <FilterField label="Status">
+        <select
+          value={status}
+          onChange={(event) => onStatusChange(event.target.value)}
+          className={FILTER_CONTROL_CLASS}
+        >
+          <option value="">Semua Status</option>
+          {MATERIAL_STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </FilterField>
+      <FilterField label="Kategori">
+        <select
+          value={category}
+          onChange={(event) => onCategoryChange(event.target.value)}
+          className={FILTER_CONTROL_CLASS}
+        >
+          <option value="">Semua Kategori</option>
+          {MATERIAL_CATEGORY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </FilterField>
+      <FilterField label="Ruangan">
+        <select
+          value={room}
+          onChange={(event) => onRoomChange(event.target.value)}
+          className={FILTER_CONTROL_CLASS}
+        >
+          <option value="">Semua Ruangan</option>
+          {rooms.map((roomOption) => (
+            <option key={roomOption.id} value={roomOption.id}>
+              {roomOption.label}
+            </option>
+          ))}
+        </select>
+      </FilterField>
+      <Button type="button" variant="outline" className={FILTER_BUTTON_CLASS} onClick={onReset}>
+        Reset Filter
+      </Button>
+    </FilterCard>
+  );
+
   const handleActionClick = () => {
     if (mobile) onClose();
   };
@@ -819,6 +922,11 @@ export function DashboardActionPanel({
                   actionIsActive &&
                   action.id === "software" &&
                   isSoftwareListPage;
+                const showMaterialFilters =
+                  menu.id === "use-equipment" &&
+                  actionIsActive &&
+                  action.id === "materials" &&
+                  isMaterialsListPage;
                 const showBorrowFilters =
                   menu.id === "borrow-equipment" &&
                   isActionPathActive(
@@ -1046,6 +1154,25 @@ export function DashboardActionPanel({
                             updateSoftwareFilter("equipment", value),
                           onReset: () =>
                             resetFilters(["q", "equipment"]),
+                        })}
+                    </AnimatedFilterSection>
+
+                    <AnimatedFilterSection show={showMaterialFilters}>
+                      {renderMaterialFilters({
+                          keyword: materialKeyword,
+                          status: materialStatus,
+                          category: materialCategory,
+                          room: materialRoom,
+                          onKeywordChange: (value) =>
+                            updateMaterialFilter("q", value),
+                          onStatusChange: (value) =>
+                            updateMaterialFilter("status", value),
+                          onCategoryChange: (value) =>
+                            updateMaterialFilter("category", value),
+                          onRoomChange: (value) =>
+                            updateMaterialFilter("room", value),
+                          onReset: () =>
+                            resetFilters(["q", "status", "category", "room"]),
                         })}
                     </AnimatedFilterSection>
 

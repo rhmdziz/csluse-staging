@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/selunaa/Projects/csluse-staging/backend/csluse/*.py)"
+    ]
+  }
+}

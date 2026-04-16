@@ -55,6 +55,12 @@ const UseEquipmentFormPage = lazy(
 const EquipmentListPage = lazy(
   () => import("@/pages/dashboard/use-equipment/EquipmentListPage"),
 );
+const MaterialListPage = lazy(
+  () => import("@/pages/dashboard/use-equipment/MaterialListPage"),
+);
+const MaterialDetailPage = lazy(
+  () => import("@/pages/dashboard/use-equipment/MaterialDetailPage"),
+);
 const SoftwareListPage = lazy(() => import("@/pages/dashboard/use-equipment/SoftwareListPage"));
 const EquipmentDetailPage = lazy(
   () => import("@/pages/dashboard/use-equipment/EquipmentDetailPage"),
@@ -98,6 +104,7 @@ const AdminAnnouncementPage = lazy(
 );
 const AdminFaqPage = lazy(() => import("@/pages/admin/information/AdminFaqPage"));
 const AdminEquipmentPage = lazy(() => import("@/pages/admin/inventory/AdminEquipmentPage"));
+const AdminMaterialPage = lazy(() => import("@/pages/admin/inventory/AdminMaterialPage"));
 const AdminSoftwarePage = lazy(() => import("@/pages/admin/inventory/AdminSoftwarePage"));
 const AdminRoomPage = lazy(() => import("@/pages/admin/inventory/AdminRoomPage"));
 const AdminRoomBookingHistoryPage = lazy(
@@ -361,6 +368,22 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "materials",
+        element: (
+          <RequireMenuAccess menuId="use-equipment">
+            {renderPage(MaterialListPage)}
+          </RequireMenuAccess>
+        ),
+      },
+      {
+        path: "materials/:id",
+        element: (
+          <RequireMenuAccess menuId="use-equipment">
+            {renderPage(MaterialDetailPage)}
+          </RequireMenuAccess>
+        ),
+      },
+      {
         path: "equipment/:id",
         element: (
           <RequireMenuAccess menuId="use-equipment">
@@ -544,6 +567,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="equipment" replace /> },
           { path: "equipment", element: renderPage(AdminEquipmentPage) },
+          { path: "materials", element: renderPage(AdminMaterialPage) },
           { path: "software", element: renderPage(AdminSoftwarePage) },
           { path: "rooms", element: renderPage(AdminRoomPage) },
         ],

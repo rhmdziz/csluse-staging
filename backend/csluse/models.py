@@ -103,6 +103,36 @@ class Equipment(BaseModel):
         room_name = self.room.name if self.room else "Tanpa Ruangan"
         return f"{self.name} - {room_name} - Qty: {self.quantity}"
 
+class Material(BaseModel):
+    STATUS_CHOICES = [
+        ("Available", "Available"),
+        ("In Storage", "In Storage"),
+        ("Consumed", "Consumed"),
+        ("Expired", "Expired"),
+    ]
+    CATEGORY_CHOICES = [
+        ("Chemicals", "Chemicals"),
+        ("Biological Materials", "Biological Materials"),
+        ("Consumables", "Consumables"),
+        ("Other", "Other"),
+    ]
+    name = models.CharField(max_length=255)
+    description = models.CharField(max_length=2000, blank=True, null=True)
+    quantity = models.PositiveIntegerField(default=1)
+    unit = models.CharField(max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Available")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="Other")
+    room = models.ForeignKey(
+        Room,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="materials",
+    )
+
+    def __str__(self):
+        room_name = self.room.name if self.room else "Tanpa Ruangan"
+        return f"{self.name} - {room_name} - Qty: {self.quantity} {self.unit or ''}"
 
 class Software(BaseModel):
     name = models.CharField(max_length=255)

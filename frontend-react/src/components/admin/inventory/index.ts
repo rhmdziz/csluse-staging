@@ -1,4 +1,9 @@
 export { default as AdminEquipmentDetailDialog } from "./AdminEquipmentDetailDialog";
+export { default as AdminMaterialDetailDialog } from "./AdminMaterialDetailDialog";
+export { default as MaterialBulkImportByRoomDialog } from "./MaterialBulkImportByRoomDialog";
+export { default as MaterialBulkImportDialog } from "./MaterialBulkImportDialog";
+export { default as MaterialCreateDialog } from "./MaterialCreateDialog";
+export { default as MaterialTable } from "./MaterialTable";
 export { default as AdminRoomDetailDialog } from "./AdminRoomDetailDialog";
 export { default as AdminSoftwareDetailDialog } from "./AdminSoftwareDetailDialog";
 export { default as EquipmentBulkImportByRoomDialog } from "./EquipmentBulkImportByRoomDialog";

@@ -17,6 +17,7 @@ from .models import (
     Equipment,
     FAQ,
     Image,
+    Material,
     Notification,
     Pengujian,
     Room,
@@ -353,6 +354,66 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "quantity",
+            "room_detail",
+        ]
+
+
+class MaterialSerializer(serializers.ModelSerializer):
+    room_detail = RoomSerializer(source="room", read_only=True)
+
+    class Meta:
+        model = Material
+        fields = [
+            "id",
+            "name",
+            "description",
+            "quantity",
+            "unit",
+            "status",
+            "category",
+            "room",
+            "room_detail",
+        ]
+
+
+class MaterialRoomListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = [
+            "id",
+            "name",
+            "number",
+        ]
+
+
+class MaterialListSerializer(serializers.ModelSerializer):
+    room_detail = MaterialRoomListSerializer(source="room", read_only=True)
+
+    class Meta:
+        model = Material
+        fields = [
+            "id",
+            "name",
+            "description",
+            "quantity",
+            "unit",
+            "status",
+            "category",
+            "room",
+            "room_detail",
+        ]
+
+
+class MaterialDropdownSerializer(serializers.ModelSerializer):
+    room_detail = MaterialRoomListSerializer(source="room", read_only=True)
+
+    class Meta:
+        model = Material
+        fields = [
+            "id",
+            "name",
+            "quantity",
+            "unit",
             "room_detail",
         ]
 

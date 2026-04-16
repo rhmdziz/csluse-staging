@@ -21,6 +21,7 @@ from .models import (
     Document,
     Room,
     Equipment,
+    Material,
     Software,
     Booking,
     Borrow,
@@ -42,6 +43,9 @@ from .serializers import (
     EquipmentSerializer,
     EquipmentListSerializer,
     EquipmentDropdownSerializer,
+    MaterialSerializer,
+    MaterialListSerializer,
+    MaterialDropdownSerializer,
     SoftwareSerializer,
     SoftwareListSerializer,
     BookingSerializer,
@@ -687,6 +691,199 @@ class EquipmentViewSet(viewsets.ModelViewSet):
         )
 
         return Response({'occupied': occupied})
+
+
+class MaterialViewSet(viewsets.ModelViewSet):
+    queryset = (
+        Material.objects
+        .select_related('room')
+        .order_by('-created_at')
+    )
+    serializer_class = MaterialSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = DefaultPagination
+
+    def get_serializer_class(self):
+        if self.action == "dropdown":
+            return MaterialDropdownSerializer
+        if self.action == "list":
+            return MaterialListSerializer
+        return MaterialSerializer
+
+    def get_permissions(self):
+        if self.action in {"create", "bulk_create"}:
+            return [IsAuthenticated(), IsStaffOrAbove()]
+        if self.action in {"update", "partial_update", "destroy", "bulk_delete"}:
+            return [IsAuthenticated(), IsAdministratorOrAbove()]
+        return super().get_permissions()
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("status", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter("category", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter("room", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_param = self.request.query_params.get('status')
+        category = self.request.query_params.get('category')
+        room_id = self.request.query_params.get('room')
+        query = (self.request.query_params.get('q') or self.request.query_params.get('search') or '').strip()
+
+        if status_param:
+            qs = qs.filter(status=status_param)
+        if category:
+            qs = qs.filter(category=category)
+        if room_id:
+            qs = qs.filter(room_id=room_id)
+        if query:
+            qs = qs.filter(
+                Q(name__icontains=query)
+                | Q(category__icontains=query)
+                | Q(status__icontains=query)
+                | Q(unit__icontains=query)
+                | Q(room__name__icontains=query)
+                | Q(description__icontains=query)
+            ).distinct()
+        return qs
+
+    def perform_update(self, serializer):
+        new_instance = serializer.save()
+        log_admin_action(
+            self.request.user,
+            new_instance,
+            CHANGE,
+            "Updated material via CSL Admin (inventory).",
+        )
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_admin_action(
+            self.request.user,
+            instance,
+            ADDITION,
+            "Created material via CSL Admin (inventory).",
+        )
+
+    @action(detail=False, methods=['post'], url_path='bulk-create')
+    def bulk_create(self, request):
+        rows = request.data.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return Response(
+                {"detail": "rows wajib berupa array dan tidak boleh kosong."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        results = []
+        success_count = 0
+
+        for index, row in enumerate(rows, start=1):
+            row_number = row.get("index", index) if isinstance(row, dict) else index
+            serializer = MaterialSerializer(data=row)
+            if serializer.is_valid():
+                instance = serializer.save()
+                log_admin_action(
+                    self.request.user,
+                    instance,
+                    ADDITION,
+                    "Created material via CSL Admin bulk import.",
+                )
+                results.append({
+                    "index": row_number,
+                    "status": "success",
+                    "message": "Sukses",
+                    "id": str(instance.id),
+                })
+                success_count += 1
+            else:
+                results.append({
+                    "index": row_number,
+                    "status": "error",
+                    "message": serializer.errors,
+                })
+
+        failed_count = len(results) - success_count
+        response_status = (
+            status.HTTP_201_CREATED if failed_count == 0 else status.HTTP_207_MULTI_STATUS
+        )
+        return Response(
+            {
+                "results": results,
+                "success_count": success_count,
+                "failed_count": failed_count,
+            },
+            status=response_status,
+        )
+
+    def _delete_material_instance(self, instance):
+        log_admin_action(
+            self.request.user,
+            instance,
+            DELETION,
+            "Deleted material via CSL Admin (inventory).",
+        )
+        super().perform_destroy(instance)
+
+    def perform_destroy(self, instance):
+        self._delete_material_instance(instance)
+
+    @action(detail=False, methods=['post'], url_path='bulk-delete')
+    def bulk_delete(self, request):
+        if not is_administrator_or_above(request.user):
+            raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data bahan.")
+
+        serializer = RecordBulkDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = serializer.validated_data["ids"]
+
+        material_map = {
+            str(item.id): item
+            for item in Material.objects.filter(id__in=ids)
+        }
+        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in material_map]
+        deleted_ids = []
+
+        for item_id in ids:
+            material = material_map.get(str(item_id))
+            if material is None:
+                continue
+            self._delete_material_instance(material)
+            deleted_ids.append(str(item_id))
+
+        response_status = (
+            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
+        )
+        return Response(
+            {
+                "deleted_ids": deleted_ids,
+                "deleted_count": len(deleted_ids),
+                "failed_ids": missing_ids,
+                "failed_count": len(missing_ids),
+                "detail": (
+                    "Semua bahan terpilih berhasil dihapus."
+                    if not missing_ids
+                    else "Sebagian bahan tidak ditemukan."
+                ),
+            },
+            status=response_status,
+        )
+
+    @action(detail=False, methods=['get'], url_path='dropdown')
+    def dropdown(self, request):
+        queryset = self.get_queryset().order_by('name')
+        serializer = MaterialDropdownSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='export')
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = MaterialListSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class SoftwareViewSet(viewsets.ModelViewSet):
