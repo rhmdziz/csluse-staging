@@ -33,6 +33,7 @@ ALLOWED_HOSTS = [
     ".azizrahmad.com",
     ".onrender.com",
     "127.0.0.1",
+    "108.136.248.15",
 ]
 
 ROOT_URLCONF = "config.urls"
