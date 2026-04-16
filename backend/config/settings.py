@@ -237,6 +237,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "https://csl.azizrahmad.com",
+    "http://108.136.248.15",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -257,6 +258,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://csl.azizrahmad.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://108.136.248.15",
 ]
 
 
