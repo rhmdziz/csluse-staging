@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  AppWindow,
+  Boxes,
   Building2,
   CalendarCheck2,
   Package,
@@ -18,10 +20,7 @@ import { AdminPageHeader } from "@/components/admin/shared";
 import { InlineErrorAlert } from "@/components/shared";
 import { Skeleton } from "@/components/ui";
 import { API_AUTH_ADMIN_DASHBOARD_KPIS } from "@/constants/api";
-import {
-  useAdminActions,
-  type AdminAction,
-} from "@/hooks/admin";
+import { useAdminActions, type AdminAction } from "@/hooks/admin";
 import { useLoadProfile } from "@/hooks/shared/profile";
 import { authFetch } from "@/lib/auth";
 import {
@@ -34,20 +33,36 @@ type AdminKpis = {
   totalUsers: number;
   totalRooms: number;
   totalEquipments: number;
+  totalMaterials: number;
+  totalSoftware: number;
   totalBookings: number;
   totalBorrows: number;
   totalSampleTesting: number;
   totalUseRequest: number;
+  usersByRole: Record<string, number>;
+  usersByType: Record<string, number>;
+  bookingsByStatus: Record<string, number>;
+  borrowsByStatus: Record<string, number>;
+  usesByStatus: Record<string, number>;
+  pengujiansByStatus: Record<string, number>;
 };
 
 type AdminKpisResponse = {
   total_users?: number;
   total_rooms?: number;
   total_equipments?: number;
+  total_materials?: number;
+  total_software?: number;
   total_bookings?: number;
   total_borrows?: number;
   total_uses?: number;
   total_pengujians?: number;
+  users_by_role?: Record<string, number>;
+  users_by_type?: Record<string, number>;
+  bookings_by_status?: Record<string, number>;
+  borrows_by_status?: Record<string, number>;
+  uses_by_status?: Record<string, number>;
+  pengujians_by_status?: Record<string, number>;
 };
 
 function formatActionLabel(action: AdminAction["action"]) {
@@ -160,10 +175,18 @@ export default function Page() {
     totalUsers: 0,
     totalRooms: 0,
     totalEquipments: 0,
+    totalMaterials: 0,
+    totalSoftware: 0,
     totalBookings: 0,
     totalBorrows: 0,
     totalSampleTesting: 0,
     totalUseRequest: 0,
+    usersByRole: {},
+    usersByType: {},
+    bookingsByStatus: {},
+    borrowsByStatus: {},
+    usesByStatus: {},
+    pengujiansByStatus: {},
   });
   const [isLoadingKpis, setIsLoadingKpis] = useState(true);
   const [kpisError, setKpisError] = useState("");
@@ -191,10 +214,18 @@ export default function Page() {
           totalUsers: payload.total_users ?? 0,
           totalRooms: payload.total_rooms ?? 0,
           totalEquipments: payload.total_equipments ?? 0,
+          totalMaterials: payload.total_materials ?? 0,
+          totalSoftware: payload.total_software ?? 0,
           totalBookings: payload.total_bookings ?? 0,
           totalBorrows: payload.total_borrows ?? 0,
           totalSampleTesting: payload.total_pengujians ?? 0,
           totalUseRequest: payload.total_uses ?? 0,
+          usersByRole: payload.users_by_role ?? {},
+          usersByType: payload.users_by_type ?? {},
+          bookingsByStatus: payload.bookings_by_status ?? {},
+          borrowsByStatus: payload.borrows_by_status ?? {},
+          usesByStatus: payload.uses_by_status ?? {},
+          pengujiansByStatus: payload.pengujians_by_status ?? {},
         });
       } catch (loadError) {
         if (
@@ -246,42 +277,62 @@ export default function Page() {
 
       {kpisError ? <InlineErrorAlert>{kpisError}</InlineErrorAlert> : null}
 
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-4 lg:grid-cols-[1fr_3fr]">
         <KpiCard
           label="Pengguna"
           value={isLoadingKpis ? "0" : String(kpis.totalUsers)}
           tone="users"
+          roleBreakdown={isLoadingKpis ? undefined : kpis.usersByRole}
+          className="h-full"
         />
-        <KpiCard
-          label="Ruangan"
-          value={isLoadingKpis ? "0" : String(kpis.totalRooms)}
-          tone="rooms"
-        />
-        <KpiCard
-          label="Peralatan"
-          value={isLoadingKpis ? "0" : String(kpis.totalEquipments)}
-          tone="equipments"
-        />
-        <KpiCard
-          label="Peminjaman Lab"
-          value={isLoadingKpis ? "0" : String(kpis.totalBookings)}
-          tone="bookings"
-        />
-        <KpiCard
-          label="Penggunaan Alat"
-          value={isLoadingKpis ? "0" : String(kpis.totalUseRequest)}
-          tone="useRequest"
-        />
-        <KpiCard
-          label="Peminjaman Alat"
-          value={isLoadingKpis ? "0" : String(kpis.totalBorrows)}
-          tone="borrows"
-        />
-        <KpiCard
-          label="Pengujian Sampel"
-          value={isLoadingKpis ? "0" : String(kpis.totalSampleTesting)}
-          tone="sample-testing"
-        />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 *:h-full">
+          <KpiCard
+            label="Ruangan"
+            value={isLoadingKpis ? "0" : String(kpis.totalRooms)}
+            tone="rooms"
+          />
+          <KpiCard
+            label="Peralatan"
+            value={isLoadingKpis ? "0" : String(kpis.totalEquipments)}
+            tone="equipments"
+          />
+          <KpiCard
+            label="Bahan"
+            value={isLoadingKpis ? "0" : String(kpis.totalMaterials)}
+            tone="materials"
+          />
+          <KpiCard
+            label="Software"
+            value={isLoadingKpis ? "0" : String(kpis.totalSoftware)}
+            tone="software"
+          />
+          <KpiCard
+            label="Peminjaman Lab"
+            value={isLoadingKpis ? "0" : String(kpis.totalBookings)}
+            tone="bookings"
+            statusBreakdown={isLoadingKpis ? undefined : kpis.bookingsByStatus}
+          />
+          <KpiCard
+            label="Penggunaan Alat"
+            value={isLoadingKpis ? "0" : String(kpis.totalUseRequest)}
+            tone="useRequest"
+            statusBreakdown={isLoadingKpis ? undefined : kpis.usesByStatus}
+          />
+          <KpiCard
+            label="Peminjaman Alat"
+            value={isLoadingKpis ? "0" : String(kpis.totalBorrows)}
+            tone="borrows"
+            statusBreakdown={isLoadingKpis ? undefined : kpis.borrowsByStatus}
+          />
+          <KpiCard
+            label="Pengujian Sampel"
+            value={isLoadingKpis ? "0" : String(kpis.totalSampleTesting)}
+            tone="sample-testing"
+            statusBreakdown={
+              isLoadingKpis ? undefined : kpis.pengujiansByStatus
+            }
+          />
+        </div>
       </div>
 
       {error ? <InlineErrorAlert>{error}</InlineErrorAlert> : null}
@@ -309,19 +360,53 @@ function HomePageSkeleton() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        {Array.from({ length: 7 }).map((_, index) => (
-          <div
-            key={`kpi-skeleton-${index}`}
-            className="relative overflow-hidden rounded-lg border bg-white p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-7 w-7 rounded-lg" />
-            </div>
-            <Skeleton className="mt-3 h-8 w-14" />
+      <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+        {/* Pengguna skeleton */}
+        <div className="relative overflow-hidden rounded-lg border bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-7 w-7 rounded-lg" />
           </div>
-        ))}
+          <Skeleton className="mt-3 h-8 w-14" />
+          <Skeleton className="mt-3 h-2 w-full rounded-full" />
+          <div className="mt-2 flex gap-2">
+            <Skeleton className="h-2 w-14" />
+            <Skeleton className="h-2 w-14" />
+            <Skeleton className="h-2 w-10" />
+          </div>
+        </div>
+        {/* Inventaris + Layanan 4×2 */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`kpi-sk-inv-${index}`}
+              className="relative overflow-hidden rounded-lg border bg-white p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-7 w-7 rounded-lg" />
+              </div>
+              <Skeleton className="mt-3 h-8 w-14" />
+            </div>
+          ))}
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`kpi-sk-svc-${index}`}
+              className="rounded-lg border bg-white p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-7 w-7 rounded-lg" />
+              </div>
+              <Skeleton className="mt-3 h-8 w-14" />
+              <Skeleton className="mt-3 h-2 w-full rounded-full" />
+              <div className="mt-2 flex gap-2">
+                <Skeleton className="h-2 w-14" />
+                <Skeleton className="h-2 w-10" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -361,39 +446,19 @@ type KpiTone =
   | "users"
   | "rooms"
   | "equipments"
+  | "materials"
+  | "software"
   | "bookings"
   | "borrows"
   | "sample-testing"
   | "useRequest";
 
-function getKpiToneClass(tone: KpiTone) {
-  if (tone === "users") return "border-sky-300 from-sky-100 to-sky-200/80";
-  if (tone === "rooms")
-    return "border-emerald-300 from-emerald-100 to-emerald-200/80";
-  if (tone === "equipments")
-    return "border-violet-300 from-violet-100 to-violet-200/80";
-  if (tone === "bookings")
-    return "border-amber-300 from-amber-100 to-amber-200/80";
-  if (tone === "borrows") return "border-rose-300 from-rose-100 to-rose-200/80";
-  if (tone === "sample-testing")
-    return "border-cyan-300 from-cyan-100 to-cyan-200/80";
-  return "border-indigo-300 from-indigo-100 to-indigo-200/80";
-}
-
-function getKpiValueToneClass(tone: KpiTone) {
-  if (tone === "users") return "text-sky-800";
-  if (tone === "rooms") return "text-emerald-800";
-  if (tone === "equipments") return "text-violet-800";
-  if (tone === "bookings") return "text-amber-800";
-  if (tone === "borrows") return "text-rose-800";
-  if (tone === "sample-testing") return "text-cyan-800";
-  return "text-indigo-800";
-}
-
 function getKpiIcon(tone: KpiTone) {
   if (tone === "users") return Users;
   if (tone === "rooms") return Building2;
   if (tone === "equipments") return Package;
+  if (tone === "materials") return Boxes;
+  if (tone === "software") return AppWindow;
   if (tone === "bookings") return CalendarCheck2;
   if (tone === "borrows") return Handshake;
   if (tone === "sample-testing") return Sparkles;
@@ -404,20 +469,152 @@ function getKpiIconToneClass(tone: KpiTone) {
   if (tone === "users") return "bg-sky-100 text-sky-700";
   if (tone === "rooms") return "bg-emerald-100 text-emerald-700";
   if (tone === "equipments") return "bg-violet-100 text-violet-700";
+  if (tone === "materials") return "bg-orange-100 text-orange-700";
+  if (tone === "software") return "bg-fuchsia-100 text-fuchsia-700";
   if (tone === "bookings") return "bg-amber-100 text-amber-700";
   if (tone === "borrows") return "bg-rose-100 text-rose-700";
   if (tone === "sample-testing") return "bg-cyan-100 text-cyan-700";
   return "bg-indigo-100 text-indigo-700";
 }
 
+const STATUS_COLOR_MAP: Record<string, string> = {
+  Pending: "bg-amber-400",
+  Approved: "bg-emerald-500",
+  Rejected: "bg-rose-500",
+  Expired: "bg-slate-400",
+  Completed: "bg-sky-500",
+  Borrowed: "bg-blue-500",
+  "Returned Pending Inspection": "bg-violet-400",
+  Returned: "bg-teal-500",
+  Overdue: "bg-orange-500",
+  "Lost/Damaged": "bg-red-700",
+  Diproses: "bg-cyan-500",
+  "Menunggu Pembayaran": "bg-yellow-500",
+};
+
+const STATUS_LABEL_ID: Record<string, string> = {
+  Pending: "Menunggu",
+  Approved: "Disetujui",
+  Rejected: "Ditolak",
+  Expired: "Kedaluwarsa",
+  Completed: "Selesai",
+  Borrowed: "Dipinjam",
+  "Returned Pending Inspection": "Dikembalikan (Cek)",
+  Returned: "Dikembalikan",
+  Overdue: "Terlambat",
+  "Lost/Damaged": "Hilang/Rusak",
+  Diproses: "Diproses",
+  "Menunggu Pembayaran": "Menunggu Pembayaran",
+};
+
+function getStatusColor(status: string): string {
+  return STATUS_COLOR_MAP[status] ?? "bg-slate-300";
+}
+
+function getStatusLabel(status: string): string {
+  return STATUS_LABEL_ID[status] ?? status;
+}
+
+const ROLE_COLOR_MAP: Record<string, string> = {
+  Admin: "bg-violet-600",
+  Staff: "bg-sky-600",
+  Lecturer: "bg-emerald-500",
+  Student: "bg-amber-400",
+  Guest: "bg-rose-400",
+};
+
+const ROLE_COLOR_CSS: Record<string, string> = {
+  Admin: "#7c3aed",
+  Staff: "#0284c7",
+  Lecturer: "#10b981",
+  Student: "#fbbf24",
+  Guest: "#fb7185",
+};
+
+const ROLE_LABEL_ID: Record<string, string> = {
+  Admin: "Admin",
+  Staff: "Staff",
+  Lecturer: "Dosen",
+  Student: "Mahasiswa",
+  Guest: "Tamu",
+};
+
+function getRoleColor(role: string): string {
+  return ROLE_COLOR_MAP[role] ?? "bg-slate-300";
+}
+
+function getRoleLabel(role: string): string {
+  return ROLE_LABEL_ID[role] ?? role;
+}
+
+function RolePieChart({
+  entries,
+  total,
+}: {
+  entries: [string, number][];
+  total: number;
+}) {
+  const cx = 50,
+    cy = 50,
+    oR = 44,
+    iR = 30;
+  let angle = -Math.PI / 2;
+
+  const slices = entries.map(([role, count]) => {
+    const sweep = (count / total) * 2 * Math.PI;
+    const end = angle + sweep;
+    const isFull = sweep >= 2 * Math.PI - 0.001;
+    const large = sweep > Math.PI ? 1 : 0;
+    const ox1 = cx + oR * Math.cos(angle),
+      oy1 = cy + oR * Math.sin(angle);
+    const ox2 = cx + oR * Math.cos(end),
+      oy2 = cy + oR * Math.sin(end);
+    const ix1 = cx + iR * Math.cos(end),
+      iy1 = cy + iR * Math.sin(end);
+    const ix2 = cx + iR * Math.cos(angle),
+      iy2 = cy + iR * Math.sin(angle);
+    const path = `M${ox1} ${oy1} A${oR} ${oR} 0 ${large} 1 ${ox2} ${oy2} L${ix1} ${iy1} A${iR} ${iR} 0 ${large} 0 ${ix2} ${iy2}Z`;
+    angle = end;
+    return { role, count, path, isFull };
+  });
+
+  return (
+    <svg viewBox="0 0 100 100" className="h-42 w-42 shrink-0">
+      {slices.map(({ role, count, path, isFull }) =>
+        isFull ? (
+          <g key={role}>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={oR}
+              fill={ROLE_COLOR_CSS[role] ?? "#94a3b8"}
+            />
+            <circle cx={cx} cy={cy} r={iR} fill="white" />
+          </g>
+        ) : (
+          <path key={role} d={path} fill={ROLE_COLOR_CSS[role] ?? "#94a3b8"}>
+            <title>{`${getRoleLabel(role)}: ${count}`}</title>
+          </path>
+        ),
+      )}
+    </svg>
+  );
+}
+
 function KpiCard({
   label,
   value,
   tone,
+  statusBreakdown,
+  roleBreakdown,
+  className,
 }: {
   label: string;
   value: string;
   tone: KpiTone;
+  statusBreakdown?: Record<string, number>;
+  roleBreakdown?: Record<string, number>;
+  className?: string;
 }) {
   const Icon = getKpiIcon(tone);
   const [animatedValue, setAnimatedValue] = useState(0);
@@ -456,13 +653,74 @@ function KpiCard({
     ? new Intl.NumberFormat("id-ID").format(animatedValue)
     : value;
 
+  if (statusBreakdown !== undefined) {
+    const entries = Object.entries(statusBreakdown).filter(([, n]) => n > 0);
+    const total = entries.reduce((a, [, n]) => a + n, 0);
+
+    return (
+      <div
+        className={`relative overflow-hidden rounded-lg border bg-white p-4 ${className ?? ""}`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {label}
+          </p>
+          <span
+            className={`inline-flex rounded-lg p-1.5 ${getKpiIconToneClass(tone)}`}
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+        </div>
+        <p className="mt-3 text-3xl font-bold leading-none text-slate-900">
+          {displayValue}
+        </p>
+        {entries.length > 0 && total > 0 ? (
+          <div className="mt-3 space-y-2">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              {entries.map(([status, count]) => (
+                <div
+                  key={status}
+                  className={`h-full ${getStatusColor(status)}`}
+                  style={{ width: `${(count / total) * 100}%` }}
+                  title={`${getStatusLabel(status)}: ${count}`}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {entries.map(([status, count]) => (
+                <span
+                  key={status}
+                  className="flex items-center gap-1 text-[10px] text-slate-600"
+                >
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${getStatusColor(status)}`}
+                  />
+                  {getStatusLabel(status)}{" "}
+                  <span className="font-semibold text-slate-800">{count}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] text-slate-400">
+            Belum ada pengajuan.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const roleEntries = roleBreakdown
+    ? Object.entries(roleBreakdown).filter(([, n]) => n > 0)
+    : [];
+  const roleTotal = roleEntries.reduce((a, [, n]) => a + n, 0);
+
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border bg-linear-to-br p-4 ${getKpiToneClass(tone)}`}
+      className={`relative overflow-hidden rounded-lg border bg-white p-4 ${className ?? ""}`}
     >
-      <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/40 blur-lg" />
-      <div className="relative flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           {label}
         </p>
         <span
@@ -471,11 +729,28 @@ function KpiCard({
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p
-        className={`relative mt-3 text-3xl font-bold leading-none ${getKpiValueToneClass(tone)}`}
-      >
+      <p className="mt-3 text-3xl font-bold leading-none text-slate-900">
         {displayValue}
       </p>
+      {roleEntries.length > 0 && roleTotal > 0 && (
+        <div className="mt-3 flex items-center gap-4">
+          <RolePieChart entries={roleEntries} total={roleTotal} />
+          <div className="flex flex-col gap-1.5">
+            {roleEntries.map(([role, count]) => (
+              <span
+                key={role}
+                className="flex items-center gap-1.5 text-xs text-slate-600"
+              >
+                <span
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${getRoleColor(role)}`}
+                />
+                <span>{getRoleLabel(role)}</span>
+                <span className="font-semibold text-slate-900">{count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -154,7 +154,7 @@ export default function EquipmentDetailPageContent() {
   const params = useParams<EquipmentDetailParams>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const isBorrowCatalogDetail = pathname.startsWith("/borrow-equipment/equipment/");
-  const backHref = isBorrowCatalogDetail ? "/borrow-equipment/equipment" : "/equipment";
+  const backHref = isBorrowCatalogDetail ? "/borrow-equipment/equipment" : "/use-equipment/equipment";
   const backLabel = isBorrowCatalogDetail
     ? "Kembali ke Daftar Alat Pinjam"
     : "Kembali ke Daftar Peralatan";

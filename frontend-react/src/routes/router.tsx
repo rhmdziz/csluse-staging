@@ -349,47 +349,47 @@ export const router = createBrowserRouter([
               </RequireFeatureScope>
             ),
           },
+          {
+            path: "equipment",
+            element: (
+              <RequireMenuAccess menuId="use-equipment">
+                {renderPage(EquipmentListPage)}
+              </RequireMenuAccess>
+            ),
+          },
+          {
+            path: "equipment/:id",
+            element: (
+              <RequireMenuAccess menuId="use-equipment">
+                {renderPage(EquipmentDetailPage)}
+              </RequireMenuAccess>
+            ),
+          },
+          {
+            path: "software",
+            element: (
+              <RequireMenuAccess menuId="use-equipment">
+                {renderPage(SoftwareListPage)}
+              </RequireMenuAccess>
+            ),
+          },
+          {
+            path: "materials",
+            element: (
+              <RequireMenuAccess menuId="use-equipment">
+                {renderPage(MaterialListPage)}
+              </RequireMenuAccess>
+            ),
+          },
+          {
+            path: "materials/:id",
+            element: (
+              <RequireMenuAccess menuId="use-equipment">
+                {renderPage(MaterialDetailPage)}
+              </RequireMenuAccess>
+            ),
+          },
         ],
-      },
-      {
-        path: "equipment",
-        element: (
-          <RequireMenuAccess menuId="use-equipment">
-            {renderPage(EquipmentListPage)}
-          </RequireMenuAccess>
-        ),
-      },
-      {
-        path: "software",
-        element: (
-          <RequireMenuAccess menuId="use-equipment">
-            {renderPage(SoftwareListPage)}
-          </RequireMenuAccess>
-        ),
-      },
-      {
-        path: "materials",
-        element: (
-          <RequireMenuAccess menuId="use-equipment">
-            {renderPage(MaterialListPage)}
-          </RequireMenuAccess>
-        ),
-      },
-      {
-        path: "materials/:id",
-        element: (
-          <RequireMenuAccess menuId="use-equipment">
-            {renderPage(MaterialDetailPage)}
-          </RequireMenuAccess>
-        ),
-      },
-      {
-        path: "equipment/:id",
-        element: (
-          <RequireMenuAccess menuId="use-equipment">
-            {renderPage(EquipmentDetailPage)}
-          </RequireMenuAccess>
-        ),
       },
       {
         path: "sample-testing",

@@ -117,7 +117,7 @@ export default function MaterialDetailPageContent() {
   const router = useRouter();
   const params = useParams<MaterialDetailParams>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
-  const backHref = "/materials";
+  const backHref = "/use-equipment/materials";
 
   const { material, isLoading, error } = useMaterialDetail(id);
 

@@ -235,21 +235,21 @@ export const SIDEBAR_SHORTCUTS: SidebarShortcut[] = [
         id: "equipment",
         label: "Peralatan yang Tersedia",
         description: "Lihat daftar peralatan yang tersedia untuk pengajuan penggunaan alat.",
-        href: "/equipment",
+        href: "/use-equipment/equipment",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
       {
         id: "materials",
         label: "Bahan yang Tersedia",
         description: "Lihat daftar bahan habis pakai yang tersedia di laboratorium.",
-        href: "/materials",
+        href: "/use-equipment/materials",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
       {
         id: "software",
         label: "Daftar Software",
         description: "Lihat daftar software yang tersedia pada peralatan laboratorium.",
-        href: "/software",
+        href: "/use-equipment/software",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
     ],
@@ -475,16 +475,16 @@ export function parseDashboardPath(pathname: string) {
     if (parts[1] === "form") {
       return { menu: "use-equipment", action: "request-form" };
     }
+    if (parts[1] === "equipment") {
+      return { menu: "use-equipment", action: "equipment" };
+    }
+    if (parts[1] === "software") {
+      return { menu: "use-equipment", action: "software" };
+    }
+    if (parts[1] === "materials") {
+      return { menu: "use-equipment", action: "materials" };
+    }
     return { menu: "use-equipment", action: "request-list" };
-  }
-  if (parts[0] === "equipment") {
-    return { menu: "use-equipment", action: "equipment" };
-  }
-  if (parts[0] === "software") {
-    return { menu: "use-equipment", action: "software" };
-  }
-  if (parts[0] === "materials") {
-    return { menu: "use-equipment", action: "materials" };
   }
   if (parts[0] === "sample-testing") {
     if (parts[1] === "approval") {

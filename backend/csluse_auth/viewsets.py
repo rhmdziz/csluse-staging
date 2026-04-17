@@ -4,7 +4,7 @@ from allauth.account.models import EmailAddress
 from django.contrib.admin.models import CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -13,7 +13,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from csluse.models import Booking, Borrow, Equipment, Pengujian, Room, Use
+from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room, Software, Use
 from csluse.viewsets import DefaultPagination
 
 from .audit import log_admin_action
@@ -456,6 +456,11 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
+def _status_breakdown(model):
+    rows = model.objects.values("status").annotate(n=Count("id"))
+    return {row["status"]: row["n"] for row in rows}
+
+
 class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
     http_method_names = ["get"]
@@ -468,10 +473,24 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             "total_users": User.objects.count(),
             "total_rooms": Room.objects.count(),
             "total_equipments": Equipment.objects.count(),
+            "total_materials": Material.objects.count(),
+            "total_software": Software.objects.count(),
             "total_bookings": Booking.objects.count(),
             "total_borrows": Borrow.objects.count(),
             "total_uses": Use.objects.count(),
             "total_pengujians": Pengujian.objects.count(),
+            "users_by_role": {
+                row["role"]: row["n"]
+                for row in Profile.objects.filter(role__isnull=False).values("role").annotate(n=Count("id"))
+            },
+            "users_by_type": {
+                row["user_type"]: row["n"]
+                for row in Profile.objects.values("user_type").annotate(n=Count("id"))
+            },
+            "bookings_by_status": _status_breakdown(Booking),
+            "borrows_by_status": _status_breakdown(Borrow),
+            "uses_by_status": _status_breakdown(Use),
+            "pengujians_by_status": _status_breakdown(Pengujian),
         }
         return Response(data)
 

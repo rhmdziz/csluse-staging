@@ -337,9 +337,9 @@ export function DashboardActionPanel({
   const isRoomsListPage = pathname === "/rooms";
   const isUseRequestListPage = pathname === "/use-equipment";
   const isUseAllRequestsPage = pathname === "/use-equipment/approval";
-  const isEquipmentListPage = pathname === "/equipment";
-  const isSoftwareListPage = pathname === "/software";
-  const isMaterialsListPage = pathname === "/materials";
+  const isEquipmentListPage = pathname === "/use-equipment/equipment";
+  const isSoftwareListPage = pathname === "/use-equipment/software";
+  const isMaterialsListPage = pathname === "/use-equipment/materials";
   const materialKeyword = searchParams.get("q") ?? "";
   const materialStatus = searchParams.get("status") ?? "";
   const materialCategory = searchParams.get("category") ?? "";
