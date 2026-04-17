@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleDollarSign,
+  ClipboardCheck,
   Eye,
   FileText,
   FlaskConical,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
+
+import { DashboardDetailReviewDialog } from "@/components/dashboard/layout/DashboardDetailReviewDialog";
 
 import {
   SampleTestingDocumentsDialog,
@@ -61,6 +64,9 @@ export default function SampleTestingAllListPage() {
     string | null
   >(null);
   const [documentsSampleTestingId, setDocumentsSampleTestingId] = useState<
+    string | null
+  >(null);
+  const [reviewSampleTestingId, setReviewSampleTestingId] = useState<
     string | null
   >(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -241,6 +247,17 @@ export default function SampleTestingAllListPage() {
                   </td>
                   <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
                     <div className="flex items-center justify-center gap-2">
+                      {normalizeStatus(item.status) === "pending" ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Review"
+                          icon={<ClipboardCheck className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-sky-200 bg-sky-50 p-0 text-sky-700 shadow-none hover:bg-sky-100"
+                          onClick={() =>
+                            setReviewSampleTestingId(String(item.id))
+                          }
+                        />
+                      ) : null}
                       {canShowDocumentAction(item.status) ? (
                         <TableActionIconButton
                           type="button"
@@ -307,6 +324,21 @@ export default function SampleTestingAllListPage() {
         sampleTestingId={documentsSampleTestingId}
         viewerRole="approver"
         onUploaded={() => setReloadKey((prev) => prev + 1)}
+      />
+      <DashboardDetailReviewDialog
+        open={Boolean(reviewSampleTestingId)}
+        onOpenChange={(open) => {
+          if (!open) setReviewSampleTestingId(null);
+        }}
+        context={
+          reviewSampleTestingId
+            ? { kind: "sample-testing", id: reviewSampleTestingId }
+            : null
+        }
+        onActionComplete={() => {
+          setReviewSampleTestingId(null);
+          setReloadKey((prev) => prev + 1);
+        }}
       />
     </section>
   );

@@ -172,7 +172,9 @@ class Booking(BaseModel):
     code = models.CharField(max_length=12, unique=True, editable=False, null=True)
     requested_by = models.ForeignKey(
         Profile,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="bookings",
     )
     requester_phone = models.CharField(max_length=20, blank=True, null=True)
@@ -198,7 +200,9 @@ class Booking(BaseModel):
 
     room = models.ForeignKey(
         Room,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="bookings",
     )
     start_time = models.DateTimeField()
@@ -245,7 +249,9 @@ class BookingEquipmentItem(BaseModel):
     )
     equipment = models.ForeignKey(
         Equipment,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="booking_items",
     )
     quantity = models.PositiveIntegerField(default=1)
@@ -272,7 +278,9 @@ class Use(BaseModel):
     code = models.CharField(max_length=12, unique=True, editable=False, null=True)
     requested_by = models.ForeignKey(
         Profile,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="uses",
     )
     requester_phone = models.CharField(max_length=20, blank=True, null=True)
@@ -293,7 +301,9 @@ class Use(BaseModel):
 
     equipment = models.ForeignKey(
         Equipment,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="uses",
     )
     quantity = models.PositiveIntegerField(default=1)
@@ -349,7 +359,9 @@ class Borrow(BaseModel):
     code = models.CharField(max_length=12, unique=True, editable=False, null=True)
     requested_by = models.ForeignKey(
         Profile,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="borrows",
     )
     requester_phone = models.CharField(max_length=20, blank=True, null=True)
@@ -370,7 +382,9 @@ class Borrow(BaseModel):
 
     equipment = models.ForeignKey(
         Equipment,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="borrows",
     )
     start_time = models.DateTimeField()
@@ -443,7 +457,9 @@ class Pengujian(BaseModel):
     sample_testing_type = models.CharField(max_length=255, blank=True, null=True)
     requested_by = models.ForeignKey(
         Profile,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="pengujians",
     )
     approved_by = models.ForeignKey(
