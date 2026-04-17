@@ -43,6 +43,7 @@ import {
   EQUIPMENT_CATEGORY_OPTIONS,
   EQUIPMENT_STATUS_OPTIONS,
   MOVEABLE_OPTIONS,
+  USEABLE_OPTIONS,
 } from "@/constants/equipments";
 
 import { API_EQUIPMENTS_EXPORT } from "@/constants/api";
@@ -58,6 +59,8 @@ import {
 } from "@/hooks/shared/resources/equipments";
 
 import { useUpdateEquipment } from "@/hooks/shared/resources/equipments";
+
+import { equipmentsService } from "@/services/shared/resources/equipments.service";
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
@@ -119,6 +122,7 @@ export default function AdminEquipmentsPage() {
   const [pic, setPic] = useState("");
   const [moveable, setMoveable] = useState("");
   const [borrowable, setBorrowable] = useState("");
+  const [useable, setUseable] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
@@ -136,6 +140,7 @@ export default function AdminEquipmentsPage() {
   const [isExportingSelectedPdf, setIsExportingSelectedPdf] = useState(false);
   const [isExportingSelectedExcel, setIsExportingSelectedExcel] =
     useState(false);
+  const [isBulkSettingFlag, setIsBulkSettingFlag] = useState(false);
   const [togglingEquipmentId, setTogglingEquipmentId] = useState<
     string | number | null
   >(null);
@@ -165,6 +170,7 @@ export default function AdminEquipmentsPage() {
         pic,
         is_moveable: moveable,
         is_borrowable: borrowable,
+        is_useable: useable,
       },
       reloadKey,
     );
@@ -224,6 +230,7 @@ export default function AdminEquipmentsPage() {
         pic,
         is_moveable: moveable,
         is_borrowable: borrowable,
+        is_useable: useable,
         q: debouncedSearch,
       },
       mapItem: mapEquipment,
@@ -245,6 +252,7 @@ export default function AdminEquipmentsPage() {
     setPic("");
     setMoveable("");
     setBorrowable("");
+    setUseable("");
     setPage(1);
   };
 
@@ -320,6 +328,45 @@ export default function AdminEquipmentsPage() {
     toast.success(`${result.deletedCount ?? 0} peralatan berhasil dihapus.`);
   };
 
+  const handleBulkSetShareable = async (value: boolean) => {
+    if (!selectedIds.length) return;
+    setIsBulkSettingFlag(true);
+    const result = await equipmentsService.bulkSetShareable(selectedIds, value);
+    setIsBulkSettingFlag(false);
+    if (!result.ok) {
+      toast.error("Gagal mengubah shareable peralatan terpilih.");
+      return;
+    }
+    setReloadKey((prev) => prev + 1);
+    toast.success(`${selectedIds.length} peralatan ditandai sebagai ${value ? "shareable" : "tidak shareable"}.`);
+  };
+
+  const handleBulkSetBorrowable = async (value: boolean) => {
+    if (!selectedIds.length) return;
+    setIsBulkSettingFlag(true);
+    const result = await equipmentsService.bulkSetBorrowable(selectedIds, value);
+    setIsBulkSettingFlag(false);
+    if (!result.ok) {
+      toast.error("Gagal mengubah borrowable peralatan terpilih.");
+      return;
+    }
+    setReloadKey((prev) => prev + 1);
+    toast.success(`${selectedIds.length} peralatan ditandai sebagai ${value ? "borrowable" : "tidak borrowable"}.`);
+  };
+
+  const handleBulkSetUseable = async (value: boolean) => {
+    if (!selectedIds.length) return;
+    setIsBulkSettingFlag(true);
+    const result = await equipmentsService.bulkSetUseable(selectedIds, value);
+    setIsBulkSettingFlag(false);
+    if (!result.ok) {
+      toast.error("Gagal mengubah useable peralatan terpilih.");
+      return;
+    }
+    setReloadKey((prev) => prev + 1);
+    toast.success(`${selectedIds.length} peralatan ditandai sebagai ${value ? "useable" : "tidak useable"}.`);
+  };
+
   const handleExportSelectedPdf = async () => {
     try {
       setIsExportingSelectedPdf(true);
@@ -386,7 +433,7 @@ export default function AdminEquipmentsPage() {
                 setPage(1);
               }}
             >
-              <AdminFilterGrid columns={5}>
+              <AdminFilterGrid columns={6}>
                 <AdminFilterField label="Cari">
                   <Input
                     type="search"
@@ -433,6 +480,15 @@ export default function AdminEquipmentsPage() {
                   options={BORROWABLE_OPTIONS}
                   onChange={(value) => {
                     setBorrowable(value);
+                    setPage(1);
+                  }}
+                />
+                <FilterSelectField
+                  label="Useable"
+                  value={useable}
+                  options={USEABLE_OPTIONS}
+                  onChange={(value) => {
+                    setUseable(value);
                     setPage(1);
                   }}
                 />
@@ -488,16 +544,16 @@ export default function AdminEquipmentsPage() {
             <InventoryBulkActions
               selectedCount={selectedCount}
               isDeleting={isDeleting}
+              isBulkSettingFlag={isBulkSettingFlag}
               isExportingSelectedPdf={isExportingSelectedPdf}
               isExportingSelectedExcel={isExportingSelectedExcel}
               onClearSelection={() => setSelectedIds([])}
               onDeleteSelected={() => setIsBulkDeleteOpen(true)}
-              onExportSelectedPdf={() => {
-                void handleExportSelectedPdf();
-              }}
-              onExportSelectedExcel={() => {
-                void handleExportSelectedExcel();
-              }}
+              onExportSelectedPdf={() => { void handleExportSelectedPdf(); }}
+              onExportSelectedExcel={() => { void handleExportSelectedExcel(); }}
+              onSetShareable={(value) => { void handleBulkSetShareable(value); }}
+              onSetBorrowable={(value) => { void handleBulkSetBorrowable(value); }}
+              onSetUseable={(value) => { void handleBulkSetUseable(value); }}
             />
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-end">
               <p className="text-xs text-muted-foreground sm:text-right">

@@ -53,6 +53,7 @@ from .serializers import (
     BookingUserListSerializer,
     BorrowSerializer,
     RecordBulkDeleteSerializer,
+    BulkSetBooleanSerializer,
     BorrowListSerializer,
     AnnouncementListSerializer,
     AnnouncementSerializer,
@@ -464,7 +465,10 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in {"create", "bulk_create"}:
             return [IsAuthenticated(), IsStaffOrAbove()]
-        if self.action in {"update", "partial_update", "destroy", "bulk_delete"}:
+        if self.action in {
+            "update", "partial_update", "destroy", "bulk_delete",
+            "bulk_set_shareable", "bulk_set_borrowable", "bulk_set_useable",
+        }:
             return [IsAuthenticated(), IsAdministratorOrAbove()]
         return super().get_permissions()
 
@@ -477,6 +481,7 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
             OpenApiParameter("is_moveable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
             OpenApiParameter("is_borrowable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+            OpenApiParameter("is_useable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
             OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY),
         ]
     )
@@ -491,6 +496,7 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
         is_moveable = self.request.query_params.get('is_moveable')
         is_borrowable = self.request.query_params.get('is_borrowable')
+        is_useable = self.request.query_params.get('is_useable')
 
         # Filter params: status, category, room, pic, is_moveable, is_borrowable, created range
         if is_active_status_filter(status_param):
@@ -513,6 +519,11 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 qs = qs.filter(is_borrowable=True)
             elif str(is_borrowable).lower() in ['false', '0', 'no']:
                 qs = qs.filter(is_borrowable=False)
+        if is_useable is not None:
+            if str(is_useable).lower() in ['true', '1', 'yes']:
+                qs = qs.filter(is_useable=True)
+            elif str(is_useable).lower() in ['false', '0', 'no']:
+                qs = qs.filter(is_useable=False)
         query = (self.request.query_params.get('q') or self.request.query_params.get('search') or '').strip()
         if query:
             qs = qs.filter(
@@ -616,6 +627,31 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data peralatan.")
+
+    def _bulk_set_flag(self, request, field_name):
+        if not is_administrator_or_above(request.user):
+            raise PermissionDenied("Anda tidak memiliki akses untuk mengubah data peralatan.")
+        serializer = BulkSetBooleanSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = serializer.validated_data["ids"]
+        value = serializer.validated_data["value"]
+        updated = Equipment.objects.filter(id__in=ids).update(**{field_name: value})
+        return Response(
+            {"detail": f"{updated} peralatan berhasil diperbarui.", "updated_count": updated},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=['post'], url_path='bulk-set-shareable')
+    def bulk_set_shareable(self, request):
+        return self._bulk_set_flag(request, "is_shareable")
+
+    @action(detail=False, methods=['post'], url_path='bulk-set-borrowable')
+    def bulk_set_borrowable(self, request):
+        return self._bulk_set_flag(request, "is_borrowable")
+
+    @action(detail=False, methods=['post'], url_path='bulk-set-useable')
+    def bulk_set_useable(self, request):
+        return self._bulk_set_flag(request, "is_useable")
 
     @action(detail=False, methods=['get'], url_path='dropdown')
     def dropdown(self, request):

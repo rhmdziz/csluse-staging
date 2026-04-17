@@ -109,7 +109,7 @@ export default function UseEquipmentFormPage() {
     equipments,
     isLoading: isLoadingEquipments,
     error: equipmentError,
-  } = useEquipmentOptions(isEditMode ? "" : "Available");
+  } = useEquipmentOptions(isEditMode ? "" : "Available", "", true, undefined, "", undefined, true);
   const {
     mentors,
     isLoading: isLoadingMentors,

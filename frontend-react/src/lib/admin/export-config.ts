@@ -112,11 +112,13 @@ export const EQUIPMENT_EXPORT_COLUMNS: ExportColumn<EquipmentRow>[] = [
   { header: "nama peralatan", cell: (item) => item.name },
   { header: "jumlah", cell: (item) => item.quantity },
   { header: "kategori", cell: (item) => item.category },
+  { header: "status", cell: (item) => formatStatus(item.status) },
+  { header: "ruangan", cell: (item) => item.roomName || "-" },
   { header: "moveable", cell: (item) => (item.isMoveable ? "ya" : "tidak") },
+  { header: "shareable", cell: (item) => (item.isShareable ? "ya" : "tidak") },
+  { header: "borrowable", cell: (item) => (item.isBorrowable ? "ya" : "tidak") },
+  { header: "useable", cell: (item) => (item.isUseable ? "ya" : "tidak") },
   { header: "deskripsi", cell: (item) => item.description || "-" },
-  { header: "Status", cell: (item) => formatStatus(item.status) },
-  { header: "Ruangan", cell: (item) => item.roomName || "-" },
-  { header: "Shareable", cell: (item) => (item.isShareable ? "Ya" : "Tidak") },
 ];
 
 export const MATERIAL_EXPORT_COLUMNS: ExportColumn<MaterialRow>[] = [
@@ -125,8 +127,8 @@ export const MATERIAL_EXPORT_COLUMNS: ExportColumn<MaterialRow>[] = [
   { header: "satuan", cell: (item) => item.unit || "-" },
   { header: "kategori", cell: (item) => item.category },
   { header: "deskripsi", cell: (item) => item.description || "-" },
-  { header: "Status", cell: (item) => formatStatus(item.status) },
-  { header: "Ruangan", cell: (item) => item.roomName || "-" },
+  { header: "status", cell: (item) => formatStatus(item.status) },
+  { header: "ruangan", cell: (item) => item.roomName || "-" },
 ];
 
 export const SOFTWARE_EXPORT_COLUMNS: ExportColumn<SoftwareRow>[] = [
@@ -135,8 +137,8 @@ export const SOFTWARE_EXPORT_COLUMNS: ExportColumn<SoftwareRow>[] = [
   { header: "lisensi", cell: (item) => item.licenseInfo || "-" },
   { header: "expired", cell: (item) => item.licenseExpiration || "-" },
   { header: "deskripsi", cell: (item) => item.description || "-" },
-  { header: "Peralatan", cell: (item) => item.equipmentName || "-" },
-  { header: "Ruangan", cell: (item) => item.roomName || "-" },
+  { header: "peralatan", cell: (item) => item.equipmentName || "-" },
+  { header: "ruangan", cell: (item) => item.roomName || "-" },
 ];
 
 function formatStatus(value?: string | null) {

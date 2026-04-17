@@ -239,6 +239,10 @@ export function DashboardActionPanel({
     "",
     "",
     menu.id === "use-equipment",
+    undefined,
+    "",
+    undefined,
+    true,
   );
   const { equipments: softwareEquipmentOptionsList } = useEquipmentOptions(
     "",
@@ -251,6 +255,8 @@ export function DashboardActionPanel({
     "",
     "",
     menu.id === "borrow-equipment",
+    true,
+    "",
     true,
   );
   const isScheduleMenu = menu.id === "schedule";

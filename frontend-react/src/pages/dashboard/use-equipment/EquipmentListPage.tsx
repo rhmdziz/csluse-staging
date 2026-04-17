@@ -43,6 +43,7 @@ export default function EquipmentListPage() {
     status,
     category,
     room,
+    is_useable: "true",
   });
 
   const totalPages = Math.max(1, Math.ceil((totalCount || equipments.length) / PAGE_SIZE));

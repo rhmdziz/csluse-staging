@@ -359,7 +359,12 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="dropdown")
     def dropdown(self, request):
-        queryset = self.get_queryset().order_by("profile__full_name", "email")
+        queryset = (
+            self.get_queryset()
+            .filter(profile__rooms_as_pic__isnull=False)
+            .distinct()
+            .order_by("profile__full_name", "email")
+        )
         serializer = PicUserDropdownSerializer(queryset, many=True)
         return Response(serializer.data)
 

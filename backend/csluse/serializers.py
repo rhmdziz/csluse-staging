@@ -314,6 +314,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "is_moveable",
             "is_shareable",
             "is_borrowable",
+            "is_useable",
         ]
 
 
@@ -344,6 +345,7 @@ class EquipmentListSerializer(serializers.ModelSerializer):
             "is_moveable",
             "is_shareable",
             "is_borrowable",
+            "is_useable",
         ]
 
 
@@ -358,6 +360,7 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
             "quantity",
             "room_detail",
             "is_borrowable",
+            "is_useable",
         ]
 
 
@@ -544,6 +547,23 @@ class RecordBulkDeleteSerializer(serializers.Serializer):
             "empty": "Pilih minimal satu record untuk dihapus.",
         },
     )
+
+    def validate_ids(self, value):
+        unique_ids = list(dict.fromkeys(value))
+        if len(unique_ids) != len(value):
+            raise serializers.ValidationError("Terdapat ID record yang duplikat.")
+        return unique_ids
+
+
+class BulkSetBooleanSerializer(serializers.Serializer):
+    ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+        error_messages={
+            "empty": "Pilih minimal satu record.",
+        },
+    )
+    value = serializers.BooleanField()
 
     def validate_ids(self, value):
         unique_ids = list(dict.fromkeys(value))

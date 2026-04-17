@@ -58,7 +58,7 @@ export function useEquipments(page: number, pageSize = 10, filters: EquipmentFil
       isAborted = true;
       controller.abort();
     };
-  }, [page, pageSize, filters.status, filters.category, filters.room, filters.pic, filters.is_moveable, filters.is_borrowable, filters.search, reloadKey]);
+  }, [page, pageSize, filters.status, filters.category, filters.room, filters.pic, filters.is_moveable, filters.is_borrowable, filters.is_useable, filters.search, reloadKey]);
 
   return {
     equipments,

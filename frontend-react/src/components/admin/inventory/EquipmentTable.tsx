@@ -73,6 +73,7 @@ export default function EquipmentTable({
             <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Moveable</th>
             <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Shareable</th>
             <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Borrowable</th>
+            <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Useable</th>
             <th className="sticky right-0 z-10 relative w-[144px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
               Aksi
             </th>
@@ -146,6 +147,9 @@ export default function EquipmentTable({
                 </td>
                 <td className="px-3 py-2 align-middle text-muted-foreground">
                   {item.isBorrowable ? "Ya" : "Tidak"}
+                </td>
+                <td className="px-3 py-2 align-middle text-muted-foreground">
+                  {item.isUseable ? "Ya" : "Tidak"}
                 </td>
                 <td className="sticky right-0 z-10 relative bg-card px-3 py-2 align-middle shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
                   <div className="flex justify-center gap-2">

@@ -23,7 +23,7 @@ const HEADER_MAP: Record<
   string,
   keyof Pick<
     BulkEquipmentRow,
-    "name" | "quantity" | "category" | "isMoveable" | "isShareable" | "isBorrowable" | "description"
+    "name" | "quantity" | "category" | "isMoveable" | "isShareable" | "isBorrowable" | "isUseable" | "description"
   >
 > = {
   nama: "name",
@@ -43,6 +43,9 @@ const HEADER_MAP: Record<
   borrowable: "isBorrowable",
   "is borrowable": "isBorrowable",
   "bisa dipinjam": "isBorrowable",
+  useable: "isUseable",
+  "is useable": "isUseable",
+  "dapat digunakan": "isUseable",
   deskripsi: "description",
   description: "description",
 };
@@ -80,6 +83,7 @@ function buildTemplateWorkbook() {
     "moveable",
     "shareable",
     "borrowable",
+    "useable",
     "deskripsi",
   ];
   const sample = [
@@ -90,9 +94,10 @@ function buildTemplateWorkbook() {
       "ya",
       "tidak",
       "ya",
+      "ya",
       "Single board computer untuk praktikum",
     ],
-    ["Oscilloscope", "2", "Electronics", "tidak", "tidak", "ya", "Alat ukur elektronika"],
+    ["Oscilloscope", "2", "Electronics", "tidak", "tidak", "ya", "ya", "Alat ukur elektronika"],
   ];
   const guideRows = [
     ["Field", "Wajib", "Aturan", "Contoh"],
@@ -107,6 +112,7 @@ function buildTemplateWorkbook() {
     ["moveable", "Ya", "Boleh: ya/tidak atau true/false.", "ya"],
     ["shareable", "Tidak", "Boleh: ya/tidak atau true/false. Default: tidak.", "tidak"],
     ["borrowable", "Tidak", "Boleh: ya/tidak atau true/false. Default: tidak.", "ya"],
+    ["useable", "Tidak", "Boleh: ya/tidak atau true/false. Default: ya.", "ya"],
     [
       "deskripsi",
       "Tidak",
@@ -234,6 +240,7 @@ export default function EquipmentBulkImportByRoomDialog({
         const moveableRaw = String(row[headerIndexes.isMoveable ?? -1] || "").trim();
         const shareableRaw = String(row[headerIndexes.isShareable ?? -1] || "").trim();
         const borrowableRaw = String(row[headerIndexes.isBorrowable ?? -1] || "").trim();
+        const useableRaw = String(row[headerIndexes.isUseable ?? -1] || "").trim();
         const description = String(row[headerIndexes.description ?? -1] || "").trim();
 
         const isCompletelyEmpty =
@@ -270,6 +277,11 @@ export default function EquipmentBulkImportByRoomDialog({
           reasons.push("borrowable harus ya/tidak atau true/false");
         }
 
+        const parsedUseable = useableRaw ? parseMoveableValue(useableRaw) : true;
+        if (useableRaw && parsedUseable === null) {
+          reasons.push("useable harus ya/tidak atau true/false");
+        }
+
         if (reasons.length) {
           nextSkippedRows.push({
             index: lineNumber,
@@ -286,6 +298,7 @@ export default function EquipmentBulkImportByRoomDialog({
           isMoveable: Boolean(parsedMoveable),
           isShareable: Boolean(parsedShareable),
           isBorrowable: Boolean(parsedBorrowable),
+          isUseable: parsedUseable !== null ? Boolean(parsedUseable) : true,
           description,
         });
       });
@@ -451,6 +464,7 @@ export default function EquipmentBulkImportByRoomDialog({
                   <th className="w-[110px] px-2 py-2 font-medium">Moveable</th>
                   <th className="w-[110px] px-2 py-2 font-medium">Shareable</th>
                   <th className="w-[110px] px-2 py-2 font-medium">Borrowable</th>
+                  <th className="w-[110px] px-2 py-2 font-medium">Useable</th>
                   <th className="px-2 py-2 font-medium">Deskripsi</th>
                 </tr>
               </thead>
@@ -482,6 +496,9 @@ export default function EquipmentBulkImportByRoomDialog({
                     </td>
                     <td className="px-2 py-2">
                       {row.isBorrowable ? "Ya" : "Tidak"}
+                    </td>
+                    <td className="px-2 py-2">
+                      {row.isUseable !== false ? "Ya" : "Tidak"}
                     </td>
                     <td className="px-2 py-2 text-muted-foreground">
                       {row.description || "-"}
