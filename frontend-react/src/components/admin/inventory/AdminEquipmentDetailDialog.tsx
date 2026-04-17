@@ -543,6 +543,7 @@ export default function AdminEquipmentDetailDialog({
                       isMoveable: String(equipment.isMoveable),
                       isShareable: String(equipment.isShareable),
                       isBorrowable: String(equipment.isBorrowable),
+                      isUseable: String(equipment.isUseable),
                       description: equipment.description,
                     });
                   }}

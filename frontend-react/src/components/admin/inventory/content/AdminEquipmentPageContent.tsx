@@ -287,6 +287,7 @@ export default function AdminEquipmentsPage() {
       isMoveable: item.isMoveable,
       isShareable: item.isShareable,
       isBorrowable: item.isBorrowable,
+      isUseable: item.isUseable,
       description: item.description,
     });
     setTogglingEquipmentId(null);
