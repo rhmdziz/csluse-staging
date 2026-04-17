@@ -128,6 +128,62 @@ class DefaultPagination(PageNumberPagination):
     max_page_size = 100
 
 
+class BulkDeleteMixin:
+    """Generic bulk-delete action for ModelViewSets.
+
+    Subclasses must implement ``check_bulk_delete_permission`` and may override
+    ``bulk_delete_success_message`` / ``bulk_delete_failure_message``.
+    """
+
+    bulk_delete_success_message: str = "Semua data terpilih berhasil dihapus."
+    bulk_delete_failure_message: str = "Sebagian data tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
+        """Raise PermissionDenied if the caller is not allowed to bulk-delete."""
+        raise NotImplementedError
+
+    @action(detail=False, methods=['post'], url_path='bulk-delete')
+    def bulk_delete(self, request):
+        self.check_bulk_delete_permission(request)
+
+        serializer = RecordBulkDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = serializer.validated_data["ids"]
+
+        model = self.get_queryset().model
+        instance_map = {
+            str(item.id): item
+            for item in model.objects.filter(id__in=ids)
+        }
+        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in instance_map]
+        deleted_ids = []
+
+        for item_id in ids:
+            instance = instance_map.get(str(item_id))
+            if instance is None:
+                continue
+            self.perform_destroy(instance)
+            deleted_ids.append(str(item_id))
+
+        response_status = (
+            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
+        )
+        return Response(
+            {
+                "deleted_ids": deleted_ids,
+                "deleted_count": len(deleted_ids),
+                "failed_ids": missing_ids,
+                "failed_count": len(missing_ids),
+                "detail": (
+                    self.bulk_delete_success_message
+                    if not missing_ids
+                    else self.bulk_delete_failure_message
+                ),
+            },
+            status=response_status,
+        )
+
+
 def extract_announcement_image_refs(content: str | None) -> set[str]:
     if not content:
         return set()
@@ -190,7 +246,7 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 
 # region Inventory
-class RoomViewSet(viewsets.ModelViewSet):
+class RoomViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = Room.objects.prefetch_related('pics').order_by('-created_at')
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated]
@@ -329,46 +385,12 @@ class RoomViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._delete_room_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua ruangan terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian ruangan tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data ruangan.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        room_map = {
-            str(item.id): item
-            for item in Room.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in room_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            room = room_map.get(str(item_id))
-            if room is None:
-                continue
-            self._delete_room_instance(room)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua ruangan terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian ruangan tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='dropdown')
     def dropdown(self, request):
@@ -421,7 +443,7 @@ class RoomViewSet(viewsets.ModelViewSet):
         return Response({'occupied': list(bookings)})
 
 
-class EquipmentViewSet(viewsets.ModelViewSet):
+class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Equipment.objects
         .select_related('room')
@@ -454,6 +476,7 @@ class EquipmentViewSet(viewsets.ModelViewSet):
             OpenApiParameter("pic", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="PIC of the room"),
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
             OpenApiParameter("is_moveable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+            OpenApiParameter("is_borrowable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
             OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY),
         ]
     )
@@ -467,9 +490,9 @@ class EquipmentViewSet(viewsets.ModelViewSet):
         room_id = self.request.query_params.get('room')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
         is_moveable = self.request.query_params.get('is_moveable')
+        is_borrowable = self.request.query_params.get('is_borrowable')
 
-
-        # Filter params: status, category, room, pic, is_moveable, created range
+        # Filter params: status, category, room, pic, is_moveable, is_borrowable, created range
         if is_active_status_filter(status_param):
             qs = qs.filter(status__in=['Approved', 'Completed'])
         elif status_param:
@@ -485,6 +508,11 @@ class EquipmentViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(is_moveable=True)
             elif str(is_moveable).lower() in ['false', '0', 'no']:
                 qs = qs.filter(is_moveable=False)
+        if is_borrowable is not None:
+            if str(is_borrowable).lower() in ['true', '1', 'yes']:
+                qs = qs.filter(is_borrowable=True)
+            elif str(is_borrowable).lower() in ['false', '0', 'no']:
+                qs = qs.filter(is_borrowable=False)
         query = (self.request.query_params.get('q') or self.request.query_params.get('search') or '').strip()
         if query:
             qs = qs.filter(
@@ -582,46 +610,12 @@ class EquipmentViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._delete_equipment_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua peralatan terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian peralatan tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data peralatan.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        equipment_map = {
-            str(item.id): item
-            for item in Equipment.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in equipment_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            equipment = equipment_map.get(str(item_id))
-            if equipment is None:
-                continue
-            self._delete_equipment_instance(equipment)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua peralatan terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian peralatan tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='dropdown')
     def dropdown(self, request):
@@ -693,7 +687,7 @@ class EquipmentViewSet(viewsets.ModelViewSet):
         return Response({'occupied': occupied})
 
 
-class MaterialViewSet(viewsets.ModelViewSet):
+class MaterialViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Material.objects
         .select_related('room')
@@ -832,46 +826,12 @@ class MaterialViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._delete_material_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua bahan terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian bahan tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data bahan.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        material_map = {
-            str(item.id): item
-            for item in Material.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in material_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            material = material_map.get(str(item_id))
-            if material is None:
-                continue
-            self._delete_material_instance(material)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua bahan terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian bahan tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='dropdown')
     def dropdown(self, request):
@@ -886,7 +846,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class SoftwareViewSet(viewsets.ModelViewSet):
+class SoftwareViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Software.objects
         .select_related('equipment', 'equipment__room')
@@ -1030,46 +990,12 @@ class SoftwareViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._delete_software_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua software terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian software tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data software.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        software_map = {
-            str(item.id): item
-            for item in Software.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in software_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            software = software_map.get(str(item_id))
-            if software is None:
-                continue
-            self._delete_software_instance(software)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua software terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian software tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
@@ -1082,7 +1008,7 @@ class SoftwareViewSet(viewsets.ModelViewSet):
 
 
 # region Booking Rooms
-class BookingViewSet(viewsets.ModelViewSet):
+class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Booking.objects
         .select_related(
@@ -1375,46 +1301,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         self._ensure_requester_mutation_permission(instance)
         self._delete_booking_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua record peminjaman lab terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian record peminjaman lab tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not self._can_access_booking_approval_scope():
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data booking.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        booking_map = {
-            str(item.id): item
-            for item in Booking.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in booking_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            booking = booking_map.get(str(item_id))
-            if booking is None:
-                continue
-            self._delete_booking_instance(booking)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua record peminjaman lab terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian record peminjaman lab tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='my')
     def my(self, request):
@@ -1588,7 +1480,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 # endregion
 
 # region Borrow Equipment
-class BorrowViewSet(viewsets.ModelViewSet):
+class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Borrow.objects
         .select_related(
@@ -1905,46 +1797,12 @@ class BorrowViewSet(viewsets.ModelViewSet):
         self._ensure_requester_mutation_permission(instance)
         self._delete_borrow_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua record peminjaman alat terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian record peminjaman alat tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not self._can_manage_all_borrows():
             raise PermissionDenied("Hanya laboran/admin yang dapat menghapus record borrow.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        borrow_map = {
-            str(item.id): item
-            for item in Borrow.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in borrow_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            borrow = borrow_map.get(str(item_id))
-            if borrow is None:
-                continue
-            self._delete_borrow_instance(borrow)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua record peminjaman alat terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian record peminjaman alat tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='my')
     def my(self, request):
@@ -2240,7 +2098,7 @@ class BorrowViewSet(viewsets.ModelViewSet):
 
 
 # region Content
-class AnnouncementViewSet(viewsets.ModelViewSet):
+class AnnouncementViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = Announcement.objects.select_related('created_by').order_by('-created_at')
     serializer_class = AnnouncementSerializer
     permission_classes = [IsAuthenticated]
@@ -2339,53 +2197,19 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._delete_announcement_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua pengumuman terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian pengumuman berhasil dihapus."
+
+    def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus pengumuman.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        announcement_map = {
-            str(item.id): item
-            for item in Announcement.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in announcement_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            announcement = announcement_map.get(str(item_id))
-            if announcement is None:
-                continue
-            self._delete_announcement_instance(announcement)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua pengumuman terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian pengumuman berhasil dihapus."
-                ),
-            },
-            status=response_status,
-        )
 
 
 # endregion
 
 
 # region Scheduling And Overview
-class ScheduleViewSet(viewsets.ModelViewSet):
+class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = Schedule.objects.select_related('room', 'created_by').order_by('start_time')
     serializer_class = ScheduleSerializer
     permission_classes = [IsAuthenticated]
@@ -2508,46 +2332,12 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         )
         super().perform_destroy(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua jadwal terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian jadwal berhasil dihapus."
+
+    def check_bulk_delete_permission(self, request):
         if not has_staff_management_access(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus jadwal.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        schedule_map = {
-            str(item.id): item
-            for item in Schedule.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in schedule_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            schedule = schedule_map.get(str(item_id))
-            if schedule is None:
-                continue
-            self.perform_destroy(schedule)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua jadwal terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian jadwal berhasil dihapus."
-                ),
-            },
-            status=response_status,
-        )
 
     @extend_schema(
         parameters=[
@@ -3030,7 +2820,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
 
 
 # region FAQ
-class FAQViewSet(viewsets.ModelViewSet):
+class FAQViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = FAQ.objects.select_related('created_by').order_by('-created_at')
     serializer_class = FAQSerializer
     permission_classes = [IsAuthenticated]
@@ -3096,53 +2886,19 @@ class FAQViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._delete_faq_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua FAQ terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian FAQ berhasil dihapus."
+
+    def check_bulk_delete_permission(self, request):
         if not is_administrator_or_above(request.user):
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus FAQ.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        faq_map = {
-            str(item.id): item
-            for item in FAQ.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in faq_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            faq = faq_map.get(str(item_id))
-            if faq is None:
-                continue
-            self._delete_faq_instance(faq)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua FAQ terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian FAQ berhasil dihapus."
-                ),
-            },
-            status=response_status,
-        )
 
 
 # endregion
 
 
 # region Sample Testing
-class PengujianViewSet(viewsets.ModelViewSet):
+class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Pengujian.objects
         .select_related('requested_by', 'approved_by')
@@ -3460,46 +3216,12 @@ class PengujianViewSet(viewsets.ModelViewSet):
         self._ensure_requester_mutation_permission(instance)
         self._delete_pengujian_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua record pengujian sampel terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian record pengujian sampel tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not self._can_manage_sample_testing_approval():
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data pengujian sampel.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        pengujian_map = {
-            str(item.id): item
-            for item in Pengujian.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in pengujian_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            pengujian = pengujian_map.get(str(item_id))
-            if pengujian is None:
-                continue
-            self._delete_pengujian_instance(pengujian)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua record pengujian sampel terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian record pengujian sampel tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='my')
     def my(self, request):
@@ -3721,7 +3443,7 @@ class PengujianViewSet(viewsets.ModelViewSet):
 
 
 # region Use Equipment
-class UseViewSet(viewsets.ModelViewSet):
+class UseViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Use.objects
         .select_related(
@@ -4015,46 +3737,12 @@ class UseViewSet(viewsets.ModelViewSet):
         self._ensure_requester_mutation_permission(instance)
         self._delete_use_instance(instance)
 
-    @action(detail=False, methods=['post'], url_path='bulk-delete')
-    def bulk_delete(self, request):
+    bulk_delete_success_message = "Semua record penggunaan alat terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian record penggunaan alat tidak ditemukan."
+
+    def check_bulk_delete_permission(self, request):
         if not self._can_access_use_approval_scope():
             raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data penggunaan alat.")
-
-        serializer = RecordBulkDeleteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ids = serializer.validated_data["ids"]
-
-        use_map = {
-            str(item.id): item
-            for item in Use.objects.filter(id__in=ids)
-        }
-        missing_ids = [str(item_id) for item_id in ids if str(item_id) not in use_map]
-        deleted_ids = []
-
-        for item_id in ids:
-            use_item = use_map.get(str(item_id))
-            if use_item is None:
-                continue
-            self._delete_use_instance(use_item)
-            deleted_ids.append(str(item_id))
-
-        response_status = (
-            status.HTTP_200_OK if not missing_ids else status.HTTP_207_MULTI_STATUS
-        )
-        return Response(
-            {
-                "deleted_ids": deleted_ids,
-                "deleted_count": len(deleted_ids),
-                "failed_ids": missing_ids,
-                "failed_count": len(missing_ids),
-                "detail": (
-                    "Semua record penggunaan alat terpilih berhasil dihapus."
-                    if not missing_ids
-                    else "Sebagian record penggunaan alat tidak ditemukan."
-                ),
-            },
-            status=response_status,
-        )
 
     @action(detail=False, methods=['get'], url_path='my')
     def my(self, request):

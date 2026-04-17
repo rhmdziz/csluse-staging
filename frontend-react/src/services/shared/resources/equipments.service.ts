@@ -16,6 +16,7 @@ export type EquipmentFilters = {
   room?: string;
   pic?: string;
   is_moveable?: string;
+  is_borrowable?: string;
   search?: string;
 };
 
@@ -31,6 +32,7 @@ export type EquipmentRow = {
   roomNumber: string;
   isMoveable: boolean;
   isShareable: boolean;
+  isBorrowable: boolean;
   imageId: string | number | null;
   imageUrl: string;
 };
@@ -46,6 +48,7 @@ type ApiEquipment = {
   quantity?: number | string | null;
   is_moveable?: boolean | null;
   is_shareable?: boolean | null;
+  is_borrowable?: boolean | null;
   room_detail?: { name?: string | null; number?: string | null } | null;
   room?: string | number | null;
   image?: string | number | null;
@@ -64,6 +67,7 @@ export type CreateEquipmentPayload = {
   roomId: string;
   isMoveable: boolean;
   isShareable: boolean;
+  isBorrowable: boolean;
   description?: string;
 };
 
@@ -75,15 +79,17 @@ export type UpdateEquipmentPayload = {
   status?: string;
   isMoveable: boolean;
   isShareable: boolean;
+  isBorrowable: boolean;
   description?: string;
   imageId?: string | number | null;
   imageFile?: File | null;
 };
 
-export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "isShareable"> & {
+export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "isShareable" | "isBorrowable"> & {
   index: number;
   roomId?: string;
   isShareable?: boolean;
+  isBorrowable?: boolean;
 };
 
 export type BulkEquipmentResult = {
@@ -132,6 +138,7 @@ export function mapEquipment(item: ApiEquipment): EquipmentRow {
     roomNumber: String(item.room_detail?.number ?? ""),
     isMoveable: Boolean(item.is_moveable),
     isShareable: Boolean(item.is_shareable),
+    isBorrowable: Boolean(item.is_borrowable),
     imageId: item.image ?? null,
     imageUrl: resolveAssetUrl(item.image_detail?.url ?? ""),
   };
@@ -173,6 +180,9 @@ export const equipmentsService = {
     if (filters.is_moveable !== undefined && filters.is_moveable !== "") {
       url.searchParams.set("is_moveable", filters.is_moveable);
     }
+    if (filters.is_borrowable !== undefined && filters.is_borrowable !== "") {
+      url.searchParams.set("is_borrowable", filters.is_borrowable);
+    }
     if (filters.search) url.searchParams.set("search", filters.search);
 
     const response = await authFetch(url.toString(), { method: "GET", signal });
@@ -213,6 +223,7 @@ export const equipmentsService = {
       room: payload.roomId,
       is_moveable: payload.isMoveable,
       is_shareable: payload.isShareable,
+      is_borrowable: payload.isBorrowable,
     };
 
     if (payload.description?.trim()) body.description = payload.description.trim();
@@ -245,6 +256,7 @@ export const equipmentsService = {
       room: payload.roomId,
       is_moveable: payload.isMoveable,
       is_shareable: payload.isShareable,
+      is_borrowable: payload.isBorrowable,
       description: payload.description?.trim() || "",
     };
     if (payload.status?.trim()) body.status = payload.status.trim();
@@ -304,6 +316,7 @@ export const equipmentsService = {
           room: row.roomId || "",
           is_moveable: row.isMoveable,
           is_shareable: row.isShareable ?? false,
+          is_borrowable: row.isBorrowable ?? false,
           description: row.description?.trim() || "",
         })),
       }),
@@ -312,7 +325,7 @@ export const equipmentsService = {
   },
 
   async getOptions(
-    params: { status?: string; room?: string; isMoveable?: boolean; category?: string } = {},
+    params: { status?: string; room?: string; isMoveable?: boolean; isBorrowable?: boolean; category?: string } = {},
     signal?: AbortSignal,
   ) {
     const url = new URL(API_EQUIPMENTS_DROPDOWN, window.location.origin);
@@ -321,6 +334,9 @@ export const equipmentsService = {
     if (params.category) url.searchParams.set("category", params.category);
     if (typeof params.isMoveable === "boolean") {
       url.searchParams.set("is_moveable", String(params.isMoveable));
+    }
+    if (typeof params.isBorrowable === "boolean") {
+      url.searchParams.set("is_borrowable", String(params.isBorrowable));
     }
 
     const response = await authFetch(url.toString(), { method: "GET", signal });

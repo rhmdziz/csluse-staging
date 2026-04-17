@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui";
 
 import {
+  BORROWABLE_OPTIONS,
   EQUIPMENT_CATEGORY_OPTIONS,
   EQUIPMENT_STATUS_OPTIONS,
   MOVEABLE_OPTIONS,
@@ -164,6 +165,7 @@ export default function AdminEquipmentDetailDialog({
     roomId: "",
     isMoveable: "true",
     isShareable: "false",
+    isBorrowable: "false",
     description: "",
   });
   const {
@@ -196,6 +198,7 @@ export default function AdminEquipmentDetailDialog({
       roomId: equipment.roomId,
       isMoveable: String(equipment.isMoveable),
       isShareable: String(equipment.isShareable),
+      isBorrowable: String(equipment.isBorrowable),
       description: equipment.description,
     });
     setIsEditing(initialMode === "edit" && canManage);
@@ -217,6 +220,7 @@ export default function AdminEquipmentDetailDialog({
       roomId: "",
       isMoveable: "true",
       isShareable: "false",
+      isBorrowable: "false",
       description: "",
     });
   };
@@ -242,6 +246,7 @@ export default function AdminEquipmentDetailDialog({
       roomId: formData.roomId,
       isMoveable: formData.isMoveable === "true",
       isShareable: formData.isShareable === "true",
+      isBorrowable: formData.isBorrowable === "true",
       description: formData.description,
     });
     if (!result.ok) return;
@@ -275,6 +280,7 @@ export default function AdminEquipmentDetailDialog({
       status: nextChecked ? "Available" : "In Storage",
       isMoveable: equipment.isMoveable,
       isShareable: equipment.isShareable,
+      isBorrowable: equipment.isBorrowable,
       description: equipment.description,
     });
     if (!result.ok) return;
@@ -421,6 +427,21 @@ export default function AdminEquipmentDetailDialog({
                     setFormData((prev) => ({ ...prev, isShareable: value }))
                   }
                 />
+                <SelectDetailField
+                  label="Borrowable (Dapat Dipinjam)"
+                  value={
+                    isEditing
+                      ? formData.isBorrowable
+                      : equipment.isBorrowable
+                        ? "Ya"
+                        : "Tidak"
+                  }
+                  editable={isEditing}
+                  options={BORROWABLE_OPTIONS}
+                  onChange={(value) =>
+                    setFormData((prev) => ({ ...prev, isBorrowable: value }))
+                  }
+                />
                 {!isEditing ? (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-slate-700">Available</p>
@@ -500,6 +521,7 @@ export default function AdminEquipmentDetailDialog({
                       roomId: equipment.roomId,
                       isMoveable: String(equipment.isMoveable),
                       isShareable: String(equipment.isShareable),
+                      isBorrowable: String(equipment.isBorrowable),
                       description: equipment.description,
                     });
                   }}

@@ -44,6 +44,7 @@ export default function BorrowEquipmentAvailablePage() {
       category,
       room,
       is_moveable: "true",
+      is_borrowable: "true",
     });
 
   const totalPages = Math.max(

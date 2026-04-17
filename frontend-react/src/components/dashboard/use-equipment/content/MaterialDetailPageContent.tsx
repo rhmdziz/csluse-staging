@@ -39,7 +39,9 @@ function DetailCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">{subtitle}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            {subtitle}
+          </p>
         </div>
       </div>
       <div className="mt-4 space-y-2">{children}</div>
@@ -47,13 +49,7 @@ function DetailCard({
   );
 }
 
-function DetailMetaItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailMetaItem({ label, value }: { label: string; value: string }) {
   if (!hasDisplayValue(value)) return null;
 
   return (
@@ -135,7 +131,11 @@ export default function MaterialDetailPageContent() {
         <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
-        <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push(backHref)}
+        >
           <ArrowLeft className="h-4 w-4" />
           Kembali ke Daftar Bahan
         </Button>
@@ -147,7 +147,11 @@ export default function MaterialDetailPageContent() {
     return (
       <section className="space-y-3">
         <p className="text-sm text-slate-600">Data bahan tidak ditemukan.</p>
-        <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push(backHref)}
+        >
           <ArrowLeft className="h-4 w-4" />
           Kembali ke Daftar Bahan
         </Button>
@@ -161,11 +165,17 @@ export default function MaterialDetailPageContent() {
         <div className="space-y-3">
           <div>
             <p className="text-xs text-slate-300">Detail Bahan</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-50">{material.name}</h2>
+            <h2 className="mt-1 text-xl font-bold text-slate-50">
+              {material.name}
+            </h2>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(backHref)}
+          >
             <ArrowLeft className="h-4 w-4" />
             Kembali
           </Button>
@@ -181,11 +191,16 @@ export default function MaterialDetailPageContent() {
           >
             <DetailMetaItem label="Nama Bahan" value={material.name} />
             <DetailMetaItem label="Kategori" value={material.category} />
-            <DetailMetaItem label="Status" value={formatStatus(material.status)} />
-            <DetailMetaItem label="Jumlah" value={String(material.quantity)} />
-            <DetailMetaItem label="Satuan" value={material.unit || "-"} />
+            <DetailMetaItem
+              label="Status"
+              value={formatStatus(material.status)}
+            />
+
             <DetailMetaItem label="Ruangan" value={material.roomName || "-"} />
-            <DetailMetaItem label="Deskripsi" value={material.description || "-"} />
+            <DetailMetaItem
+              label="Deskripsi"
+              value={material.description || "-"}
+            />
           </DetailCard>
         </div>
 
@@ -195,17 +210,14 @@ export default function MaterialDetailPageContent() {
             subtitle="Informasi singkat mengenai ketersediaan bahan ini."
             icon={<Package2 className="h-4 w-4" />}
           >
-            <DetailMetaItem label="Status Saat Ini" value={formatStatus(material.status)} />
+            <DetailMetaItem
+              label="Status Saat Ini"
+              value={formatStatus(material.status)}
+            />
             {material.roomName ? (
               <DetailMetaItem
                 label="Lokasi"
                 value={`Bahan ini terdaftar di ${material.roomName}.`}
-              />
-            ) : null}
-            {material.unit ? (
-              <DetailMetaItem
-                label="Satuan"
-                value={`Bahan ini diukur dalam satuan ${material.unit}.`}
               />
             ) : null}
           </DetailCard>

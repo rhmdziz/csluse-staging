@@ -28,4 +28,9 @@ const SHAREABLE_OPTIONS = [
   { value: "false", label: "Tidak" },
 ];
 
-export { EQUIPMENT_CATEGORY_OPTIONS, EQUIPMENT_STATUS_OPTIONS, MOVEABLE_OPTIONS, SHAREABLE_OPTIONS };
+const BORROWABLE_OPTIONS = [
+  { value: "true", label: "Ya" },
+  { value: "false", label: "Tidak" },
+];
+
+export { EQUIPMENT_CATEGORY_OPTIONS, EQUIPMENT_STATUS_OPTIONS, MOVEABLE_OPTIONS, SHAREABLE_OPTIONS, BORROWABLE_OPTIONS };

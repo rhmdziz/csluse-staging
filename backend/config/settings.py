@@ -34,6 +34,7 @@ ALLOWED_HOSTS = [
     ".onrender.com",
     "127.0.0.1",
     "108.136.248.15",
+    "csl-test.azizrahmad.com",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -238,6 +239,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://csl.azizrahmad.com",
     "http://108.136.248.15",
+    "https://csl-test.azizrahmad.com",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -256,6 +258,7 @@ CORS_ALLOW_HEADERS = [
 
 CSRF_TRUSTED_ORIGINS = [
     "https://csl.azizrahmad.com",
+    "https://csl-test.azizrahmad.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://108.136.248.15",

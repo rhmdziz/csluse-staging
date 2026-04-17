@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useState } from "react";
 
 import { Eye, Loader2 } from "lucide-react";
@@ -37,14 +36,18 @@ export default function MaterialListPage() {
     setPage(1);
   }, [search, status, category, room]);
 
-  const { materials, totalCount, isLoading, hasLoadedOnce, error } = useMaterials(page, PAGE_SIZE, {
-    search: search.trim(),
-    status,
-    category,
-    room,
-  });
+  const { materials, totalCount, isLoading, hasLoadedOnce, error } =
+    useMaterials(page, PAGE_SIZE, {
+      search: search.trim(),
+      status,
+      category,
+      room,
+    });
 
-  const totalPages = Math.max(1, Math.ceil((totalCount || materials.length) / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil((totalCount || materials.length) / PAGE_SIZE),
+  );
 
   return (
     <section className="space-y-4">
@@ -58,12 +61,19 @@ export default function MaterialListPage() {
         <table className="w-full min-w-[1020px] table-fixed">
           <thead className="border-b border-slate-800 bg-slate-900">
             <tr className="text-left text-sm">
-              <th className="w-[180px] px-3 py-3 font-medium text-slate-50">Nama</th>
-              <th className="w-[140px] px-3 py-3 font-medium text-slate-50">Kategori</th>
-              <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Status</th>
-              <th className="w-[80px] px-3 py-3 font-medium text-slate-50">Jumlah</th>
-              <th className="w-[80px] px-3 py-3 font-medium text-slate-50">Satuan</th>
-              <th className="w-[280px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
+              <th className="w-[180px] px-3 py-3 font-medium text-slate-50">
+                Nama
+              </th>
+              <th className="w-[140px] px-3 py-3 font-medium text-slate-50">
+                Kategori
+              </th>
+              <th className="w-[120px] px-3 py-3 font-medium text-slate-50">
+                Status
+              </th>
+
+              <th className="w-[280px] px-3 py-3 font-medium text-slate-50">
+                Ruangan
+              </th>
               <th className="sticky right-0 z-20 w-[100px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
                 Aksi
               </th>
@@ -72,7 +82,10 @@ export default function MaterialListPage() {
           <tbody className="text-sm">
             {isLoading || !hasLoadedOnce ? (
               <tr>
-                <td colSpan={7} className="px-3 py-5 text-center text-slate-500">
+                <td
+                  colSpan={5}
+                  className="px-3 py-5 text-center text-slate-500"
+                >
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Memuat data...
@@ -82,7 +95,9 @@ export default function MaterialListPage() {
             ) : materials.length ? (
               materials.map((item) => (
                 <tr key={String(item.id)} className="border-b last:border-b-0">
-                  <td className="truncate px-3 py-2.5 font-medium text-slate-800">{item.name}</td>
+                  <td className="truncate px-3 py-2.5 font-medium text-slate-800">
+                    {item.name}
+                  </td>
                   <td className="truncate px-3 py-2.5">{item.category}</td>
                   <td className="px-3 py-2.5">
                     <span
@@ -91,12 +106,12 @@ export default function MaterialListPage() {
                       {formatStatus(item.status)}
                     </span>
                   </td>
-                  <td className="truncate px-3 py-2.5">{item.quantity}</td>
-                  <td className="truncate px-3 py-2.5">{item.unit || "-"}</td>
                   <td className="truncate px-3 py-2.5">
                     {item.roomName}
                     {item.roomNumber && (
-                      <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
+                      <span className="ml-1 text-xs text-slate-400">
+                        ({item.roomNumber})
+                      </span>
                     )}
                   </td>
                   <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
@@ -114,7 +129,10 @@ export default function MaterialListPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="px-3 py-5 text-center text-slate-500">
+                <td
+                  colSpan={7}
+                  className="px-3 py-5 text-center text-slate-500"
+                >
                   Belum ada bahan yang tersedia.
                 </td>
               </tr>

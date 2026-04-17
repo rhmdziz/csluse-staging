@@ -14,6 +14,7 @@ export function useEquipmentOptions(
   enabled = true,
   isMoveable?: boolean,
   category = "",
+  isBorrowable?: boolean,
 ) {
   const [equipments, setEquipments] = useState<EquipmentOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +36,7 @@ export function useEquipmentOptions(
       setError("");
       try {
         const mapped = await equipmentsService.getOptions(
-          { status, room, isMoveable, category },
+          { status, room, isMoveable, isBorrowable, category },
           controller.signal,
         );
         setEquipments(mapped.filter((item) => item.id));
@@ -54,7 +55,7 @@ export function useEquipmentOptions(
       isAborted = true;
       controller.abort();
     };
-  }, [status, room, enabled, isMoveable, category]);
+  }, [status, room, enabled, isMoveable, isBorrowable, category]);
 
   return { equipments, isLoading, error };
 }

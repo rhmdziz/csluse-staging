@@ -313,6 +313,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "room_detail",
             "is_moveable",
             "is_shareable",
+            "is_borrowable",
         ]
 
 
@@ -342,6 +343,7 @@ class EquipmentListSerializer(serializers.ModelSerializer):
             "room_detail",
             "is_moveable",
             "is_shareable",
+            "is_borrowable",
         ]
 
 
@@ -355,6 +357,7 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
             "name",
             "quantity",
             "room_detail",
+            "is_borrowable",
         ]
 
 
@@ -1114,6 +1117,11 @@ class BorrowSerializer(serializers.ModelSerializer):
             )
 
         if instance is None:
+            equipment = attrs.get("equipment")
+            if equipment is not None and not equipment.is_borrowable:
+                raise serializers.ValidationError(
+                    {"equipment": "Peralatan ini tidak tersedia untuk dipinjam."}
+                )
             if attrs.get("status") not in (None, "Pending"):
                 raise serializers.ValidationError(
                     {"status": "Status borrow hanya boleh di-set melalui action endpoint khusus."}

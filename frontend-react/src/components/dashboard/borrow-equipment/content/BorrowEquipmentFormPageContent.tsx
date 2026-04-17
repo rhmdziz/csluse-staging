@@ -110,7 +110,7 @@ export default function BorrowEquipmentFormPage() {
     equipments,
     isLoading: isLoadingEquipments,
     error: equipmentError,
-  } = useEquipmentOptions(isEditMode ? "" : "Available", "", true, true);
+  } = useEquipmentOptions(isEditMode ? "" : "Available", "", true, true, "", true);
   const {
     mentors,
     isLoading: isLoadingMentors,

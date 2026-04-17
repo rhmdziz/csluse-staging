@@ -39,6 +39,7 @@ import {
 } from "@/components/ui";
 
 import {
+  BORROWABLE_OPTIONS,
   EQUIPMENT_CATEGORY_OPTIONS,
   EQUIPMENT_STATUS_OPTIONS,
   MOVEABLE_OPTIONS,
@@ -117,6 +118,7 @@ export default function AdminEquipmentsPage() {
   const [room, setRoom] = useState("");
   const [pic, setPic] = useState("");
   const [moveable, setMoveable] = useState("");
+  const [borrowable, setBorrowable] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
@@ -162,6 +164,7 @@ export default function AdminEquipmentsPage() {
         room,
         pic,
         is_moveable: moveable,
+        is_borrowable: borrowable,
       },
       reloadKey,
     );
@@ -220,6 +223,7 @@ export default function AdminEquipmentsPage() {
         room,
         pic,
         is_moveable: moveable,
+        is_borrowable: borrowable,
         q: debouncedSearch,
       },
       mapItem: mapEquipment,
@@ -240,6 +244,7 @@ export default function AdminEquipmentsPage() {
     setRoom("");
     setPic("");
     setMoveable("");
+    setBorrowable("");
     setPage(1);
   };
 
@@ -273,6 +278,7 @@ export default function AdminEquipmentsPage() {
       status: nextChecked ? "Available" : "In Storage",
       isMoveable: item.isMoveable,
       isShareable: item.isShareable,
+      isBorrowable: item.isBorrowable,
       description: item.description,
     });
     setTogglingEquipmentId(null);
@@ -380,7 +386,7 @@ export default function AdminEquipmentsPage() {
                 setPage(1);
               }}
             >
-              <AdminFilterGrid columns={6}>
+              <AdminFilterGrid columns={5}>
                 <AdminFilterField label="Cari">
                   <Input
                     type="search"
@@ -418,6 +424,15 @@ export default function AdminEquipmentsPage() {
                   options={MOVEABLE_OPTIONS}
                   onChange={(value) => {
                     setMoveable(value);
+                    setPage(1);
+                  }}
+                />
+                <FilterSelectField
+                  label="Borrowable"
+                  value={borrowable}
+                  options={BORROWABLE_OPTIONS}
+                  onChange={(value) => {
+                    setBorrowable(value);
                     setPage(1);
                   }}
                 />

@@ -23,7 +23,7 @@ const HEADER_MAP: Record<
   string,
   keyof Pick<
     BulkEquipmentRow,
-    "name" | "quantity" | "category" | "isMoveable" | "description"
+    "name" | "quantity" | "category" | "isMoveable" | "isShareable" | "isBorrowable" | "description"
   >
 > = {
   nama: "name",
@@ -37,6 +37,12 @@ const HEADER_MAP: Record<
   moveable: "isMoveable",
   "is moveable": "isMoveable",
   "bisa dipindah": "isMoveable",
+  shareable: "isShareable",
+  "is shareable": "isShareable",
+  "bisa dibagi": "isShareable",
+  borrowable: "isBorrowable",
+  "is borrowable": "isBorrowable",
+  "bisa dipinjam": "isBorrowable",
   deskripsi: "description",
   description: "description",
 };
@@ -72,6 +78,8 @@ function buildTemplateWorkbook() {
     "jumlah",
     "kategori",
     "moveable",
+    "shareable",
+    "borrowable",
     "deskripsi",
   ];
   const sample = [
@@ -80,9 +88,11 @@ function buildTemplateWorkbook() {
       "4",
       "Computer",
       "ya",
+      "tidak",
+      "ya",
       "Single board computer untuk praktikum",
     ],
-    ["Oscilloscope", "2", "Electronics", "tidak", "Alat ukur elektronika"],
+    ["Oscilloscope", "2", "Electronics", "tidak", "tidak", "ya", "Alat ukur elektronika"],
   ];
   const guideRows = [
     ["Field", "Wajib", "Aturan", "Contoh"],
@@ -95,6 +105,8 @@ function buildTemplateWorkbook() {
       "Computer",
     ],
     ["moveable", "Ya", "Boleh: ya/tidak atau true/false.", "ya"],
+    ["shareable", "Tidak", "Boleh: ya/tidak atau true/false. Default: tidak.", "tidak"],
+    ["borrowable", "Tidak", "Boleh: ya/tidak atau true/false. Default: tidak.", "ya"],
     [
       "deskripsi",
       "Tidak",
@@ -218,12 +230,10 @@ export default function EquipmentBulkImportDialog({
         const name = String(row[headerIndexes.name ?? -1] || "").trim();
         const quantity = String(row[headerIndexes.quantity ?? -1] || "").trim();
         const category = String(row[headerIndexes.category ?? -1] || "").trim();
-        const moveableRaw = String(
-          row[headerIndexes.isMoveable ?? -1] || "",
-        ).trim();
-        const description = String(
-          row[headerIndexes.description ?? -1] || "",
-        ).trim();
+        const moveableRaw = String(row[headerIndexes.isMoveable ?? -1] || "").trim();
+        const shareableRaw = String(row[headerIndexes.isShareable ?? -1] || "").trim();
+        const borrowableRaw = String(row[headerIndexes.isBorrowable ?? -1] || "").trim();
+        const description = String(row[headerIndexes.description ?? -1] || "").trim();
 
         const isCompletelyEmpty =
           !name && !quantity && !category && !moveableRaw && !description;
@@ -249,6 +259,16 @@ export default function EquipmentBulkImportDialog({
           reasons.push("moveable harus ya/tidak atau true/false");
         }
 
+        const parsedShareable = shareableRaw ? parseMoveableValue(shareableRaw) : false;
+        if (shareableRaw && parsedShareable === null) {
+          reasons.push("shareable harus ya/tidak atau true/false");
+        }
+
+        const parsedBorrowable = borrowableRaw ? parseMoveableValue(borrowableRaw) : false;
+        if (borrowableRaw && parsedBorrowable === null) {
+          reasons.push("borrowable harus ya/tidak atau true/false");
+        }
+
         if (reasons.length) {
           nextSkippedRows.push({
             index: lineNumber,
@@ -263,6 +283,8 @@ export default function EquipmentBulkImportDialog({
           quantity,
           category,
           isMoveable: Boolean(parsedMoveable),
+          isShareable: Boolean(parsedShareable),
+          isBorrowable: Boolean(parsedBorrowable),
           description,
         });
       });
@@ -393,7 +415,7 @@ export default function EquipmentBulkImportDialog({
             </span>
           </div>
           <div className="max-h-80 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-md border">
-            <table className="w-full min-w-[1180px] text-left text-xs">
+            <table className="w-full min-w-[1400px] text-left text-xs">
               <thead className="sticky top-0 z-10 bg-muted/40">
                 <tr>
                   <th className="w-[56px] px-2 py-2 text-center font-medium">
@@ -411,6 +433,8 @@ export default function EquipmentBulkImportDialog({
                   <th className="w-[96px] px-2 py-2 font-medium">Jumlah</th>
                   <th className="w-[180px] px-2 py-2 font-medium">Kategori</th>
                   <th className="w-[110px] px-2 py-2 font-medium">Moveable</th>
+                  <th className="w-[110px] px-2 py-2 font-medium">Shareable</th>
+                  <th className="w-[110px] px-2 py-2 font-medium">Borrowable</th>
                   <th className="px-2 py-2 font-medium">Deskripsi</th>
                 </tr>
               </thead>
@@ -466,6 +490,12 @@ export default function EquipmentBulkImportDialog({
                     <td className="px-2 py-2">{row.category}</td>
                     <td className="px-2 py-2">
                       {row.isMoveable ? "Ya" : "Tidak"}
+                    </td>
+                    <td className="px-2 py-2">
+                      {row.isShareable ? "Ya" : "Tidak"}
+                    </td>
+                    <td className="px-2 py-2">
+                      {row.isBorrowable ? "Ya" : "Tidak"}
                     </td>
                     <td className="px-2 py-2 text-muted-foreground">
                       {row.description || "-"}

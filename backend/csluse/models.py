@@ -98,6 +98,7 @@ class Equipment(BaseModel):
     )
     is_moveable = models.BooleanField(default=True)
     is_shareable = models.BooleanField(default=False)
+    is_borrowable = models.BooleanField(default=False)
 
     def __str__(self):
         room_name = self.room.name if self.room else "Tanpa Ruangan"
