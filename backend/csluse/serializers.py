@@ -878,7 +878,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 booking_allocated = (
                     Booking.objects.filter(
                         equipment_items__equipment_id=equipment.id,
-                        status__in=["Pending", "Approved"],
+                        status__in=["Approved"],
                         start_time__lt=end_time,
                         end_time__gt=start_time,
                     )
@@ -888,7 +888,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 use_allocated = (
                     Use.objects.filter(
                         equipment_id=equipment.id,
-                        status__in=["Pending", "Approved"],
+                        status__in=["Approved"],
                         start_time__lt=end_time,
                         end_time__gt=start_time,
                     )
@@ -897,7 +897,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 borrow_allocated = (
                     Borrow.objects.filter(
                         equipment_id=equipment.id,
-                        status__in=["Pending", "Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+                        status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
                         start_time__lt=end_time,
                         end_time__gt=start_time,
                     )
@@ -1162,57 +1162,101 @@ class BorrowSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"inspection_note": "inspection_note hanya boleh diisi melalui action endpoint inspeksi."}
                 )
-            return attrs
-
-        if "status" in attrs:
-            if not self.context.get("allow_status_transition"):
-                raise serializers.ValidationError(
-                    {"status": "Gunakan action status borrow yang spesifik untuk mengubah status."}
-                )
-            allowed_next_status = self.context.get("allowed_next_status")
-            if allowed_next_status and attrs["status"] != allowed_next_status:
-                raise serializers.ValidationError(
-                    {"status": f"Transisi status hanya boleh menuju {allowed_next_status}."}
-                )
-
-        if "end_time_actual" in attrs and not self.context.get("allow_end_time_actual"):
-            raise serializers.ValidationError(
-                {"end_time_actual": "Gunakan action penerimaan pengembalian untuk mengisi end_time_actual."}
-            )
-
-        if "approved_by" in attrs:
-            raise serializers.ValidationError(
-                {"approved_by": "approved_by tidak boleh diubah langsung."}
-            )
-        current_purpose = attrs.get("purpose") or (instance.purpose if instance else None)
-        if not self.context.get("allow_mentor_transition"):
-            if "is_approved_by_mentor" in attrs:
-                if current_purpose == "Skripsi/TA":
+        else:
+            if "status" in attrs:
+                if not self.context.get("allow_status_transition"):
                     raise serializers.ValidationError(
-                        {"is_approved_by_mentor": "Status approval dosen pembimbing tidak boleh diubah langsung."}
+                        {"status": "Gunakan action status borrow yang spesifik untuk mengubah status."}
                     )
-                else:
-                    attrs.pop("is_approved_by_mentor")
-            if "mentor_approved_at" in attrs:
-                if current_purpose == "Skripsi/TA":
+                allowed_next_status = self.context.get("allowed_next_status")
+                if allowed_next_status and attrs["status"] != allowed_next_status:
                     raise serializers.ValidationError(
-                        {"mentor_approved_at": "mentor_approved_at tidak boleh diubah langsung."}
+                        {"status": f"Transisi status hanya boleh menuju {allowed_next_status}."}
                     )
-                else:
-                    attrs.pop("mentor_approved_at")
 
-        if "inspection_note" in attrs:
-            raise serializers.ValidationError(
-                {"inspection_note": "Gunakan action inspeksi borrow untuk mengisi inspection_note."}
-            )
+            if "end_time_actual" in attrs and not self.context.get("allow_end_time_actual"):
+                raise serializers.ValidationError(
+                    {"end_time_actual": "Gunakan action penerimaan pengembalian untuk mengisi end_time_actual."}
+                )
 
-        if (
-            attrs.get("status", getattr(instance, "status", "Pending")) == "Rejected"
-            and not str(rejection_note or "").strip()
-        ):
-            raise serializers.ValidationError(
-                {"rejection_note": "Alasan penolakan wajib diisi."}
+            if "approved_by" in attrs:
+                raise serializers.ValidationError(
+                    {"approved_by": "approved_by tidak boleh diubah langsung."}
+                )
+            current_purpose = attrs.get("purpose") or (instance.purpose if instance else None)
+            if not self.context.get("allow_mentor_transition"):
+                if "is_approved_by_mentor" in attrs:
+                    if current_purpose == "Skripsi/TA":
+                        raise serializers.ValidationError(
+                            {"is_approved_by_mentor": "Status approval dosen pembimbing tidak boleh diubah langsung."}
+                        )
+                    else:
+                        attrs.pop("is_approved_by_mentor")
+                if "mentor_approved_at" in attrs:
+                    if current_purpose == "Skripsi/TA":
+                        raise serializers.ValidationError(
+                            {"mentor_approved_at": "mentor_approved_at tidak boleh diubah langsung."}
+                        )
+                    else:
+                        attrs.pop("mentor_approved_at")
+
+            if "inspection_note" in attrs:
+                raise serializers.ValidationError(
+                    {"inspection_note": "Gunakan action inspeksi borrow untuk mengisi inspection_note."}
+                )
+
+            if (
+                attrs.get("status", getattr(instance, "status", "Pending")) == "Rejected"
+                and not str(rejection_note or "").strip()
+            ):
+                raise serializers.ValidationError(
+                    {"rejection_note": "Alasan penolakan wajib diisi."}
+                )
+
+        equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
+        quantity = attrs.get("quantity", getattr(instance, "quantity", 0))
+        if equipment is not None and start_time and end_time:
+            if quantity > equipment.quantity:
+                raise serializers.ValidationError(
+                    {"quantity": f"Jumlah melebihi stok tersedia ({equipment.quantity})."}
+                )
+            booking_allocated = (
+                Booking.objects.filter(
+                    equipment_items__equipment_id=equipment.id,
+                    status__in=["Approved"],
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
             )
+            use_allocated = (
+                Use.objects.filter(
+                    equipment_id=equipment.id,
+                    status__in=["Approved"],
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).aggregate(total=Sum("quantity"))["total"] or 0
+            )
+            borrow_allocated = (
+                Borrow.objects.filter(
+                    equipment_id=equipment.id,
+                    status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).exclude(pk=instance.pk if instance else None)
+                .aggregate(total=Sum("quantity"))["total"] or 0
+            )
+            allocated = booking_allocated + use_allocated + borrow_allocated
+            remaining = max(equipment.quantity - allocated, 0)
+            if quantity > remaining:
+                raise serializers.ValidationError(
+                    {
+                        "quantity": (
+                            f"Stok {equipment.name} tidak mencukupi pada rentang waktu yang dipilih. "
+                            f"Stok total {equipment.quantity}, sudah teralokasi {allocated} unit "
+                            f"(sisa {remaining} unit)."
+                        )
+                    }
+                )
 
         return attrs
 
@@ -1667,6 +1711,51 @@ class UseSerializer(serializers.ModelSerializer):
                             ]
                         }
                     )
+
+        equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
+        quantity = attrs.get("quantity", getattr(instance, "quantity", 0))
+        if equipment is not None and start_time and end_time and not getattr(equipment, "is_shareable", False):
+            if quantity > equipment.quantity:
+                raise serializers.ValidationError(
+                    {"quantity": f"Jumlah melebihi stok tersedia ({equipment.quantity})."}
+                )
+            booking_allocated = (
+                Booking.objects.filter(
+                    equipment_items__equipment_id=equipment.id,
+                    status__in=["Approved"],
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
+            )
+            use_allocated = (
+                Use.objects.filter(
+                    equipment_id=equipment.id,
+                    status__in=["Approved"],
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).exclude(pk=instance.pk if instance else None)
+                .aggregate(total=Sum("quantity"))["total"] or 0
+            )
+            borrow_allocated = (
+                Borrow.objects.filter(
+                    equipment_id=equipment.id,
+                    status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).aggregate(total=Sum("quantity"))["total"] or 0
+            )
+            allocated = booking_allocated + use_allocated + borrow_allocated
+            remaining = max(equipment.quantity - allocated, 0)
+            if quantity > remaining:
+                raise serializers.ValidationError(
+                    {
+                        "quantity": (
+                            f"Stok {equipment.name} tidak mencukupi pada rentang waktu yang dipilih. "
+                            f"Stok total {equipment.quantity}, sudah teralokasi {allocated} unit "
+                            f"(sisa {remaining} unit)."
+                        )
+                    }
+                )
 
         return attrs
 

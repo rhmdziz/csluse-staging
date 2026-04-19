@@ -58,6 +58,7 @@ export default function TaskManagementRoomPicPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailUser, setDetailUser] = useState<RoomPicTaskUserRow | null>(null);
+  const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
   const [removeCandidate, setRemoveCandidate] = useState<RoomPicTaskUserRow | null>(null);
   const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Array<number | string>>([]);
@@ -297,16 +298,20 @@ export default function TaskManagementRoomPicPage() {
           onToggleItemSelection={toggleItemSelection}
           onToggleSelectAllVisible={toggleSelectAllVisible}
           selectAllRef={selectAllRef}
-          onOpenDetail={(user) => setDetailUser(user)}
+          onOpenDetail={(user) => { setDetailMode("view"); setDetailUser(user); }}
+          onEdit={(user) => { setDetailMode("edit"); setDetailUser(user); }}
           onDelete={setRemoveCandidate}
           isDeleting={false}
           selectionLabel="PIC ruangan"
           removeLabel="Lepaskan PIC Ruangan"
           emptyMessage="Tidak ada PIC ruangan terdaftar."
           roomHeader="Ruangan"
-          getRoomLabel={(user) =>
-            user.roomNames?.length ? user.roomNames.join(", ") : "-"
-          }
+          getRoomLabel={(user) => {
+            if (!user.roomNames?.length) return "-";
+            return user.roomNames
+              .map((n) => rooms.find((r) => r.name === n)?.label ?? n)
+              .join(", ");
+          }}
           secondaryHeader="Role"
           getSecondaryLabel={(user) => user.role}
         />
@@ -321,9 +326,11 @@ export default function TaskManagementRoomPicPage() {
       <RoomPicDetailDialog
         open={Boolean(detailUser)}
         user={detailUser}
+        mode={detailMode}
         onOpenChange={(open) => {
           if (!open) setDetailUser(null);
         }}
+        onUpdated={() => setReloadKey((prev) => prev + 1)}
       />
 
       <ConfirmDeleteDialog

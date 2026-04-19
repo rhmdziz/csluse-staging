@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 
 import { TableActionIconButton } from "@/components/shared";
 import { getUserInitials, type UserRow } from "@/hooks/shared/resources/users";
@@ -21,6 +21,7 @@ type MentorTaskTableProps = {
   onToggleSelectAllVisible: (checked: boolean) => void;
   selectAllRef: RefObject<HTMLInputElement | null>;
   onOpenDetail: (user: TaskTableUserRow, mode: UserDetailMode) => void;
+  onEdit?: (user: TaskTableUserRow) => void;
   onDelete: (user: TaskTableUserRow) => void;
   isDeleting: boolean;
   selectionLabel?: string;
@@ -42,6 +43,7 @@ export default function MentorTaskTable({
   onToggleSelectAllVisible,
   selectAllRef,
   onOpenDetail,
+  onEdit,
   onDelete,
   isDeleting,
   selectionLabel = "user",
@@ -72,7 +74,7 @@ export default function MentorTaskTable({
             <th className="w-[260px] px-3 py-3 font-medium text-slate-50">Email</th>
             <th className="w-[220px] px-3 py-3 font-medium text-slate-50">{roomHeader}</th>
             <th className="w-[140px] px-3 py-3 font-medium text-slate-50">{secondaryHeader}</th>
-            <th className="sticky right-0 z-10 relative w-[112px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
+            <th className="sticky right-0 z-10 relative w-36 bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
               Aksi
             </th>
           </tr>
@@ -116,6 +118,15 @@ export default function MentorTaskTable({
                       onClick={() => onOpenDetail(user, "view")}
                       icon={<Eye className="h-4 w-4" />}
                     />
+                    {onEdit && (
+                      <TableActionIconButton
+                        label="Edit ruangan"
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={() => onEdit(user)}
+                        icon={<Pencil className="h-4 w-4" />}
+                      />
+                    )}
                     <TableActionIconButton
                       label={removeLabel}
                       variant="outline"

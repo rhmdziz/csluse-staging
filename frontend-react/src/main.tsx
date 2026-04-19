@@ -2,6 +2,11 @@ import React, { useEffect } from "react";
 
 import ReactDOM from "react-dom/client";
 
+// Auto-reload when Vite fails to fetch a lazy-loaded chunk (e.g. after a new build or dev server restart)
+window.addEventListener("vite:preloadError", () => {
+  window.location.reload();
+});
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { RouterProvider } from "react-router-dom";

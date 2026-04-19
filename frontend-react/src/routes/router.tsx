@@ -12,145 +12,160 @@ import {
   RequireMenuAccess,
 } from "@/routes/guards";
 
-const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
-const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPasswordPage"));
-const SignupGuestPage = lazy(() => import("@/pages/auth/SignupGuestPage"));
-const SignupGuestVerifyPage = lazy(() => import("@/pages/auth/SignupGuestVerifyPage"));
-const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPasswordPage"));
-const DashboardHomePage = lazy(() => import("@/pages/dashboard/DashboardHomePage"));
-const DashboardOverviewPage = lazy(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lazyWithReload<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) {
+  return lazy(() =>
+    factory().catch((e: unknown) => {
+      if (e instanceof Error && e.message.includes("Failed to fetch dynamically imported module")) {
+        window.location.reload();
+        return new Promise<never>(() => {});
+      }
+      throw e;
+    }),
+  );
+}
+
+const LoginPage = lazyWithReload(() => import("@/pages/auth/LoginPage"));
+const ForgotPasswordPage = lazyWithReload(() => import("@/pages/auth/ForgotPasswordPage"));
+const SignupGuestPage = lazyWithReload(() => import("@/pages/auth/SignupGuestPage"));
+const SignupGuestVerifyPage = lazyWithReload(() => import("@/pages/auth/SignupGuestVerifyPage"));
+const ResetPasswordPage = lazyWithReload(() => import("@/pages/auth/ResetPasswordPage"));
+const DashboardHomePage = lazyWithReload(() => import("@/pages/dashboard/DashboardHomePage"));
+const DashboardOverviewPage = lazyWithReload(
   () => import("@/pages/dashboard/overview/DashboardOverviewPage"),
 );
-const DashboardAnnouncementsPage = lazy(
+const DashboardAnnouncementsPage = lazyWithReload(
   () => import("@/pages/dashboard/announcements/DashboardAnnouncementsPage"),
 );
-const DashboardFaqPage = lazy(() => import("@/pages/dashboard/faq/DashboardFaqPage"));
-const DashboardOrganizationStructurePage = lazy(
+const DashboardFaqPage = lazyWithReload(() => import("@/pages/dashboard/faq/DashboardFaqPage"));
+const DashboardOrganizationStructurePage = lazyWithReload(
   () => import("@/pages/dashboard/organization/DashboardOrganizationStructurePage"),
 );
-const SchedulePage = lazy(() => import("@/pages/dashboard/schedule/SchedulePage"));
-const BookingRoomsListPage = lazy(
+const SchedulePage = lazyWithReload(() => import("@/pages/dashboard/schedule/SchedulePage"));
+const BookingRoomsListPage = lazyWithReload(
   () => import("@/pages/dashboard/booking-rooms/BookingRoomsListPage"),
 );
-const BookingRoomsAllListPage = lazy(
+const BookingRoomsAllListPage = lazyWithReload(
   () => import("@/pages/dashboard/booking-rooms/BookingRoomsAllListPage"),
 );
-const BookingRoomsFormPage = lazy(
+const BookingRoomsFormPage = lazyWithReload(
   () => import("@/pages/dashboard/booking-rooms/BookingRoomsFormPage"),
 );
-const BookingRoomsDetailPage = lazy(
+const BookingRoomsDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/booking-rooms/BookingRoomsDetailPage"),
 );
-const RoomsListPage = lazy(() => import("@/pages/dashboard/booking-rooms/RoomsListPage"));
-const RoomDetailPage = lazy(() => import("@/pages/dashboard/booking-rooms/RoomDetailPage"));
-const UseEquipmentListPage = lazy(
+const RoomsListPage = lazyWithReload(() => import("@/pages/dashboard/booking-rooms/RoomsListPage"));
+const RoomDetailPage = lazyWithReload(() => import("@/pages/dashboard/booking-rooms/RoomDetailPage"));
+const UseEquipmentListPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/UseEquipmentListPage"),
 );
-const UseEquipmentAllListPage = lazy(
+const UseEquipmentAllListPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/UseEquipmentAllListPage"),
 );
-const UseEquipmentFormPage = lazy(
+const UseEquipmentFormPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/UseEquipmentFormPage"),
 );
-const EquipmentListPage = lazy(
+const EquipmentListPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/EquipmentListPage"),
 );
-const MaterialListPage = lazy(
+const MaterialListPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/MaterialListPage"),
 );
-const MaterialDetailPage = lazy(
+const MaterialDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/MaterialDetailPage"),
 );
-const SoftwareListPage = lazy(() => import("@/pages/dashboard/use-equipment/SoftwareListPage"));
-const EquipmentDetailPage = lazy(
+const SoftwareListPage = lazyWithReload(() => import("@/pages/dashboard/use-equipment/SoftwareListPage"));
+const EquipmentDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/EquipmentDetailPage"),
 );
-const UseEquipmentDetailPage = lazy(
+const UseEquipmentDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/use-equipment/UseEquipmentDetailPage"),
 );
-const SampleTestingListPage = lazy(
+const SampleTestingListPage = lazyWithReload(
   () => import("@/pages/dashboard/sample-testing/SampleTestingListPage"),
 );
-const SampleTestingAllListPage = lazy(
+const SampleTestingAllListPage = lazyWithReload(
   () => import("@/pages/dashboard/sample-testing/SampleTestingAllListPage"),
 );
-const SampleTestingFormPage = lazy(
+const SampleTestingFormPage = lazyWithReload(
   () => import("@/pages/dashboard/sample-testing/SampleTestingFormPage"),
 );
-const SampleTestingDetailPage = lazy(
+const SampleTestingDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/sample-testing/SampleTestingDetailPage"),
 );
-const BorrowEquipmentListPage = lazy(
+const BorrowEquipmentListPage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentListPage"),
 );
-const BorrowEquipmentAllListPage = lazy(
+const BorrowEquipmentAllListPage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentAllListPage"),
 );
-const BorrowEquipmentFormPage = lazy(
+const BorrowEquipmentFormPage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentFormPage"),
 );
-const BorrowEquipmentAvailablePage = lazy(
+const BorrowEquipmentAvailablePage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentAvailablePage"),
 );
-const BorrowEquipmentDetailPage = lazy(
+const BorrowEquipmentDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentDetailPage"),
 );
-const NotificationsPage = lazy(() => import("@/pages/dashboard/account/NotificationsPage"));
-const MyProfilePage = lazy(() => import("@/pages/dashboard/account/MyProfilePage"));
-const AdminHomePage = lazy(() => import("@/pages/admin/home/AdminHomePage"));
-const AdminSchedulePage = lazy(() => import("@/pages/admin/schedules/AdminSchedulePage"));
-const AdminAnnouncementPage = lazy(
+const NotificationsPage = lazyWithReload(() => import("@/pages/dashboard/account/NotificationsPage"));
+const MyProfilePage = lazyWithReload(() => import("@/pages/dashboard/account/MyProfilePage"));
+const AdminHomePage = lazyWithReload(() => import("@/pages/admin/home/AdminHomePage"));
+const AdminSchedulePage = lazyWithReload(() => import("@/pages/admin/schedules/AdminSchedulePage"));
+const AdminAnnouncementPage = lazyWithReload(
   () => import("@/pages/admin/information/AdminAnnouncementPage"),
 );
-const AdminFaqPage = lazy(() => import("@/pages/admin/information/AdminFaqPage"));
-const AdminEquipmentPage = lazy(() => import("@/pages/admin/inventory/AdminEquipmentPage"));
-const AdminMaterialPage = lazy(() => import("@/pages/admin/inventory/AdminMaterialPage"));
-const AdminSoftwarePage = lazy(() => import("@/pages/admin/inventory/AdminSoftwarePage"));
-const AdminRoomPage = lazy(() => import("@/pages/admin/inventory/AdminRoomPage"));
-const AdminRoomBookingHistoryPage = lazy(
+const AdminFaqPage = lazyWithReload(() => import("@/pages/admin/information/AdminFaqPage"));
+const AdminEquipmentPage = lazyWithReload(() => import("@/pages/admin/inventory/AdminEquipmentPage"));
+const AdminMaterialPage = lazyWithReload(() => import("@/pages/admin/inventory/AdminMaterialPage"));
+const AdminSoftwarePage = lazyWithReload(() => import("@/pages/admin/inventory/AdminSoftwarePage"));
+const AdminRoomPage = lazyWithReload(() => import("@/pages/admin/inventory/AdminRoomPage"));
+const AdminRoomBookingHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminRoomBookingHistoryPage"),
 );
-const AdminEquipmentUsageHistoryPage = lazy(
+const AdminEquipmentUsageHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminEquipmentUsageHistoryPage"),
 );
-const AdminEquipmentBorrowHistoryPage = lazy(
+const AdminEquipmentBorrowHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminEquipmentBorrowHistoryPage"),
 );
-const AdminSampleTestingHistoryPage = lazy(
+const AdminSampleTestingHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminSampleTestingHistoryPage"),
 );
-const AdminSampleTestingDocumentsPage = lazy(
+const AdminSampleTestingDocumentsPage = lazyWithReload(
   () => import("@/pages/admin/documents/AdminSampleTestingDocumentsPage"),
 );
-const AdminLabClearancePage = lazy(
+const AdminLabClearancePage = lazyWithReload(
   () => import("@/pages/admin/documents/AdminLabClearancePage"),
 );
-const AdminMyProfilePage = lazy(() => import("@/pages/admin/profile/AdminMyProfilePage"));
-const UserManagementAllPage = lazy(
+const AdminMyProfilePage = lazyWithReload(() => import("@/pages/admin/profile/AdminMyProfilePage"));
+const UserManagementAllPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementAllPage"),
 );
-const UserManagementStudentPage = lazy(
+const UserManagementStudentPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementStudentPage"),
 );
-const UserManagementLecturerPage = lazy(
+const UserManagementLecturerPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementLecturerPage"),
 );
-const UserManagementAdminPage = lazy(
+const UserManagementAdminPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementAdminPage"),
 );
-const UserManagementStaffPage = lazy(
+const UserManagementStaffPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementStaffPage"),
 );
-const UserManagementGuestPage = lazy(
+const UserManagementGuestPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementGuestPage"),
 );
-const TaskManagementAdvisorPage = lazy(
+const TaskManagementAdvisorPage = lazyWithReload(
   () => import("@/pages/admin/task-management/TaskManagementAdvisorPage"),
 );
-const TaskManagementRoomPicPage = lazy(
+const TaskManagementRoomPicPage = lazyWithReload(
   () => import("@/pages/admin/task-management/TaskManagementRoomPicPage"),
 );
-const NotFoundPage = lazy(() => import("@/pages/errors/NotFoundPage"));
+const NotFoundPage = lazyWithReload(() => import("@/pages/errors/NotFoundPage"));
 
 function RoutePending() {
   return (

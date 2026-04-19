@@ -10,7 +10,8 @@
       "Bash(flake8 backend/config/settings.py backend/csluse/viewsets.py --count)",
       "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
       "Bash(grep -v \"^\\\\.$\")",
-      "Bash(python3 -m py_compile csluse/viewsets.py)"
+      "Bash(python3 -m py_compile csluse/viewsets.py)",
+      "Bash(npx tsc *)"
     ]
   }
 }

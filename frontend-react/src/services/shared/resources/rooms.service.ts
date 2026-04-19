@@ -87,6 +87,7 @@ export type BulkRoomResult = {
 
 export type RoomOption = {
   id: string;
+  name: string;
   label: string;
   capacity: number;
 };
@@ -313,6 +314,7 @@ export const roomsService = {
       .filter((room) => room.id)
       .map((room) => ({
         id: String(room.id),
+        name: String(room.name ?? "-"),
         label: room.number ? `${room.name ?? "-"} (${room.number})` : String(room.name ?? "-"),
         capacity: Number(room.capacity ?? 0),
       }));
