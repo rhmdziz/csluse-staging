@@ -124,11 +124,15 @@ const adminMenuConfig: MenuConfig[] = [
     label: "Dokumen",
     icon: FileText,
     tooltip: "Dokumen",
-    searchTerms: ["dokumen", "surat", "invoice", "pengujian"],
+    searchTerms: ["dokumen", "surat", "invoice", "pengujian", "bebas", "tanggungan", "lab"],
     items: [
       {
         label: "Pengujian Sampel",
         href: "/admin/documents/sample-testing",
+      },
+      {
+        label: "Surat Bebas Lab",
+        href: "/admin/documents/lab-clearance",
       },
     ],
   },

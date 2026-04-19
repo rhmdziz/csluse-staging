@@ -27,6 +27,7 @@ from .permissions import (
 from .serializers import (
     AdminActionSerializer,
     AdminDashboardKpisSerializer,
+    LabClearanceSerializer,
     PicUserDropdownSerializer,
     PicUserSerializer,
     ProfileSerializer,
@@ -445,7 +446,7 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="recent")
     def recent(self, request):
-        queryset = self.get_queryset()[:10]
+        queryset = self.get_queryset().exclude(user=request.user)[:10]
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -483,10 +484,6 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
                 row["role"]: row["n"]
                 for row in Profile.objects.filter(role__isnull=False).values("role").annotate(n=Count("id"))
             },
-            "users_by_type": {
-                row["user_type"]: row["n"]
-                for row in Profile.objects.values("user_type").annotate(n=Count("id"))
-            },
             "bookings_by_status": _status_breakdown(Booking),
             "borrows_by_status": _status_breakdown(Borrow),
             "uses_by_status": _status_breakdown(Use),
@@ -496,3 +493,107 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # endregion Admin Monitoring Viewsets
+
+
+# region Lab Clearance Viewsets
+
+
+class LabClearanceViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
+
+    @action(detail=False, methods=["get"], url_path="check")
+    def check(self, request):
+        """GET /api/admin/lab-clearance/check/?profile_id=<uuid>"""
+        profile_id = request.query_params.get("profile_id")
+        if not profile_id:
+            return Response({"detail": "profile_id wajib diisi."}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile = get_object_or_404(Profile, id=profile_id)
+
+        ACTIVE_BORROW_STATUSES = ["Pending", "Approved", "Borrowed", "Returned Pending Inspection", "Overdue"]
+        ACTIVE_BOOKING_STATUSES = ["Pending", "Approved"]
+        ACTIVE_USE_STATUSES = ["Pending", "Approved"]
+        ACTIVE_PENGUJIAN_STATUSES = ["Pending", "Approved", "Diproses", "Menunggu Pembayaran"]
+
+        active_services = []
+
+        for b in Borrow.objects.select_related("equipment").filter(
+            requested_by=profile, status__in=ACTIVE_BORROW_STATUSES
+        ):
+            active_services.append({
+                "id": b.id,
+                "code": b.code,
+                "type": "borrow",
+                "label": b.equipment.name if b.equipment else "-",
+                "status": b.status,
+                "start_time": b.start_time,
+                "end_time": b.end_time,
+            })
+
+        for bk in Booking.objects.select_related("room").filter(
+            requested_by=profile, status__in=ACTIVE_BOOKING_STATUSES
+        ):
+            active_services.append({
+                "id": bk.id,
+                "code": bk.code,
+                "type": "booking",
+                "label": bk.room.name if bk.room else "-",
+                "status": bk.status,
+                "start_time": bk.start_time,
+                "end_time": bk.end_time,
+            })
+
+        for u in Use.objects.select_related("equipment").filter(
+            requested_by=profile, status__in=ACTIVE_USE_STATUSES
+        ):
+            active_services.append({
+                "id": u.id,
+                "code": u.code,
+                "type": "use",
+                "label": u.equipment.name if u.equipment else "-",
+                "status": u.status,
+                "start_time": u.start_time,
+                "end_time": u.end_time,
+            })
+
+        for p in Pengujian.objects.filter(
+            requested_by=profile, status__in=ACTIVE_PENGUJIAN_STATUSES
+        ):
+            active_services.append({
+                "id": p.id,
+                "code": p.code,
+                "type": "pengujian",
+                "label": p.name or "-",
+                "status": p.status,
+                "start_time": p.created_at,
+                "end_time": None,
+            })
+
+        borrow_count = sum(1 for s in active_services if s["type"] == "borrow")
+        booking_count = sum(1 for s in active_services if s["type"] == "booking")
+        use_count = sum(1 for s in active_services if s["type"] == "use")
+        pengujian_count = sum(1 for s in active_services if s["type"] == "pengujian")
+
+        data = {
+            "profile_id": profile.id,
+            "full_name": profile.full_name or profile.user.email,
+            "id_number": profile.id_number,
+            "email": profile.user.email,
+            "department": profile.department,
+            "batch": profile.batch,
+            "role": profile.role,
+            "is_clear": len(active_services) == 0,
+            "active_services": active_services,
+            "summary": {
+                "total_active": len(active_services),
+                "borrow_count": borrow_count,
+                "booking_count": booking_count,
+                "use_count": use_count,
+                "pengujian_count": pengujian_count,
+            },
+        }
+        serializer = LabClearanceSerializer(data)
+        return Response(serializer.data)
+
+
+# endregion Lab Clearance Viewsets

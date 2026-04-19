@@ -7,6 +7,7 @@ import { bookingRoomsService } from "@/services/booking-rooms";
 export type BookingFilters = {
   q?: string;
   status?: string;
+  purpose?: string;
   requestedBy?: string;
   department?: string;
   room?: string;
@@ -397,6 +398,7 @@ export function useBookings(
     pageSize,
     filters.q,
     filters.status,
+    filters.purpose,
     filters.requestedBy,
     filters.department,
     filters.room,

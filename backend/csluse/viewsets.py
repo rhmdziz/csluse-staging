@@ -1228,6 +1228,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         equipment_id = self.request.query_params.get('equipment')
         requester_id = self.request.query_params.get('requested_by')
         department = self.request.query_params.get('department')
+        purpose_param = self.request.query_params.get('purpose')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
         start_after = self.request.query_params.get('start_after')
         end_before = self.request.query_params.get('end_before')
@@ -1265,6 +1266,8 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(requested_by_id=requester_id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
+        if purpose_param:
+            qs = qs.filter(purpose__iexact=purpose_param)
         if pic_id:
             qs = qs.filter(room__pics__id=pic_id).distinct()
         if start_after:
@@ -1686,6 +1689,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         room_id = self.request.query_params.get('room')
         requester_id = self.request.query_params.get('requested_by')
         department = self.request.query_params.get('department')
+        purpose_param = self.request.query_params.get('purpose')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
         start_after = self.request.query_params.get('start_after')
         end_before = self.request.query_params.get('end_before')
@@ -1712,6 +1716,8 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(requested_by_id=requester_id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
+        if purpose_param:
+            qs = qs.filter(purpose__iexact=purpose_param)
         if pic_id and allow_pic_filter:
             qs = qs.filter(equipment__room__pics__id=pic_id).distinct()
         if start_after:
@@ -2584,9 +2590,21 @@ class CalendarViewSet(viewsets.ViewSet):
             .select_related('room', 'requested_by')
         )
 
+        use_qs = (
+            Use.objects
+            .filter(
+                status__in=["Approved", "Completed"],
+                start_time__lt=end,
+                end_time__gt=start,
+                equipment__room__isnull=False,
+            )
+            .select_related("equipment__room", "requested_by")
+        )
+
         if room_id:
             schedule_qs = schedule_qs.filter(room_id=room_id)
             booking_qs = booking_qs.filter(room_id=room_id)
+            use_qs = use_qs.filter(equipment__room_id=room_id)
 
         items = []
 
@@ -2620,6 +2638,23 @@ class CalendarViewSet(viewsets.ViewSet):
                 'requested_by_name': _profile_display_name(item.requested_by),
                 'attendee_count': item.attendee_count,
                 'purpose': item.purpose,
+            })
+
+        for item in use_qs:
+            room_obj = item.equipment.room if item.equipment else None
+            equip_name = item.equipment.name if item.equipment else "Alat"
+            items.append({
+                "id": str(item.id),
+                "source": "use",
+                "title": f"Penggunaan Alat ({equip_name})",
+                "start_time": item.start_time,
+                "end_time": item.end_time,
+                "room_id": room_obj.id if room_obj else None,
+                "room_name": room_obj.name if room_obj else None,
+                "room_number": room_obj.number if room_obj else None,
+                "requested_by_name": _profile_display_name(item.requested_by),
+                "attendee_count": 1,
+                "purpose": item.purpose,
             })
 
         items.sort(key=lambda item: (item['start_time'], item['title']))
@@ -3643,6 +3678,7 @@ class UseViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         room_id = self.request.query_params.get('room')
         requester_id = self.request.query_params.get('requested_by')
         department = self.request.query_params.get('department')
+        purpose_param = self.request.query_params.get('purpose')
         approved_by = self.request.query_params.get('approved_by')
         start_after = self.request.query_params.get('start_after')
         end_before = self.request.query_params.get('end_before')
@@ -3668,6 +3704,8 @@ class UseViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(requested_by_id=requester_id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
+        if purpose_param:
+            qs = qs.filter(purpose__iexact=purpose_param)
         if approved_by:
             qs = qs.filter(approved_by_id=approved_by)
         if start_after:
@@ -4107,12 +4145,19 @@ def _booking_review_result(booking):
                     )
                 )
             else:
-                # Cek kapasitas: total attendee_count semua booking Penelitian/Skripsi yang overlap + ini
+                # Cek kapasitas: total attendee_count semua booking Penelitian/Skripsi yang overlap + Use + ini
                 room_capacity = getattr(booking.room, "capacity", None)
                 shared_bookings = overlapping_bookings.filter(purpose__in=list(_SHARED_PURPOSES))
                 existing_total = shared_bookings.aggregate(
                     total=Sum("attendee_count")
                 )["total"] or 0
+                use_in_room = Use.objects.filter(
+                    equipment__room_id=booking.room_id,
+                    status="Approved",
+                    start_time__lt=booking.end_time,
+                    end_time__gt=booking.start_time,
+                ).count()
+                existing_total += use_in_room
                 current_attendees = booking.attendee_count or 0
                 total_attendees = existing_total + current_attendees
                 shared_count = shared_bookings.count()
@@ -4120,6 +4165,7 @@ def _booking_review_result(booking):
                 if room_capacity is not None:
                     overlap_info = {
                         "shared_booking_count": shared_count,
+                        "use_count_in_room": use_in_room,
                         "existing_attendees": existing_total,
                         "current_attendees": current_attendees,
                         "total_attendees": total_attendees,
@@ -4315,6 +4361,53 @@ def _use_review_result(use_item):
         passed_indicators.extend(overlap_result["passed_indicators"])
     elif equipment is not None and getattr(equipment, "is_shareable", False):
         passed_indicators.append("Alat bersifat shareable, tidak ada pembatasan stok berdasarkan waktu")
+
+    room = getattr(equipment, "room", None) if equipment else None
+    if room and use_item.start_time and use_item.end_time:
+        EXCLUSIVE = {"Praktikum", "Workshop"}
+        blocking = Booking.objects.filter(
+            room=room,
+            status="Approved",
+            purpose__in=EXCLUSIVE,
+            start_time__lt=use_item.end_time,
+            end_time__gt=use_item.start_time,
+        ).count()
+        if blocking:
+            issues.append(
+                _review_issue(
+                    "Bentrok booking Praktikum/Workshop",
+                    f"Ruangan {room.name} sudah dipakai untuk {blocking} booking Praktikum/Workshop "
+                    f"yang disetujui pada rentang waktu ini.",
+                )
+            )
+        else:
+            total_booking = (
+                Booking.objects.filter(
+                    room=room,
+                    status="Approved",
+                    start_time__lt=use_item.end_time,
+                    end_time__gt=use_item.start_time,
+                ).aggregate(total=Sum("attendee_count"))["total"] or 0
+            )
+            total_use = Use.objects.filter(
+                equipment__room=room,
+                status="Approved",
+                start_time__lt=use_item.end_time,
+                end_time__gt=use_item.start_time,
+            ).exclude(pk=use_item.pk).count()
+            total_occupancy = total_booking + total_use + 1
+            if total_occupancy > room.capacity:
+                issues.append(
+                    _review_issue(
+                        "Melebihi kapasitas ruangan",
+                        f"Total pengguna ({total_occupancy} orang) melebihi kapasitas ruangan "
+                        f"{room.name} ({room.capacity} orang) jika digabung dengan booking dan penggunaan alat lain.",
+                    )
+                )
+            else:
+                passed_indicators.append(
+                    f"Kapasitas ruangan {room.name} mencukupi ({total_occupancy}/{room.capacity} orang)"
+                )
 
     if equipment_available:
         passed_indicators.insert(0, "Status alat masih available")

@@ -12,6 +12,7 @@ import { authFetch } from "@/lib/auth";
 export type BookingServiceFilters = {
   q?: string;
   status?: string;
+  purpose?: string;
   requestedBy?: string;
   department?: string;
   room?: string;
@@ -85,6 +86,7 @@ export const bookingRoomsService = {
     url.searchParams.set("page_size", String(pageSize));
     if (filters.q) url.searchParams.set("q", filters.q);
     if (filters.status) url.searchParams.set("status", filters.status);
+    if (filters.purpose) url.searchParams.set("purpose", filters.purpose);
     if (filters.requestedBy && scope !== "my") {
       url.searchParams.set("requested_by", filters.requestedBy);
     }

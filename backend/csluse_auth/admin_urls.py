@@ -5,6 +5,7 @@ from .viewsets import (
     AdminActionViewSet,
     AdminDashboardViewSet,
     AdminProfileViewSet,
+    LabClearanceViewSet,
     PicUserViewSet,
     UserWithProfileViewSet,
 )
@@ -15,6 +16,7 @@ router.register(r"users", UserWithProfileViewSet, basename="users")
 router.register(r"pic-users", PicUserViewSet, basename="pic-users")
 router.register(r"actions", AdminActionViewSet, basename="admin-actions")
 router.register(r"dashboard", AdminDashboardViewSet, basename="admin-dashboard")
+router.register(r"lab-clearance", LabClearanceViewSet, basename="lab-clearance")
 
 urlpatterns = [
     path("", include(router.urls)),

@@ -7,6 +7,7 @@ import { borrowEquipmentService } from "@/services/borrow-equipment";
 export type BorrowFilters = {
   q?: string;
   status?: string;
+  purpose?: string;
   requestedBy?: string;
   department?: string;
   equipment?: string;
@@ -403,6 +404,7 @@ export function useBorrows(
     pageSize,
     filters.q,
     filters.status,
+    filters.purpose,
     filters.requestedBy,
     filters.department,
     filters.equipment,

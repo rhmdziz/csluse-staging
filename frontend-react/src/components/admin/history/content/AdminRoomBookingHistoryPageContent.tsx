@@ -83,6 +83,8 @@ import {
   shouldShowReviewAction,
 } from "@/lib/request";
 
+import { REQUEST_PURPOSE_OPTIONS } from "@/constants/request-purpose";
+
 import { useAdminRecordExport } from "@/hooks/admin";
 
 const PAGE_SIZE = 20;
@@ -111,6 +113,7 @@ export default function AdminRoomBookingHistoryPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [purpose, setPurpose] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
   const [department, setDepartment] = useState("");
   const [room, setRoom] = useState("");
@@ -146,6 +149,7 @@ export default function AdminRoomBookingHistoryPage() {
     filters: {
       q: debouncedSearch,
       status,
+      purpose,
       requested_by: requestedBy,
       department,
       room,
@@ -172,6 +176,7 @@ export default function AdminRoomBookingHistoryPage() {
     PAGE_SIZE,
     {
       status,
+      purpose,
       requestedBy,
       department,
       room,
@@ -239,6 +244,7 @@ export default function AdminRoomBookingHistoryPage() {
     setSearch("");
     setDebouncedSearch("");
     setStatus("");
+    setPurpose("");
     setRequestedBy("");
     setDepartment("");
     setRoom("");
@@ -377,7 +383,7 @@ export default function AdminRoomBookingHistoryPage() {
             onReset={resetFilters}
           >
             <form
-              className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6"
+              className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 setPage(1);
@@ -411,6 +417,26 @@ export default function AdminRoomBookingHistoryPage() {
                   className="h-8 w-full rounded-md border border-slate-400 bg-white px-2 text-xs outline-none shadow-xs focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-100"
                 >
                   {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <label className="mb-0.5 block text-[11px] font-semibold text-slate-900/90">
+                  Kategori
+                </label>
+                <select
+                  value={purpose}
+                  onChange={(event) => {
+                    setPurpose(event.target.value);
+                    setPage(1);
+                  }}
+                  className="h-8 w-full rounded-md border border-slate-400 bg-white px-2 text-xs outline-none shadow-xs focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-100"
+                >
+                  <option value="">Semua kategori</option>
+                  {REQUEST_PURPOSE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -496,7 +522,7 @@ export default function AdminRoomBookingHistoryPage() {
                   ))}
                 </select>
               </div>
-              <div className="min-w-0 xl:col-start-3 xl:col-span-2">
+              <div className="min-w-0">
                 <label className="mb-0.5 block text-[11px] font-semibold text-slate-900/90">
                   Tanggal Dibuat
                 </label>

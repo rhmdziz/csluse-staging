@@ -7,6 +7,7 @@ import {
   Boxes,
   Building2,
   CalendarCheck2,
+  ChevronDown,
   Package,
   ShieldUser,
   Sparkles,
@@ -40,7 +41,6 @@ type AdminKpis = {
   totalSampleTesting: number;
   totalUseRequest: number;
   usersByRole: Record<string, number>;
-  usersByType: Record<string, number>;
   bookingsByStatus: Record<string, number>;
   borrowsByStatus: Record<string, number>;
   usesByStatus: Record<string, number>;
@@ -58,7 +58,6 @@ type AdminKpisResponse = {
   total_uses?: number;
   total_pengujians?: number;
   users_by_role?: Record<string, number>;
-  users_by_type?: Record<string, number>;
   bookings_by_status?: Record<string, number>;
   borrows_by_status?: Record<string, number>;
   uses_by_status?: Record<string, number>;
@@ -87,6 +86,74 @@ function getActionAccentClass(action: AdminAction["action"]) {
   return "bg-slate-400";
 }
 
+function ActionItem({
+  item,
+  showDivider,
+}: {
+  item: AdminAction;
+  showDivider: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative min-w-0 overflow-hidden rounded-lg border bg-white p-3">
+      <span
+        className={`absolute inset-y-0 left-0 w-1 ${getActionAccentClass(item.action)}`}
+      />
+      <div className="ml-2 min-w-0">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full min-w-0 flex-col items-start gap-2 text-left sm:flex-row sm:items-start sm:justify-between sm:gap-3"
+        >
+          <p className="min-w-0 max-w-[80%] flex-1 break-all text-sm font-semibold text-slate-900 sm:max-w-none sm:break-words sm:line-clamp-2">
+            {item.object_repr || "-"}
+          </p>
+          <div className="flex shrink-0 flex-row items-center gap-2 sm:items-end">
+            <span
+              className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getActionBadgeClass(item.action)}`}
+            >
+              {formatActionLabel(item.action)}
+            </span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            />
+          </div>
+        </button>
+
+        {open && (
+          <>
+            <div className="mt-2 grid gap-1 text-xs text-slate-600">
+              <p className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                <span className="flex min-w-0 max-w-[80%] flex-1 items-center gap-1 sm:max-w-none">
+                  <ShieldUser className="h-3.5 w-3.5 text-slate-500" />
+                  <span className="min-w-0 flex-1 break-all sm:break-words">
+                    {item.actor || "-"}
+                  </span>
+                </span>
+                <span className="flex max-w-full flex-wrap items-center gap-1 break-words text-[11px] sm:text-xs">
+                  <CalendarCheck2 className="h-3 w-3 text-slate-500" />
+                  {formatDateId(item.action_time)} {", "}
+                  {formatTimeIdWithZone(item.action_time)}
+                </span>
+              </p>
+            </div>
+
+            {item.change_message ? (
+              <p className="mt-2 min-w-0 break-all rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+                {item.change_message}
+              </p>
+            ) : null}
+          </>
+        )}
+      </div>
+      {showDivider ? (
+        <div className="mt-3 border-b border-dashed border-slate-200" />
+      ) : null}
+    </div>
+  );
+}
+
 function ActionList({
   title,
   actions,
@@ -100,65 +167,11 @@ function ActionList({
       {actions.length ? (
         <div className="space-y-2">
           {actions.map((item, index) => (
-            <div
+            <ActionItem
               key={item.id}
-              className="relative min-w-0 overflow-hidden rounded-lg border bg-white p-3"
-            >
-              <span
-                className={`absolute inset-y-0 left-0 w-1 ${getActionAccentClass(item.action)}`}
-              />
-              <div className="ml-2 min-w-0">
-                <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                  <p className="min-w-0 max-w-[80%] flex-1 break-all text-sm font-semibold text-slate-900 sm:max-w-none sm:break-words sm:line-clamp-2">
-                    {item.object_repr || "-"}
-                  </p>
-                  <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
-                    <span
-                      className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getActionBadgeClass(item.action)}`}
-                    >
-                      {formatActionLabel(item.action)}
-                    </span>
-                    {/* <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                      <CalendarCheck2 className="h-3 w-3 text-slate-500" />
-                      {formatDateId(item.action_time)}
-                      <Clock3 className="h-3 w-3 text-slate-500" />
-                      {formatTimeIdWithZone(item.action_time)}
-                    </span> */}
-                  </div>
-                </div>
-
-                <div className="mt-2 grid gap-1 text-xs text-slate-600">
-                  <p className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                    <span className="flex min-w-0 max-w-[80%] flex-1 items-center gap-1 sm:max-w-none">
-                      <ShieldUser className="h-3.5 w-3.5 text-slate-500" />
-                      <span className="min-w-0 flex-1 break-all sm:break-words">
-                        {item.actor || "-"}
-                      </span>
-                    </span>
-                    <span className="flex max-w-full flex-wrap items-center gap-1 break-words text-[11px] sm:text-xs">
-                      <CalendarCheck2 className="h-3 w-3 text-slate-500" />
-                      {formatDateId(item.action_time)} {", "}
-                      {formatTimeIdWithZone(item.action_time)}
-                    </span>
-                  </p>
-                  {/* <p className="flex min-w-0 items-center gap-2">
-                    <Waypoints className="h-3.5 w-3.5 text-slate-500" />
-                    <span className="min-w-0 max-w-[80%] flex-1 break-all sm:max-w-none sm:break-words">
-                      {item.target || "-"}
-                    </span>
-                  </p> */}
-                </div>
-
-                {item.change_message ? (
-                  <p className="mt-2 min-w-0 break-all rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
-                    {item.change_message}
-                  </p>
-                ) : null}
-              </div>
-              {index < actions.length - 1 ? (
-                <div className="mt-3 border-b border-dashed border-slate-200" />
-              ) : null}
-            </div>
+              item={item}
+              showDivider={index < actions.length - 1}
+            />
           ))}
         </div>
       ) : (
@@ -182,7 +195,6 @@ export default function Page() {
     totalSampleTesting: 0,
     totalUseRequest: 0,
     usersByRole: {},
-    usersByType: {},
     bookingsByStatus: {},
     borrowsByStatus: {},
     usesByStatus: {},
@@ -221,7 +233,6 @@ export default function Page() {
           totalSampleTesting: payload.total_pengujians ?? 0,
           totalUseRequest: payload.total_uses ?? 0,
           usersByRole: payload.users_by_role ?? {},
-          usersByType: payload.users_by_type ?? {},
           bookingsByStatus: payload.bookings_by_status ?? {},
           borrowsByStatus: payload.borrows_by_status ?? {},
           usesByStatus: payload.uses_by_status ?? {},

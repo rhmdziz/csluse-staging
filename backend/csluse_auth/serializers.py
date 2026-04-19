@@ -470,7 +470,6 @@ class AdminDashboardKpisSerializer(serializers.Serializer):
     total_uses = serializers.IntegerField()
     total_pengujians = serializers.IntegerField()
     users_by_role = serializers.DictField(child=serializers.IntegerField(), required=False)
-    users_by_type = serializers.DictField(child=serializers.IntegerField(), required=False)
     bookings_by_status = serializers.DictField(child=serializers.IntegerField(), required=False)
     borrows_by_status = serializers.DictField(child=serializers.IntegerField(), required=False)
     uses_by_status = serializers.DictField(child=serializers.IntegerField(), required=False)
@@ -590,3 +589,32 @@ def _generate_unique_username(base):
 
 
 # endregion Utilities
+
+
+# region Lab Clearance Serializers
+
+
+class LabClearanceActiveServiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    code = serializers.CharField()
+    type = serializers.CharField()
+    label = serializers.CharField()
+    status = serializers.CharField()
+    start_time = serializers.DateTimeField()
+    end_time = serializers.DateTimeField(allow_null=True)
+
+
+class LabClearanceSerializer(serializers.Serializer):
+    profile_id = serializers.UUIDField()
+    full_name = serializers.CharField()
+    id_number = serializers.CharField(allow_null=True)
+    email = serializers.CharField()
+    department = serializers.CharField(allow_null=True)
+    batch = serializers.CharField(allow_null=True)
+    role = serializers.CharField()
+    is_clear = serializers.BooleanField()
+    active_services = LabClearanceActiveServiceSerializer(many=True)
+    summary = serializers.DictField()
+
+
+# endregion Lab Clearance Serializers

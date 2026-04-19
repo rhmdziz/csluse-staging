@@ -1,5 +1,6 @@
 services:
   backend:
+    container_name: csluse-backend
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
@@ -10,6 +11,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    container_name: csluse-frontend
     build:
       context: ./frontend-react
     expose:
@@ -17,6 +19,7 @@ services:
     restart: unless-stopped
 
   nginx:
+    container_name: csluse-nginx
     image: nginx:1.27-alpine
     ports:
       - "80:80"

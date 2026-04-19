@@ -830,12 +830,18 @@ class BookingSerializer(serializers.ModelSerializer):
                 total_approved = overlapping_approved.aggregate(
                     total=Sum("attendee_count")
                 )["total"] or 0
-                if total_approved + attendee_count > room.capacity:
+                use_count_in_room = Use.objects.filter(
+                    equipment__room=room,
+                    status="Approved",
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                ).count()
+                if total_approved + use_count_in_room + attendee_count > room.capacity:
                     raise serializers.ValidationError(
                         {
                             "non_field_errors": [
                                 f"Total peserta melebihi kapasitas ruangan ({room.capacity} orang) "
-                                f"jika digabung dengan booking lain yang sudah disetujui pada waktu yang sama."
+                                f"jika digabung dengan booking dan penggunaan alat lain yang sudah disetujui pada waktu yang sama."
                             ]
                         }
                     )
@@ -869,8 +875,6 @@ class BookingSerializer(serializers.ModelSerializer):
 
             # Time-overlap stock check: account for concurrent Booking/Use/Borrow allocations
             if start_time and end_time and not equipment.is_shareable:
-                from .models import Borrow, Use
-
                 booking_allocated = (
                     Booking.objects.filter(
                         equipment_items__equipment_id=equipment.id,
@@ -1616,6 +1620,50 @@ class UseSerializer(serializers.ModelSerializer):
                         {
                             "non_field_errors": [
                                 "Ruangan sudah memiliki jadwal praktikum pada rentang waktu tersebut."
+                            ]
+                        }
+                    )
+
+                EXCLUSIVE_PURPOSES = {"Praktikum", "Workshop"}
+                blocking_bookings = Booking.objects.filter(
+                    room=room,
+                    status="Approved",
+                    purpose__in=EXCLUSIVE_PURPOSES,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time,
+                )
+                if blocking_bookings.exists():
+                    raise serializers.ValidationError(
+                        {
+                            "non_field_errors": [
+                                "Ruangan sudah memiliki booking Praktikum/Workshop yang disetujui pada rentang waktu tersebut."
+                            ]
+                        }
+                    )
+
+            if room:
+                total_booking_attendees = (
+                    Booking.objects.filter(
+                        room=room,
+                        status="Approved",
+                        start_time__lt=end_time,
+                        end_time__gt=start_time,
+                    ).aggregate(total=Sum("attendee_count"))["total"] or 0
+                )
+                total_use_count = (
+                    Use.objects.filter(
+                        equipment__room=room,
+                        status="Approved",
+                        start_time__lt=end_time,
+                        end_time__gt=start_time,
+                    ).exclude(pk=instance.pk if instance else None).count()
+                )
+                if total_booking_attendees + total_use_count + 1 > room.capacity:
+                    raise serializers.ValidationError(
+                        {
+                            "non_field_errors": [
+                                f"Total pengguna ruangan melebihi kapasitas ({room.capacity} orang) "
+                                f"jika digabung dengan booking dan penggunaan alat lain yang sudah disetujui."
                             ]
                         }
                     )

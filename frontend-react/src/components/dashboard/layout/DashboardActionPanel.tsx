@@ -864,6 +864,7 @@ export function DashboardActionPanel({
                   <option value="">Semua Kategori</option>
                   <option value="schedule">Jadwal Praktikum</option>
                   <option value="booking">Peminjaman Lab</option>
+                  <option value="use">Penggunaan Alat</option>
                 </select>
               </FilterField>
               <FilterField label="Ruangan">

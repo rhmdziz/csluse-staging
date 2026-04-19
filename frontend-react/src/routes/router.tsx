@@ -122,6 +122,9 @@ const AdminSampleTestingHistoryPage = lazy(
 const AdminSampleTestingDocumentsPage = lazy(
   () => import("@/pages/admin/documents/AdminSampleTestingDocumentsPage"),
 );
+const AdminLabClearancePage = lazy(
+  () => import("@/pages/admin/documents/AdminLabClearancePage"),
+);
 const AdminMyProfilePage = lazy(() => import("@/pages/admin/profile/AdminMyProfilePage"));
 const UserManagementAllPage = lazy(
   () => import("@/pages/admin/user-management/UserManagementAllPage"),
@@ -586,6 +589,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="sample-testing" replace /> },
           { path: "sample-testing", element: renderPage(AdminSampleTestingDocumentsPage) },
+          { path: "lab-clearance", element: renderPage(AdminLabClearancePage) },
         ],
       },
       {

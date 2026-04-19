@@ -7,6 +7,7 @@ import { useEquipmentService } from "@/services/use-equipment";
 export type UseFilters = {
   q?: string;
   status?: string;
+  purpose?: string;
   department?: string;
   equipment?: string;
   room?: string;
@@ -361,6 +362,7 @@ export function useUses(
     pageSize,
     filters.q,
     filters.status,
+    filters.purpose,
     filters.department,
     filters.equipment,
     filters.room,
