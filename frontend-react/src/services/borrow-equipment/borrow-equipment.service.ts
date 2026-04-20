@@ -19,6 +19,7 @@ export type BorrowServiceFilters = {
   status?: string;
   purpose?: string;
   requestedBy?: string;
+  reviewerScope?: "mentor" | "all";
   department?: string;
   equipment?: string;
   createdAfter?: string;
@@ -95,6 +96,9 @@ export const borrowEquipmentService = {
     if (filters.purpose) url.searchParams.set("purpose", filters.purpose);
     if (filters.requestedBy && scope !== "my") {
       url.searchParams.set("requested_by", filters.requestedBy);
+    }
+    if (filters.reviewerScope) {
+      url.searchParams.set("reviewer_scope", filters.reviewerScope);
     }
     if (filters.department) url.searchParams.set("department", filters.department);
     if (filters.equipment) url.searchParams.set("equipment", filters.equipment);

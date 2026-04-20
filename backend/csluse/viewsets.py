@@ -1211,6 +1211,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("room", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("equipment", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("requested_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("reviewer_scope", OpenApiTypes.STR, OpenApiParameter.QUERY, description="mentor or all"),
             OpenApiParameter("department", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("pic", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="PIC of the room"),
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
@@ -1229,6 +1230,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         room_id = self.request.query_params.get('room')
         equipment_id = self.request.query_params.get('equipment')
         requester_id = self.request.query_params.get('requested_by')
+        reviewer_scope = (self.request.query_params.get('reviewer_scope') or '').strip().lower()
         department = self.request.query_params.get('department')
         purpose_param = self.request.query_params.get('purpose')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
@@ -1266,6 +1268,11 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(equipment_items__equipment_id=equipment_id).distinct()
         if requester_id and allow_requester_filter:
             qs = qs.filter(requested_by_id=requester_id)
+        if reviewer_scope == 'mentor':
+            profile = self._current_profile()
+            if profile is None:
+                return qs.none()
+            qs = qs.filter(requester_mentor_profile_id=profile.id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
         if purpose_param:
@@ -1725,6 +1732,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         equipment_id = self.request.query_params.get('equipment')
         room_id = self.request.query_params.get('room')
         requester_id = self.request.query_params.get('requested_by')
+        reviewer_scope = (self.request.query_params.get('reviewer_scope') or '').strip().lower()
         department = self.request.query_params.get('department')
         purpose_param = self.request.query_params.get('purpose')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
@@ -1751,6 +1759,11 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(equipment__room_id=room_id)
         if requester_id and allow_requester_filter:
             qs = qs.filter(requested_by_id=requester_id)
+        if reviewer_scope == 'mentor':
+            profile = self._current_profile()
+            if profile is None:
+                return qs.none()
+            qs = qs.filter(requester_mentor_profile_id=profile.id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
         if purpose_param:
@@ -1773,6 +1786,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("equipment", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("room", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("requested_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("reviewer_scope", OpenApiTypes.STR, OpenApiParameter.QUERY, description="mentor or all"),
             OpenApiParameter("department", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("pic", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="PIC of the equipment's room"),
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
