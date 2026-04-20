@@ -59,19 +59,19 @@ const BookingRoomsDetailPage = lazyWithReload(
 const RoomsListPage = lazyWithReload(() => import("@/pages/dashboard/booking-rooms/RoomsListPage"));
 const RoomDetailPage = lazyWithReload(() => import("@/pages/dashboard/booking-rooms/RoomDetailPage"));
 const BookingEquipmentListPage = lazyWithReload(
-  () => import("@/pages/dashboard/booking/EquipmentListPage"),
+  () => import("@/pages/dashboard/booking-rooms/EquipmentListPage"),
 );
 const BookingEquipmentDetailPage = lazyWithReload(
-  () => import("@/pages/dashboard/booking/EquipmentDetailPage"),
+  () => import("@/pages/dashboard/booking-rooms/EquipmentDetailPage"),
 );
 const BookingMaterialListPage = lazyWithReload(
-  () => import("@/pages/dashboard/booking/MaterialListPage"),
+  () => import("@/pages/dashboard/booking-rooms/MaterialListPage"),
 );
 const BookingMaterialDetailPage = lazyWithReload(
-  () => import("@/pages/dashboard/booking/MaterialDetailPage"),
+  () => import("@/pages/dashboard/booking-rooms/MaterialDetailPage"),
 );
 const BookingSoftwareListPage = lazyWithReload(
-  () => import("@/pages/dashboard/booking/SoftwareListPage"),
+  () => import("@/pages/dashboard/booking-rooms/SoftwareListPage"),
 );
 const SampleTestingListPage = lazyWithReload(
   () => import("@/pages/dashboard/sample-testing/SampleTestingListPage"),

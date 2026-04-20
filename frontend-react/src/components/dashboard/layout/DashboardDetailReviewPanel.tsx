@@ -277,11 +277,11 @@ function getPengujianStatusHint(
     return {
       title: "Menunggu pembayaran",
       message: reviewer
-        ? "Sistem sedang menunggu bukti bayar dan surat hasil uji untuk menyelesaikan pengujian."
-        : "Upload bukti bayar, lalu surat hasil uji untuk menyelesaikan proses.",
+        ? "Sistem sedang menunggu bukti bayar, kuitansi, dan surat hasil uji untuk menyelesaikan pengujian."
+        : "Upload bukti bayar, lalu lanjutkan ke kuitansi dan surat hasil uji untuk menyelesaikan proses.",
       indicators: reviewer
         ? ["Pantau dokumen requester pada section dokumen pengujian."]
-        : ["Setelah bukti bayar terunggah, lanjutkan upload surat hasil uji pada tahap akhir."],
+        : ["Setelah bukti bayar terunggah, lanjutkan upload kuitansi dan surat hasil uji."],
       className: "border-violet-200 bg-violet-50/80",
       titleClassName: "text-violet-800",
       textClassName: "text-violet-900",

@@ -42,6 +42,15 @@ const ORDERING_OPTIONS = [
   { value: "oldest", label: "Terlama" },
 ];
 
+function getDocumentTypeLabel(value: SampleTestingDocumentType) {
+  if (value === "testing_agreement") return "Surat Perjanjian Pengujian";
+  if (value === "signed_testing_agreement") return "Surat Perjanjian Ditandatangani";
+  if (value === "invoice") return "Invoice";
+  if (value === "payment_proof") return "Bukti Bayar";
+  if (value === "receipt") return "Kuitansi";
+  return "Surat Hasil Uji";
+}
+
 type SupportedDocumentConfig = {
   title: string;
   description: string;
@@ -166,16 +175,7 @@ export default function AdminSampleTestingDocumentsContent({
   const documentTypeOptions =
     config.documentTypes.map((value) => ({
       value,
-      label:
-        value === "testing_agreement"
-          ? "Surat Perjanjian Pengujian"
-          : value === "signed_testing_agreement"
-            ? "Surat Perjanjian Ditandatangani"
-            : value === "invoice"
-              ? "Invoice"
-              : value === "payment_proof"
-                ? "Bukti Bayar"
-                : "Surat Hasil Uji",
+      label: getDocumentTypeLabel(value),
     }));
 
   const totalDocumentsOnPage = groupedItems.reduce(

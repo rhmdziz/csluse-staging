@@ -52,6 +52,7 @@ export type SampleTestingDocumentType =
   | "signed_testing_agreement"
   | "invoice"
   | "payment_proof"
+  | "receipt"
   | "test_result_letter";
 
 export type SampleTestingDocument = {

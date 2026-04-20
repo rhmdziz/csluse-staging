@@ -418,6 +418,7 @@ class Document(BaseModel):
         ("signed_testing_agreement", "Surat perjanjian pengujian yang sudah ditandatangani"),
         ("invoice", "Invoice"),
         ("payment_proof", "Bukti bayar"),
+        ("receipt", "Kuitansi"),
         ("test_result_letter", "Surat hasil uji"),
     ]
 

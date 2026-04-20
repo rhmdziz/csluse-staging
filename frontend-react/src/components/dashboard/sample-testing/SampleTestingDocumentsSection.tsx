@@ -49,6 +49,11 @@ const DOCUMENT_DEFINITIONS: DocumentDefinition[] = [
     owner: "requester",
   },
   {
+    type: "receipt",
+    label: "Kuitansi",
+    owner: "approver",
+  },
+  {
     type: "test_result_letter",
     label: "Surat hasil uji",
     owner: "approver",
@@ -56,24 +61,6 @@ const DOCUMENT_DEFINITIONS: DocumentDefinition[] = [
   },
 ];
 const DOCUMENT_DEFINITIONS_DISPLAY = [...DOCUMENT_DEFINITIONS].reverse();
-
-const DOCUMENT_PREVIOUS_STAGE_MAP: Partial<
-  Record<SampleTestingDocumentType, SampleTestingDocumentType>
-> = {
-  signed_testing_agreement: "testing_agreement",
-  invoice: "signed_testing_agreement",
-  payment_proof: "invoice",
-  test_result_letter: "payment_proof",
-};
-
-const DOCUMENT_NEXT_STAGE_MAP: Partial<
-  Record<SampleTestingDocumentType, SampleTestingDocumentType>
-> = {
-  testing_agreement: "signed_testing_agreement",
-  signed_testing_agreement: "invoice",
-  invoice: "payment_proof",
-  payment_proof: "test_result_letter",
-};
 const MAX_DOCUMENT_SIZE = 5 * 1024 * 1024;
 
 function isPreviewableDocument(document: SampleTestingDocument) {
@@ -106,63 +93,6 @@ function canShowSection(status: string) {
     "menunggu pembayaran",
     "completed",
   ].includes(normalized);
-}
-
-function getUploadBlockReason(
-  documents: SampleTestingDocument[],
-  documentType: SampleTestingDocumentType,
-) {
-  const previousType = DOCUMENT_PREVIOUS_STAGE_MAP[documentType];
-  if (!previousType) return "";
-
-  const previousDocument = getDocumentByType(documents, previousType);
-  if (previousDocument) return "";
-
-  const previousDefinition = DOCUMENT_DEFINITIONS.find(
-    (item) => item.type === previousType,
-  );
-  return previousDefinition
-    ? `Upload ${previousDefinition.label} terlebih dahulu.`
-    : "Dokumen tahap sebelumnya belum tersedia.";
-}
-
-function canReplaceDocument(
-  documents: SampleTestingDocument[],
-  documentType: SampleTestingDocumentType,
-) {
-  const nextType = DOCUMENT_NEXT_STAGE_MAP[documentType];
-  if (!nextType) return true;
-  return !getDocumentByType(documents, nextType);
-}
-
-function shouldRenderDocumentForViewer(
-  documents: SampleTestingDocument[],
-  documentType: SampleTestingDocumentType,
-) {
-  const testingAgreement = getDocumentByType(documents, "testing_agreement");
-  const signedAgreement = getDocumentByType(
-    documents,
-    "signed_testing_agreement",
-  );
-  const invoice = getDocumentByType(documents, "invoice");
-  const paymentProof = getDocumentByType(documents, "payment_proof");
-  const currentDocument = getDocumentByType(documents, documentType);
-
-  if (documentType === "testing_agreement") return true;
-  if (documentType === "signed_testing_agreement") {
-    return Boolean(testingAgreement || currentDocument);
-  }
-  if (documentType === "invoice") {
-    return Boolean(signedAgreement || currentDocument);
-  }
-  if (documentType === "payment_proof") {
-    return Boolean(invoice || currentDocument);
-  }
-  if (documentType === "test_result_letter") {
-    return Boolean(paymentProof || currentDocument);
-  }
-
-  return true;
 }
 
 export default function SampleTestingDocumentsSection({
@@ -222,23 +152,10 @@ export default function SampleTestingDocumentsSection({
     <>
       <div className="space-y-3">
         {DOCUMENT_DEFINITIONS_DISPLAY.map((definition) => {
-          if (
-            !shouldRenderDocumentForViewer(
-              item.documents,
-              definition.type,
-            )
-          ) {
-            return null;
-          }
-
           const document = getDocumentByType(item.documents, definition.type);
           const isOwner = viewerRole === definition.owner;
-          const uploadBlockReason = getUploadBlockReason(
-            item.documents,
-            definition.type,
-          );
-          const canUpload = allowActions && isOwner && !uploadBlockReason;
-          const canReplace = canReplaceDocument(item.documents, definition.type);
+          const canUpload = allowActions && isOwner;
+          const canReplace = true;
           const canPreview = document ? isPreviewableDocument(document) : false;
 
           return (
@@ -352,11 +269,6 @@ export default function SampleTestingDocumentsSection({
                           )}
                           Upload Dokumen
                         </Button>
-                      ) : null}
-                      {uploadBlockReason ? (
-                        <p className="text-xs text-slate-500">
-                          {uploadBlockReason}
-                        </p>
                       ) : null}
                     </>
                   ) : null}

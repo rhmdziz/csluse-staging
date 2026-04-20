@@ -102,18 +102,17 @@ STATUS_VALUE_MAP = {
     "lost/damaged": "Lost/Damaged",
 }
 
-PENGUJIAN_APPROVER_DOCUMENT_TYPES = {"testing_agreement", "invoice", "test_result_letter"}
+PENGUJIAN_APPROVER_DOCUMENT_TYPES = {
+    "testing_agreement",
+    "invoice",
+    "receipt",
+    "test_result_letter",
+}
 PENGUJIAN_REQUESTER_DOCUMENT_TYPES = {
     "signed_testing_agreement",
     "payment_proof",
 }
 PENGUJIAN_DOCUMENT_MAX_SIZE = 5 * 1024 * 1024
-PENGUJIAN_NEXT_DOCUMENT_TYPES = {
-    "testing_agreement": "signed_testing_agreement",
-    "signed_testing_agreement": "invoice",
-    "invoice": "payment_proof",
-    "payment_proof": "test_result_letter",
-}
 ANNOUNCEMENT_IMAGE_SRC_RE = re.compile(
     r"""<img[^>]+src=["'](?P<src>[^"']+)["']""",
     re.IGNORECASE,
@@ -2988,41 +2987,6 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         if pengujian.status in {"Pending", "Rejected", "Completed"}:
             raise ValidationError(
                 {"status": "Dokumen hanya dapat diunggah setelah pengajuan disetujui dan sebelum selesai."}
-            )
-
-        required_types = {
-            "signed_testing_agreement": ["testing_agreement"],
-            "invoice": ["signed_testing_agreement"],
-            "payment_proof": ["invoice"],
-            "test_result_letter": ["payment_proof"],
-        }.get(document_type, [])
-
-        missing_types = [
-            required_type
-            for required_type in required_types
-            if required_type not in existing_documents
-        ]
-        if missing_types:
-            raise ValidationError(
-                {
-                    "document_type": (
-                        "Dokumen sebelumnya belum tersedia untuk tahap ini."
-                    )
-                }
-            )
-
-        next_document_type = PENGUJIAN_NEXT_DOCUMENT_TYPES.get(document_type)
-        if (
-            document_type in existing_documents
-            and next_document_type
-            and next_document_type in existing_documents
-        ):
-            raise ValidationError(
-                {
-                    "document_type": (
-                        "Dokumen ini tidak dapat diganti karena tahap berikutnya sudah memiliki dokumen."
-                    )
-                }
             )
 
     def _resolve_pengujian_status_after_document_upload(self, pengujian, document_type):
