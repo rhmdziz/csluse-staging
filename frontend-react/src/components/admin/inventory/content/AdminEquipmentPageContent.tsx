@@ -63,7 +63,7 @@ import { equipmentsService } from "@/services/shared/resources/equipments.servic
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
-import { usePicUsers } from "@/hooks/shared/resources/users";
+import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { EQUIPMENT_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
@@ -146,7 +146,7 @@ export default function AdminEquipmentsPage() {
   const { rooms: filterRooms, isLoading: isLoadingFilterRooms } =
     useRoomOptions();
   const { picUsers: filterPicUsers, isLoading: isLoadingFilterPics } =
-    usePicUsers();
+    useAssignedPicUsers();
   const { deleteEquipment, deleteEquipments, isDeleting } =
     useDeleteEquipment();
   const { updateEquipment } = useUpdateEquipment();

@@ -25,6 +25,7 @@ export const REQUEST_STATUS_OPTIONS: StatusOption[] = [
   { value: "active", label: "Aktif" },
   { value: "pending", label: "Menunggu" },
   { value: "approved", label: "Disetujui" },
+  { value: "canceled", label: "Dibatalkan" },
   { value: "rejected", label: "Ditolak" },
   { value: "expired", label: "Kedaluwarsa" },
   { value: "completed", label: "Selesai" },
@@ -35,6 +36,7 @@ export const BORROW_STATUS_OPTIONS: StatusOption[] = [
   { value: "active", label: "Aktif" },
   { value: "pending", label: "Menunggu" },
   { value: "approved", label: "Disetujui" },
+  { value: "canceled", label: "Dibatalkan" },
   { value: "rejected", label: "Ditolak" },
   { value: "expired", label: "Kedaluwarsa" },
   { value: "borrowed", label: "Dipinjam" },
@@ -49,6 +51,7 @@ export const SAMPLE_TESTING_STATUS_OPTIONS: StatusOption[] = [
   { value: "active", label: "Aktif" },
   { value: "pending", label: "Menunggu" },
   { value: "approved", label: "Disetujui" },
+  { value: "canceled", label: "Dibatalkan" },
   { value: "diproses", label: "Diproses" },
   { value: "menunggu pembayaran", label: "Menunggu Pembayaran" },
   { value: "rejected", label: "Ditolak" },
@@ -70,6 +73,11 @@ export function getStatusBadgeClass(
     return bordered
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
       : "bg-emerald-100 text-emerald-700";
+  }
+  if (normalized === "canceled" || normalized === "cancelled") {
+    return bordered
+      ? "border-slate-200 bg-slate-50 text-slate-700"
+      : "bg-slate-200 text-slate-700";
   }
   if (normalized === "diproses") {
     return bordered
@@ -134,6 +142,7 @@ export function getStatusSummaryTone(status?: string | null): StatusSummaryTone 
   if (normalized === "diproses") return "blue";
   if (normalized === "menunggu pembayaran") return "blue";
   if (normalized === "pending") return "amber";
+  if (normalized === "canceled" || normalized === "cancelled") return "slate";
   if (normalized === "returned pending inspection" || normalized === "returned_pending_inspection") {
     return "blue";
   }
@@ -149,6 +158,7 @@ export function getStatusDisplayLabel(status?: string | null) {
 
   if (normalized === "pending") return "Pending";
   if (normalized === "approved") return "Approved";
+  if (normalized === "canceled" || normalized === "cancelled") return "Canceled";
   if (normalized === "diproses") return "Diproses";
   if (normalized === "menunggu pembayaran") return "Menunggu Pembayaran";
   if (normalized === "completed") return "Completed";
@@ -171,6 +181,7 @@ export function getRequestStatusDisplayLabel(status?: string | null) {
   if (normalized === "active") return "Aktif";
   if (normalized === "pending") return "Menunggu";
   if (normalized === "approved") return "Disetujui";
+  if (normalized === "canceled" || normalized === "cancelled") return "Dibatalkan";
   if (normalized === "completed") return "Selesai";
   if (normalized === "rejected") return "Ditolak";
   if (normalized === "expired") return "Kedaluwarsa";
@@ -184,6 +195,7 @@ export function getBorrowStatusDisplayLabel(status?: string | null) {
   if (normalized === "active") return "Aktif";
   if (normalized === "pending") return "Menunggu";
   if (normalized === "approved") return "Disetujui";
+  if (normalized === "canceled" || normalized === "cancelled") return "Dibatalkan";
   if (normalized === "rejected") return "Ditolak";
   if (normalized === "expired") return "Kedaluwarsa";
   if (normalized === "borrowed") return "Dipinjam";
@@ -206,6 +218,7 @@ export function getSampleTestingStatusDisplayLabel(status?: string | null) {
   if (normalized === "active") return "Aktif";
   if (normalized === "pending") return "Menunggu";
   if (normalized === "approved") return "Disetujui";
+  if (normalized === "canceled" || normalized === "cancelled") return "Dibatalkan";
   if (normalized === "diproses") return "Diproses";
   if (normalized === "menunggu pembayaran") return "Menunggu Pembayaran";
   if (normalized === "completed") return "Selesai";
@@ -221,10 +234,10 @@ export function shouldShowReviewAction(
   const normalized = normalizeStatus(status);
 
   if (kind === "borrow") {
-    return !["completed", "rejected", "expired", "returned"].includes(
+    return !["completed", "canceled", "cancelled", "rejected", "expired", "returned"].includes(
       normalized,
     );
   }
 
-  return !["completed", "rejected", "expired"].includes(normalized);
+  return !["completed", "canceled", "cancelled", "rejected", "expired"].includes(normalized);
 }

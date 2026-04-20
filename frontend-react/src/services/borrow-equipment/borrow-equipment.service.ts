@@ -1,5 +1,6 @@
 import {
   API_BORROW_APPROVE,
+  API_BORROW_CANCEL,
   API_BORROW_DETAIL,
   API_BORROW_FINALIZE_RETURN,
   API_BORROW_HANDOVER,
@@ -43,6 +44,7 @@ export type CreateBorrowPayload = {
 export type BorrowStatusActionType =
   | "approve"
   | "reject"
+  | "cancel"
   | "handover"
   | "receive_return"
   | "finalize_return"
@@ -165,6 +167,8 @@ export const borrowEquipmentService = {
         ? API_BORROW_APPROVE(borrowId)
         : type === "reject"
           ? API_BORROW_REJECT(borrowId)
+          : type === "cancel"
+            ? API_BORROW_CANCEL(borrowId)
           : type === "handover"
             ? API_BORROW_HANDOVER(borrowId)
             : type === "receive_return"

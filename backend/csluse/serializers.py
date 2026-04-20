@@ -1570,4 +1570,61 @@ class DashboardOverviewSerializer(serializers.Serializer):
 # region Utilities
 
 
+def _resolve_requester_profile(serializer_instance):
+    request = serializer_instance.context.get("request")
+    request_user = getattr(request, "user", None)
+    request_profile = getattr(request_user, "profile", None)
+    if request_profile is not None:
+        return request_profile
+    instance = getattr(serializer_instance, "instance", None)
+    return getattr(instance, "requested_by", None)
+
+
+def _apply_requester_mentor_rules(serializer_instance, attrs):
+    purpose = attrs.get("purpose", getattr(serializer_instance.instance, "purpose", "Other"))
+    requester_profile = _resolve_requester_profile(serializer_instance)
+    mentor_profile = attrs.get(
+        "requester_mentor_profile",
+        getattr(serializer_instance.instance, "requester_mentor_profile", None),
+    )
+    is_internal_requester = (
+        requester_profile is not None
+        and str(getattr(requester_profile, "role", "") or "").strip().lower() != "guest"
+    )
+
+    if purpose != "Skripsi/TA":
+        attrs["requester_mentor"] = None
+        attrs["requester_mentor_profile"] = None
+        attrs["is_approved_by_mentor"] = False
+        attrs["mentor_approved_at"] = None
+        return attrs
+
+    if not is_internal_requester:
+        attrs["requester_mentor"] = None
+        attrs["requester_mentor_profile"] = None
+        attrs["is_approved_by_mentor"] = False
+        attrs["mentor_approved_at"] = None
+        return attrs
+
+    if mentor_profile is None:
+        raise serializers.ValidationError(
+            {"requester_mentor_profile": "Dosen pembimbing wajib dipilih untuk tujuan Skripsi/TA."}
+        )
+
+    if (
+        str(getattr(mentor_profile, "role", "") or "").strip().lower() != "lecturer"
+        or not bool(getattr(mentor_profile, "is_mentor", False))
+    ):
+        raise serializers.ValidationError(
+            {"requester_mentor_profile": "User yang dipilih harus lecturer yang terdaftar sebagai dosen pembimbing."}
+        )
+
+    attrs["requester_mentor"] = (
+        str(getattr(mentor_profile, "full_name", "") or "").strip()
+        or getattr(getattr(mentor_profile, "user", None), "email", None)
+        or None
+    )
+    return attrs
+
+
 # endregion Utilities

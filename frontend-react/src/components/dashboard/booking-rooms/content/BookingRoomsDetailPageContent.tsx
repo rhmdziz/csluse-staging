@@ -9,20 +9,22 @@ import {
   NotebookPen,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 
+import { DeleteRequestConfirmDialog } from "@/components/dialogs";
 import { Button, Skeleton } from "@/components/ui";
 
 import { DashboardDetailReviewPanel } from "@/components/dashboard/layout";
 
 import { ProgressSteps, RequestInformationCard, RequestProgressDialog } from "@/components/shared";
 
-import { useBookingDetail } from "@/hooks/booking-rooms";
+import { useBookingDetail, useUpdateBookingStatus } from "@/hooks/booking-rooms";
 
 import { formatDateTimeWib } from "@/lib/date";
 
-import { getBookingProgressFlow } from "@/lib/request";
+import { getBookingProgressFlow, normalizeStatus } from "@/lib/request";
 
 import {
   getMentorApprovalStageLabel,
@@ -171,6 +173,8 @@ export default function BookingRoomsDetailPage() {
   const isApprovalPage = pathname.startsWith("/booking-rooms/approval/");
   const [reloadKey, setReloadKey] = useState(0);
   const [progressOpen, setProgressOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const { updateBookingStatus, pendingAction } = useUpdateBookingStatus();
 
   const { booking, isLoading, error } = useBookingDetail(id, reloadKey);
 
@@ -213,6 +217,18 @@ export default function BookingRoomsDetailPage() {
   }
 
   const flowSteps = getBookingProgressFlow(booking);
+  const canCancelBooking = !isApprovalPage && normalizeStatus(booking.status) === "approved";
+
+  const handleCancelBooking = async () => {
+    const result = await updateBookingStatus(booking.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success("Pengajuan peminjaman lab berhasil dibatalkan.");
+    setCancelOpen(false);
+    setReloadKey((prev) => prev + 1);
+  };
 
   return (
     <section className="space-y-4">
@@ -449,10 +465,39 @@ export default function BookingRoomsDetailPage() {
                   </>
                 ) : null}
               </RequestInformationCard>
+
+              {canCancelBooking ? (
+                <section className="rounded-xl border border-rose-200 bg-rose-50/70 p-5">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Batalkan Pengajuan
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Pengajuan yang sudah disetujui masih dapat dibatalkan oleh pemohon sebelum pelaksanaan selesai.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="mt-4"
+                    onClick={() => setCancelOpen(true)}
+                    disabled={pendingAction.bookingId === booking.id}
+                  >
+                    Batalkan Pengajuan
+                  </Button>
+                </section>
+              ) : null}
             </div>
           </>
         )}
       </div>
+      <DeleteRequestConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onConfirm={() => void handleCancelBooking()}
+        isSubmitting={pendingAction.bookingId === booking.id}
+        title="Batalkan pengajuan peminjaman lab ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan tidak dapat diproses lanjut."
+        confirmLabel="Ya, Batalkan"
+      />
       <RequestProgressDialog
         open={progressOpen}
         onOpenChange={setProgressOpen}

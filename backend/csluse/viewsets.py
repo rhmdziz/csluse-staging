@@ -86,6 +86,8 @@ from .email_notifications import (
 STATUS_VALUE_MAP = {
     "pending": "Pending",
     "approved": "Approved",
+    "canceled": "Canceled",
+    "cancelled": "Canceled",
     "diproses": "Diproses",
     "menunggu pembayaran": "Menunggu Pembayaran",
     "waiting_payment": "Menunggu Pembayaran",
@@ -1096,6 +1098,21 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 }
             )
 
+    def _ensure_requester_cancel_permission(self, booking):
+        profile = self._current_profile()
+        if profile is None or booking.requested_by_id != profile.id:
+            raise PermissionDenied(
+                "Anda hanya dapat membatalkan pengajuan peminjaman lab milik sendiri."
+            )
+        if booking.status != "Approved":
+            raise ValidationError(
+                {
+                    "status": (
+                        "Hanya pengajuan peminjaman lab dengan status Approved yang dapat dibatalkan."
+                    )
+                }
+            )
+
     def _ensure_review_permission(self, booking):
         if not self._can_review_booking(booking):
             raise PermissionDenied(
@@ -1500,6 +1517,26 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.save(completed_at=now)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_requester_cancel_permission(instance)
+        self._ensure_transition(instance, ["Approved"], "Canceled")
+        serializer = self._transition_serializer(
+            instance,
+            data={"status": "Canceled", **request.data},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        _notify_request_status(
+            instance,
+            kind="booking",
+            status_value="Canceled",
+            actor_profile=getattr(request.user, "profile", None),
+            request=request,
+        )
+        return Response(serializer.data)
+
 
 # endregion
 
@@ -1593,6 +1630,21 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         raise PermissionDenied(
             "Hanya PIC ruangan terkait atau laboran/admin yang dapat memproses borrow ini."
         )
+
+    def _ensure_requester_cancel_permission(self, borrow):
+        profile = self._current_profile()
+        if profile is None or borrow.requested_by_id != profile.id:
+            raise PermissionDenied(
+                "Anda hanya dapat membatalkan pengajuan peminjaman alat milik sendiri."
+            )
+        if borrow.status != "Approved":
+            raise ValidationError(
+                {
+                    "status": (
+                        "Hanya pengajuan peminjaman alat dengan status Approved dan belum diserahterimakan yang dapat dibatalkan."
+                    )
+                }
+            )
 
     def _handle_mentor_approval(self, borrow, actor_profile):
         borrow.is_approved_by_mentor = True
@@ -1995,6 +2047,26 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(borrowed_at=now)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_requester_cancel_permission(instance)
+        self._ensure_transition(instance, ["Approved"], "Canceled")
+        serializer = self._transition_serializer(
+            instance,
+            data={"status": "Canceled", **request.data},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        _notify_request_status(
+            instance,
+            kind="borrow",
+            status_value="Canceled",
+            actor_profile=getattr(request.user, "profile", None),
+            request=request,
+        )
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='receive-return')
@@ -2984,7 +3056,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         }
 
     def _validate_document_upload_sequence(self, pengujian, document_type, existing_documents):
-        if pengujian.status in {"Pending", "Rejected", "Completed"}:
+        if pengujian.status in {"Pending", "Canceled", "Rejected", "Completed"}:
             raise ValidationError(
                 {"status": "Dokumen hanya dapat diunggah setelah pengajuan disetujui dan sebelum selesai."}
             )
@@ -3005,6 +3077,21 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 {
                     "status": (
                         f"Transisi ke {target_status} hanya boleh dari status: {allowed}."
+                    )
+                }
+            )
+
+    def _ensure_requester_cancel_permission(self, pengujian):
+        profile = getattr(self.request.user, "profile", None)
+        if profile is None or pengujian.requested_by_id != profile.id:
+            raise PermissionDenied(
+                "Anda hanya dapat membatalkan pengajuan pengujian sampel milik sendiri."
+            )
+        if pengujian.status != "Approved":
+            raise ValidationError(
+                {
+                    "status": (
+                        "Hanya pengajuan pengujian sampel dengan status Approved yang dapat dibatalkan."
                     )
                 }
             )
@@ -3294,6 +3381,26 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
         _notify_request_status(instance, kind="pengujian", status_value="Rejected", actor_profile=actor_profile, request=request)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_requester_cancel_permission(instance)
+        self._ensure_transition(instance, ["Approved"], "Canceled")
+        serializer = self._transition_serializer(
+            instance,
+            data={"status": "Canceled", **request.data},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        _notify_request_status(
+            instance,
+            kind="pengujian",
+            status_value="Canceled",
+            actor_profile=getattr(request.user, "profile", None),
+            request=request,
+        )
         return Response(serializer.data)
 
     @action(
@@ -3984,7 +4091,13 @@ def _send_request_status_email(
                 cta_url=cta_url,
                 cta_label=cta_label,
             ),
-            "status_label": "disetujui" if status_value == "Approved" else "ditolak",
+            "status_label": (
+                "disetujui"
+                if status_value == "Approved"
+                else "dibatalkan"
+                if status_value == "Canceled"
+                else "ditolak"
+            ),
         },
     )
     send_notification_email(
@@ -4040,8 +4153,15 @@ def _notify_request_status(instance, *, kind, status_value, actor_profile=None, 
     request_label = _request_label(kind)
     request_identifier = _request_identifier(instance, request_label.title())
     actor_name = _profile_display_name(actor_profile) or "tim laboratorium"
-    category = "Approved" if status_value == "Approved" else "Rejected"
-    action_label = "disetujui" if status_value == "Approved" else "ditolak"
+    if status_value == "Approved":
+        category = "Approved"
+        action_label = "disetujui"
+    elif status_value == "Canceled":
+        category = "General"
+        action_label = "dibatalkan"
+    else:
+        category = "Rejected"
+        action_label = "ditolak"
     title = f"{request_label.title()} {request_identifier} {action_label}"
     message = (
         f"Pengajuan {request_label} Anda ({request_identifier}) telah "

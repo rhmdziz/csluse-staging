@@ -39,7 +39,7 @@ import { useDeleteRoom } from "@/hooks/shared/resources/rooms";
 
 import { mapRoom, useRooms, type RoomRow } from "@/hooks/shared/resources/rooms";
 
-import { usePicUsers } from "@/hooks/shared/resources/users";
+import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { ROOM_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
@@ -67,7 +67,7 @@ export default function AdminRoomsPage() {
     useState(false);
 
   const { picUsers: filterPicUsers, isLoading: isLoadingFilterPics } =
-    usePicUsers();
+    useAssignedPicUsers();
   const { deleteRoom, deleteRooms, isDeleting } = useDeleteRoom();
 
   useEffect(() => {

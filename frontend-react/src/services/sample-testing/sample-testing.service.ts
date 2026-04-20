@@ -1,5 +1,6 @@
 import {
   API_PENGUJIAN_APPROVE,
+  API_PENGUJIAN_CANCEL,
   API_PENGUJIAN_DETAIL,
   API_PENGUJIAN_REJECT,
   API_PENGUJIAN_UPLOAD_DOCUMENT,
@@ -37,7 +38,7 @@ export type CreateSampleTestingPayload = {
   sampleTestingType?: string;
 };
 
-export type SampleTestingStatusActionType = "approve" | "reject";
+export type SampleTestingStatusActionType = "approve" | "reject" | "cancel";
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -151,7 +152,9 @@ export const sampleTestingService = {
     const response = await authFetch(
       type === "approve"
         ? API_PENGUJIAN_APPROVE(sampleTestingId)
-        : API_PENGUJIAN_REJECT(sampleTestingId),
+        : type === "reject"
+          ? API_PENGUJIAN_REJECT(sampleTestingId)
+          : API_PENGUJIAN_CANCEL(sampleTestingId),
       { method: "POST" },
     );
 

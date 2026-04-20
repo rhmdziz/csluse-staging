@@ -237,7 +237,6 @@ class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
         self.client.cookies["access"] = self._expired_access_token()
 
         response = self.client.get("/api/auth/user/profile/")
-
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_refresh_endpoint_uses_refresh_cookie_to_issue_new_access_token(self):
@@ -268,6 +267,65 @@ class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
 
         self.assertEqual(profile_response.status_code, status.HTTP_200_OK)
         self.assertEqual(profile_response.data["email"], self.user.email)
+
+
+class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
+    def setUp(self):
+        self.admin = self.create_user(
+            email="pic-admin@example.com",
+            full_name="PIC Admin",
+            role="Admin",
+        )
+        assign_role(self.admin, ADMINISTRATOR)
+        self.client.force_authenticate(user=self.admin)
+
+    def test_dropdown_returns_all_eligible_pic_candidates(self):
+        assigned_lecturer = self.create_user(
+            email="assigned-lecturer@example.com",
+            full_name="Assigned Lecturer",
+            role="Lecturer",
+        )
+        eligible_admin = self.create_user(
+            email="eligible-admin@example.com",
+            full_name="Eligible Admin",
+            role="Admin",
+        )
+        self.create_user(
+            email="staff-user@example.com",
+            full_name="Staff User",
+            role="Staff",
+        )
+        room = Room.objects.create(name="Lab A", number="101")
+        room.pics.add(assigned_lecturer.profile)
+
+        response = self.client.get("/api/admin/pic-users/dropdown/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(str(assigned_lecturer.profile.id), returned_ids)
+        self.assertIn(str(eligible_admin.profile.id), returned_ids)
+        self.assertNotIn(str(self.admin.profile.id), returned_ids)
+
+    def test_assigned_dropdown_returns_only_assigned_pic_users(self):
+        assigned_lecturer = self.create_user(
+            email="assigned-only@example.com",
+            full_name="Assigned Only",
+            role="Lecturer",
+        )
+        unassigned_admin = self.create_user(
+            email="unassigned-admin@example.com",
+            full_name="Unassigned Admin",
+            role="Admin",
+        )
+        room = Room.objects.create(name="Lab B", number="102")
+        room.pics.add(assigned_lecturer.profile)
+
+        response = self.client.get("/api/admin/pic-users/assigned-dropdown/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(str(assigned_lecturer.profile.id), returned_ids)
+        self.assertNotIn(str(unassigned_admin.profile.id), returned_ids)
 
 
 class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):

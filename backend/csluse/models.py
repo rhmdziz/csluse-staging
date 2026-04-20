@@ -164,6 +164,7 @@ class Booking(BaseModel):
     STATUS_CHOICES = [
         ("Pending", "Pending"),
         ("Approved", "Approved"),
+        ("Canceled", "Canceled"),
         ("Rejected", "Rejected"),
         ("Expired", "Expired"),
         ("Completed", "Completed"),
@@ -272,6 +273,7 @@ class Borrow(BaseModel):
     STATUS_CHOICES = [
         ("Pending", "Pending"),
         ("Approved", "Approved"),
+        ("Canceled", "Canceled"),
         ("Rejected", "Rejected"),
         ("Expired", "Expired"),
         ("Borrowed", "Borrowed"),
@@ -360,6 +362,7 @@ class Pengujian(BaseModel):
     STATUS_CHOICES = [
         ("Pending", "Pending"),
         ("Approved", "Approved"),
+        ("Canceled", "Canceled"),
         ("Diproses", "Diproses"),
         ("Menunggu Pembayaran", "Menunggu Pembayaran"),
         ("Rejected", "Rejected"),

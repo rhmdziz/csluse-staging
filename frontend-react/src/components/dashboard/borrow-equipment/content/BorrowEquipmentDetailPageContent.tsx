@@ -11,16 +11,18 @@ import {
   TriangleAlert,
   Wrench,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 
+import { DeleteRequestConfirmDialog } from "@/components/dialogs";
 import { Button, Skeleton } from "@/components/ui";
 
 import { DashboardDetailReviewPanel } from "@/components/dashboard/layout";
 
 import { ProgressSteps, RequestInformationCard, RequestProgressDialog } from "@/components/shared";
 
-import { useBorrowDetail } from "@/hooks/borrow-equipment";
+import { useBorrowDetail, useUpdateBorrowStatus } from "@/hooks/borrow-equipment";
 
 import { formatDateTimeWib } from "@/lib/date";
 
@@ -34,6 +36,7 @@ import {
 import {
   getBorrowStatusDisplayLabel,
   getStatusBadgeClass,
+  normalizeStatus as normalizeRequestStatus,
 } from "@/lib/request";
 
 function hasDisplayValue(value?: string | null) {
@@ -174,6 +177,8 @@ export default function BorrowEquipmentDetailPage() {
   const borrowId = Array.isArray(id) ? id[0] : id;
   const [reloadKey, setReloadKey] = useState(0);
   const [progressOpen, setProgressOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const { updateBorrowStatus, pendingAction } = useUpdateBorrowStatus();
   const { borrow: item, isLoading, error } = useBorrowDetail(borrowId, reloadKey);
 
   const isAllPage = pathname.startsWith("/borrow-equipment/approval/");
@@ -213,6 +218,19 @@ export default function BorrowEquipmentDetailPage() {
   }
 
   const flowSteps = getBorrowProgressFlow(item);
+  const canCancelBorrow =
+    !isAllPage && normalizeRequestStatus(item.status) === "approved";
+
+  const handleCancelBorrow = async () => {
+    const result = await updateBorrowStatus(item.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success("Pengajuan peminjaman alat berhasil dibatalkan.");
+    setCancelOpen(false);
+    setReloadKey((prev) => prev + 1);
+  };
 
   return (
     <section className="space-y-4">
@@ -448,11 +466,40 @@ export default function BorrowEquipmentDetailPage() {
                     </dl>
                   </section>
                 ) : null}
+
+                {canCancelBorrow ? (
+                  <section className="rounded-xl border border-rose-200 bg-rose-50/70 p-5">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Batalkan Pengajuan
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Pengajuan yang sudah disetujui masih dapat dibatalkan selama alat belum diserahterimakan.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="mt-4"
+                      onClick={() => setCancelOpen(true)}
+                      disabled={pendingAction.borrowId === item.id}
+                    >
+                      Batalkan Pengajuan
+                    </Button>
+                  </section>
+                ) : null}
               </div>
             </div>
           </>
         )}
       </div>
+      <DeleteRequestConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onConfirm={() => void handleCancelBorrow()}
+        isSubmitting={pendingAction.borrowId === item.id}
+        title="Batalkan pengajuan peminjaman alat ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan proses peminjaman dihentikan."
+        confirmLabel="Ya, Batalkan"
+      />
       <RequestProgressDialog
         open={progressOpen}
         onOpenChange={setProgressOpen}

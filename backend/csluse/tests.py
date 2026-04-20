@@ -550,6 +550,40 @@ class CsluseWorkflowRegressionTests(APITestCase):
         borrow.refresh_from_db()
         self.assertNotEqual(borrow.note, "Tidak boleh berubah")
 
+    def test_requester_can_cancel_own_approved_booking(self):
+        booking = self.create_booking(self.student_profile, status="Approved")
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(f"/api/bookings/{booking.id}/cancel/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Canceled")
+
+    def test_requester_can_cancel_own_approved_borrow_before_handover(self):
+        borrow = self.create_borrow(self.student_profile, status="Approved")
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(f"/api/borrows/{borrow.id}/cancel/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        borrow.refresh_from_db()
+        self.assertEqual(borrow.status, "Canceled")
+
+    def test_requester_cannot_cancel_borrow_after_borrowed(self):
+        borrow = self.create_borrow(
+            self.student_profile,
+            status="Borrowed",
+            approved_by=self.admin_profile,
+        )
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(f"/api/borrows/{borrow.id}/cancel/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        borrow.refresh_from_db()
+        self.assertEqual(borrow.status, "Borrowed")
+
     def test_requester_can_update_own_pending_pengujian(self):
         pengujian = self.create_pengujian(self.student_profile)
 
@@ -573,6 +607,19 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Pengujian.objects.filter(id=pengujian.id).exists())
+
+    def test_requester_can_cancel_own_approved_pengujian(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Approved")
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/cancel/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Canceled")
 
     def test_notifications_endpoint_returns_current_user_notifications(self):
         booking = self.create_booking(self.student_profile)
@@ -646,3 +693,134 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(availability_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(availability_response.data["occupied"]), 1)
         self.assertEqual(availability_response.data["occupied"][0]["type"], "booking")
+
+    def test_canceled_booking_does_not_block_room_availability(self):
+        booking = self.create_booking(self.student_profile, status="Canceled")
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.get(
+            f"/api/rooms/{self.room.id}/availability/",
+            {
+                "start": booking.start_time.isoformat(),
+                "end": booking.end_time.isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["occupied"], [])
+
+    def test_canceled_booking_does_not_block_equipment_availability(self):
+        booking = self.create_booking(self.student_profile, status="Canceled")
+        BookingEquipmentItem.objects.create(
+            booking=booking,
+            equipment=self.equipment,
+            quantity=1,
+        )
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.get(
+            f"/api/equipments/{self.equipment.id}/availability/",
+            {
+                "start": booking.start_time.isoformat(),
+                "end": booking.end_time.isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["occupied"], [])
+
+    def test_canceled_booking_does_not_count_toward_room_capacity_validation(self):
+        cancelled_booking = self.create_booking(
+            self.student_profile,
+            status="Canceled",
+        )
+        cancelled_booking.attendee_count = 18
+        cancelled_booking.save(update_fields=["attendee_count", "updated_at"])
+
+        other_student_user, _ = self.create_user_with_profile(
+            "capacity-student@example.com",
+            "Student",
+            "Capacity Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "purpose": "Penelitian",
+                "start_time": cancelled_booking.start_time.isoformat(),
+                "end_time": cancelled_booking.end_time.isoformat(),
+                "attendee_count": 10,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_canceled_booking_does_not_count_toward_equipment_stock_validation(self):
+        cancelled_booking = self.create_booking(
+            self.student_profile,
+            status="Canceled",
+        )
+        BookingEquipmentItem.objects.create(
+            booking=cancelled_booking,
+            equipment=self.equipment,
+            quantity=5,
+        )
+
+        other_student_user, _ = self.create_user_with_profile(
+            "equipment-student@example.com",
+            "Student",
+            "Equipment Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "purpose": "Penelitian",
+                "start_time": cancelled_booking.start_time.isoformat(),
+                "end_time": cancelled_booking.end_time.isoformat(),
+                "attendee_count": 2,
+                "equipment_items": [
+                    {
+                        "equipment": str(self.equipment.id),
+                        "quantity": 5,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_canceled_borrow_does_not_count_toward_equipment_stock_validation(self):
+        cancelled_borrow = self.create_borrow(
+            self.student_profile,
+            status="Canceled",
+        )
+        cancelled_borrow.quantity = 5
+        cancelled_borrow.save(update_fields=["quantity", "updated_at"])
+
+        other_student_user, _ = self.create_user_with_profile(
+            "borrow-student@example.com",
+            "Student",
+            "Borrow Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 5,
+                "start_time": cancelled_borrow.start_time.isoformat(),
+                "end_time": cancelled_borrow.end_time.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

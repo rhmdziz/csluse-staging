@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -31,6 +32,7 @@ import {
 import {
   useCreateBookingRoom,
   useBookings,
+  useUpdateBookingStatus,
   type BookingListScope,
 } from "@/hooks/booking-rooms";
 
@@ -158,6 +160,10 @@ export default function BookingRoomsListContent({
     id: string;
     code: string;
   } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
+    id: string;
+    code: string;
+  } | null>(null);
   const [progressState, setProgressState] = useState<{
     code: string;
     steps: ProgressStepItem[];
@@ -197,6 +203,7 @@ export default function BookingRoomsListContent({
   const normalizedRole = normalizeRoleValue(profile?.role);
   const { deleteBookingRoom, isSubmitting: isDeletingBooking } =
     useCreateBookingRoom();
+  const { updateBookingStatus, pendingAction } = useUpdateBookingStatus();
   const canReviewBookings =
     scope === "all" &&
     (normalizedRole === ROLE_VALUES.ADMIN ||
@@ -252,6 +259,9 @@ export default function BookingRoomsListContent({
   const canManageBooking = (booking: (typeof filteredBookings)[number]) =>
     scope !== "all" && normalizeStatus(booking.status) === "pending";
 
+  const canCancelBooking = (booking: (typeof filteredBookings)[number]) =>
+    scope !== "all" && normalizeStatus(booking.status) === "approved";
+
   const handleDeleteBooking = async () => {
     if (!deleteTarget) return;
 
@@ -259,6 +269,20 @@ export default function BookingRoomsListContent({
     if (!result.ok) return;
 
     setDeleteTarget(null);
+    setReloadKey((prev) => prev + 1);
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancelTarget) return;
+
+    const result = await updateBookingStatus(cancelTarget.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Pengajuan peminjaman lab berhasil dibatalkan.");
+    setCancelTarget(null);
     setReloadKey((prev) => prev + 1);
   };
 
@@ -535,6 +559,20 @@ export default function BookingRoomsListContent({
                           />
                         </>
                       ) : null}
+                      {canCancelBooking(booking) ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Batalkan"
+                          icon={<X className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                          onClick={() =>
+                            setCancelTarget({
+                              id: String(booking.id),
+                              code: booking.code,
+                            })
+                          }
+                        />
+                      ) : null}
                       <TableActionIconButton
                         type="button"
                         label="Lihat detail"
@@ -603,6 +641,17 @@ export default function BookingRoomsListContent({
             ? `Pengajuan ${deleteTarget.code} akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`
             : "Pengajuan ini akan dihapus permanen."
         }
+      />
+      <DeleteRequestConfirmDialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        onConfirm={() => void handleCancelBooking()}
+        isSubmitting={pendingAction.bookingId === cancelTarget?.id}
+        title="Batalkan pengajuan peminjaman lab ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan tidak dapat diproses lanjut."
+        confirmLabel="Ya, Batalkan"
       />
       <RequestProgressDialog
         open={Boolean(progressState)}

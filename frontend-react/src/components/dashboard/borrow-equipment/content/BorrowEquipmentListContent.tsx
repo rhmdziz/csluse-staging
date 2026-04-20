@@ -18,6 +18,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -33,7 +34,11 @@ import {
 
 import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
-import { useBorrows, useCreateBorrow } from "@/hooks/borrow-equipment";
+import {
+  useBorrows,
+  useCreateBorrow,
+  useUpdateBorrowStatus,
+} from "@/hooks/borrow-equipment";
 
 import { useLoadProfile } from "@/hooks/shared/profile";
 
@@ -189,6 +194,10 @@ export default function BorrowEquipmentListContent({
     id: string;
     code: string;
   } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
+    id: string;
+    code: string;
+  } | null>(null);
   const [progressState, setProgressState] = useState<{
     code: string;
     steps: ProgressStepItem[];
@@ -242,6 +251,7 @@ export default function BorrowEquipmentListContent({
 
   const normalizedRole = normalizeRoleValue(profile?.role);
   const { deleteBorrow, isSubmitting: isDeletingBorrow } = useCreateBorrow();
+  const { updateBorrowStatus, pendingAction } = useUpdateBorrowStatus();
   const canReviewBorrows =
     scope === "all" &&
     (normalizedRole === ROLE_VALUES.ADMIN ||
@@ -285,6 +295,9 @@ export default function BorrowEquipmentListContent({
   const canManageBorrow = (item: (typeof filteredBorrows)[number]) =>
     scope !== "all" && normalizeStatus(item.status) === "pending";
 
+  const canCancelBorrow = (item: (typeof filteredBorrows)[number]) =>
+    scope !== "all" && normalizeStatus(item.status) === "approved";
+
   const handleDeleteBorrow = async () => {
     if (!deleteTarget) return;
 
@@ -292,6 +305,20 @@ export default function BorrowEquipmentListContent({
     if (!result.ok) return;
 
     setDeleteTarget(null);
+    setReloadKey((prev) => prev + 1);
+  };
+
+  const handleCancelBorrow = async () => {
+    if (!cancelTarget) return;
+
+    const result = await updateBorrowStatus(cancelTarget.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Pengajuan peminjaman alat berhasil dibatalkan.");
+    setCancelTarget(null);
     setReloadKey((prev) => prev + 1);
   };
 
@@ -595,6 +622,20 @@ export default function BorrowEquipmentListContent({
                           />
                         </>
                       ) : null}
+                      {canCancelBorrow(item) ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Batalkan"
+                          icon={<X className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                          onClick={() =>
+                            setCancelTarget({
+                              id: String(item.id),
+                              code: item.code,
+                            })
+                          }
+                        />
+                      ) : null}
                       <TableActionIconButton
                         type="button"
                         label="Lihat detail"
@@ -659,6 +700,17 @@ export default function BorrowEquipmentListContent({
             ? `Pengajuan ${deleteTarget.code} akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`
             : "Pengajuan ini akan dihapus permanen."
         }
+      />
+      <DeleteRequestConfirmDialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        onConfirm={() => void handleCancelBorrow()}
+        isSubmitting={pendingAction.borrowId === cancelTarget?.id}
+        title="Batalkan pengajuan peminjaman alat ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan proses peminjaman dihentikan."
+        confirmLabel="Ya, Batalkan"
       />
       <RequestProgressDialog
         open={Boolean(progressState)}

@@ -35,6 +35,7 @@ const API_AUTH_USERS_EXPORT = `${API_AUTH_USERS}export/`;
 const API_AUTH_USERS_BULK_DELETE = `${API_AUTH_USERS}bulk-delete/`;
 const API_AUTH_PIC_USERS = `${API_ADMIN_BASE}/pic-users/`;
 const API_AUTH_PIC_USERS_DROPDOWN = `${API_AUTH_PIC_USERS}dropdown/`;
+const API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN = `${API_AUTH_PIC_USERS}assigned-dropdown/`;
 const API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS = `${API_AUTH_PIC_USERS}bulk-remove-assignments/`;
 const API_AUTH_PIC_USER_REMOVE_ASSIGNMENTS = (id: string | number) =>
   `${API_AUTH_PIC_USERS}${id}/remove-assignments/`;
@@ -62,6 +63,8 @@ const API_BOOKING_REJECT = (id: string | number) =>
   `${API_BOOKINGS}${id}/reject/`;
 const API_BOOKING_COMPLETE = (id: string | number) =>
   `${API_BOOKINGS}${id}/complete/`;
+const API_BOOKING_CANCEL = (id: string | number) =>
+  `${API_BOOKINGS}${id}/cancel/`;
 const API_BOOKING_REVIEW_CHECK = (id: string | number) =>
   `${API_BOOKINGS}${id}/review-check/`;
 const API_BOOKINGS_BY_MONTH = `${API_BOOKINGS}by-month/`;
@@ -78,6 +81,8 @@ const API_BORROW_APPROVE = (id: string | number) =>
   `${API_BORROWS}${id}/approve/`;
 const API_BORROW_REJECT = (id: string | number) =>
   `${API_BORROWS}${id}/reject/`;
+const API_BORROW_CANCEL = (id: string | number) =>
+  `${API_BORROWS}${id}/cancel/`;
 const API_BORROW_HANDOVER = (id: string | number) =>
   `${API_BORROWS}${id}/handover/`;
 const API_BORROW_RECEIVE_RETURN = (id: string | number) =>
@@ -109,6 +114,8 @@ const API_PENGUJIAN_APPROVE = (id: string | number) =>
   `${API_PENGUJIANS}${id}/approve/`;
 const API_PENGUJIAN_REJECT = (id: string | number) =>
   `${API_PENGUJIANS}${id}/reject/`;
+const API_PENGUJIAN_CANCEL = (id: string | number) =>
+  `${API_PENGUJIANS}${id}/cancel/`;
 const API_PENGUJIAN_COMPLETE = (id: string | number) =>
   `${API_PENGUJIANS}${id}/complete/`;
 const API_PENGUJIAN_UPLOAD_DOCUMENT = (id: string | number) =>
@@ -191,6 +198,7 @@ export {
   API_AUTH_USERS,
   API_AUTH_USERS_EXPORT,
   API_AUTH_USERS_BULK_DELETE,
+  API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN,
   API_AUTH_PIC_USERS,
   API_AUTH_PIC_USERS_DROPDOWN,
   API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS,
@@ -214,6 +222,7 @@ export {
   API_BOOKING_APPROVE,
   API_BOOKING_REJECT,
   API_BOOKING_COMPLETE,
+  API_BOOKING_CANCEL,
   API_BOOKING_REVIEW_CHECK,
   API_BOOKINGS_BY_MONTH,
   API_BORROWS,
@@ -225,6 +234,7 @@ export {
   API_BORROW_DETAIL,
   API_BORROW_APPROVE,
   API_BORROW_REJECT,
+  API_BORROW_CANCEL,
   API_BORROW_HANDOVER,
   API_BORROW_RECEIVE_RETURN,
   API_BORROW_FINALIZE_RETURN,
@@ -243,6 +253,7 @@ export {
   API_PENGUJIAN_DETAIL,
   API_PENGUJIAN_APPROVE,
   API_PENGUJIAN_REJECT,
+  API_PENGUJIAN_CANCEL,
   API_PENGUJIAN_COMPLETE,
   API_PENGUJIAN_UPLOAD_DOCUMENT,
   API_EQUIPMENTS,

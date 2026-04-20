@@ -51,6 +51,21 @@ export default function RoomPicDetailDialog({
     pendingAdditionsRef.current = [];
   };
 
+  const stageRoomAddition = (roomId: string) => {
+    const room = roomOptions.find((option) => String(option.id) === String(roomId));
+    if (!room || localRoomNames.includes(room.name)) return false;
+
+    setLocalRoomNames((prev) => [...prev, room.name]);
+    const removals = pendingRemovalsRef.current;
+    if (removals.includes(room.name)) {
+      pendingRemovalsRef.current = removals.filter((name) => name !== room.name);
+    } else if (!pendingAdditionsRef.current.includes(room.name)) {
+      pendingAdditionsRef.current = [...pendingAdditionsRef.current, room.name];
+    }
+    setSelectedAddRoomId("");
+    return true;
+  };
+
   useEffect(() => {
     if (!open) return;
     const editing = mode === "edit";
@@ -78,16 +93,8 @@ export default function RoomPicDetailDialog({
   };
 
   const handleAddRoom = () => {
-    const room = roomOptions.find((r) => r.id === selectedAddRoomId);
-    if (!room || localRoomNames.includes(room.name)) return;
-    setLocalRoomNames((prev) => [...prev, room.name]);
-    const removals = pendingRemovalsRef.current;
-    if (removals.includes(room.name)) {
-      pendingRemovalsRef.current = removals.filter((n) => n !== room.name);
-    } else {
-      pendingAdditionsRef.current = [...pendingAdditionsRef.current, room.name];
-    }
-    setSelectedAddRoomId("");
+    if (!selectedAddRoomId) return;
+    stageRoomAddition(selectedAddRoomId);
   };
 
   const handleRemoveRoom = (name: string) => {
@@ -103,14 +110,19 @@ export default function RoomPicDetailDialog({
   const handleSave = async () => {
     if (!user) return;
     setErrorMessage("");
+
+    if (selectedAddRoomId) {
+      stageRoomAddition(selectedAddRoomId);
+    }
+
     setIsSaving(true);
 
-    const removedNames = pendingRemovalsRef.current;
-    const addedNames = pendingAdditionsRef.current;
+    const removedNames = [...pendingRemovalsRef.current];
+    const addedNames = [...pendingAdditionsRef.current];
 
     if (removedNames.length === 0 && addedNames.length === 0) {
+      setErrorMessage("Belum ada perubahan penugasan ruangan untuk disimpan.");
       setIsSaving(false);
-      onOpenChange(false);
       return;
     }
 

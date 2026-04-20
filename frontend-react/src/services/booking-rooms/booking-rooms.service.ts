@@ -3,6 +3,7 @@ import {
   API_BOOKINGS_ALL,
   API_BOOKINGS_MY,
   API_BOOKING_APPROVE,
+  API_BOOKING_CANCEL,
   API_BOOKING_COMPLETE,
   API_BOOKING_DETAIL,
   API_BOOKING_REJECT,
@@ -44,7 +45,7 @@ export type CreateBookingRoomPayload = {
   }>;
 };
 
-export type BookingStatusActionType = "approve" | "reject" | "complete";
+export type BookingStatusActionType = "approve" | "reject" | "complete" | "cancel";
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -161,7 +162,9 @@ export const bookingRoomsService = {
         ? API_BOOKING_APPROVE(bookingId)
         : type === "reject"
           ? API_BOOKING_REJECT(bookingId)
-          : API_BOOKING_COMPLETE(bookingId),
+          : type === "complete"
+            ? API_BOOKING_COMPLETE(bookingId)
+            : API_BOOKING_CANCEL(bookingId),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

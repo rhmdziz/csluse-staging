@@ -1,6 +1,7 @@
 export * from "./use-bulk-create-users";
 export * from "./use-create-user";
 export * from "./use-delete-user";
+export * from "./use-assigned-pic-users";
 export * from "./use-mentor-options";
 export * from "./use-pic-users";
 export * from "./use-room-pic-task-users";
