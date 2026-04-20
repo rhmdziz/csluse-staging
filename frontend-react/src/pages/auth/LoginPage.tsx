@@ -60,7 +60,7 @@ export default function LoginPage({ className, ...props }: LoginFormProps) {
             id="username"
             name="username"
             type="email"
-            placeholder="nim@student.prasetyamulya.ac.id"
+            placeholder="nim@student.prasetiyamulya.ac.id"
             className="placeholder:text-muted-foreground/50"
             required
             value={formData.username}

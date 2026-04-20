@@ -89,6 +89,13 @@ class CustomLoginSerializer(BaseLoginSerializer):
         return None
 
 
+class LoginRoutingSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return str(value or "").strip().lower()
+
+
 class CustomRegisterSerializer(RegisterSerializer):
     username = serializers.CharField(required=False, allow_blank=True)
     full_name = serializers.CharField(write_only=True)

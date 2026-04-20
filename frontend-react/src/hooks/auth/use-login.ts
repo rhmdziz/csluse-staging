@@ -1,6 +1,10 @@
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { API_AUTH_LOGIN, API_AUTH_USER_PROFILE } from "@/constants/api";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  API_AUTH_LOGIN,
+  API_AUTH_LOGIN_ROUTE,
+  API_AUTH_USER_PROFILE,
+} from "@/constants/api";
 import { authFetch } from "@/lib/auth";
 import {
   buildProfileFromApiResponse,
@@ -23,14 +27,49 @@ type LoginResponse = {
   detail?: string;
 };
 
+type LoginRouteResponse = {
+  mode?: "local" | "microsoft";
+  authorization_url?: string;
+  detail?: string;
+  code?: string;
+};
+
+const MICROSOFT_AUTH_ERROR_MESSAGES: Record<string, string> = {
+  microsoft_cancelled: "Login Microsoft dibatalkan.",
+  microsoft_domain_invalid:
+    "Gunakan email kampus Prasetiya Mulya untuk login Microsoft.",
+  microsoft_email_mismatch:
+    "Email Microsoft yang dipilih tidak sesuai dengan email yang Anda masukkan.",
+  microsoft_missing_email:
+    "Akun Microsoft tidak mengembalikan alamat email yang valid.",
+  microsoft_not_configured:
+    "Login Microsoft belum dikonfigurasi pada server.",
+  microsoft_failed: "Login Microsoft gagal. Silakan coba lagi.",
+};
+
 export function useLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     username: "",
     password: "",
   });
   const [status, setStatus] = useState<LoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const authProvider = searchParams.get("auth_provider");
+    const authError = searchParams.get("auth_error");
+    if (authProvider !== "microsoft" || !authError) {
+      return;
+    }
+
+    setStatus("error");
+    setErrorMessage(
+      MICROSOFT_AUTH_ERROR_MESSAGES[authError] ?? "Login Microsoft gagal.",
+    );
+    router.replace("/login");
+  }, [router, searchParams]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -43,6 +82,37 @@ export function useLogin() {
     setStatus("submitting");
 
     try {
+      const loginRouteResponse = await fetch(API_AUTH_LOGIN_ROUTE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: formData.username,
+        }),
+      });
+
+      const loginRouteData =
+        (await loginRouteResponse.json().catch(() => ({}))) as LoginRouteResponse;
+
+      if (!loginRouteResponse.ok) {
+        setStatus("error");
+        setFormData({ username: "", password: "" });
+        setErrorMessage(
+          loginRouteData.detail || "Login gagal. Coba lagi beberapa saat lagi.",
+        );
+        return;
+      }
+
+      if (
+        loginRouteData.mode === "microsoft" &&
+        loginRouteData.authorization_url
+      ) {
+        window.location.assign(loginRouteData.authorization_url);
+        return;
+      }
+
       const response = await fetch(API_AUTH_LOGIN, {
         method: "POST",
         headers: {

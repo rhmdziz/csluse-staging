@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.microsoft",
     "dj_rest_auth",
     "dj_rest_auth.registration",
     "csluse",
@@ -171,8 +172,10 @@ SIMPLE_JWT = {
 
 SITE_ID = 1
 FRONTEND_URL = os.getenv("FRONTEND_URL")
+MICROSOFT_ALLOWED_DOMAIN = os.getenv("MICROSOFT_ALLOWED_DOMAIN", "prasetiyamulya.ac.id")
 
 ACCOUNT_ADAPTER = "csluse_auth.adapters.CustomAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "csluse_auth.adapters.CustomSocialAccountAdapter"
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGIN_METHODS = {"email", "username"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
@@ -193,7 +196,19 @@ SOCIALACCOUNT_PROVIDERS = {
         "AUTH_PARAMS": {
             "access_type": "online",
         },
-    }
+    },
+    "microsoft": {
+        "SCOPE": [
+            "User.Read",
+            "email",
+            "openid",
+            "profile",
+        ],
+        "AUTH_PARAMS": {
+            "prompt": "select_account",
+        },
+        "VERIFIED_EMAIL": [MICROSOFT_ALLOWED_DOMAIN],
+    },
 }
 
 SOCIALACCOUNT_LOGIN_ON_GET = True

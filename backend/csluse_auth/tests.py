@@ -1,14 +1,21 @@
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
 from allauth.account.models import EmailAddress
 from django.contrib.admin.models import DELETION, LogEntry
 from django.contrib.auth import get_user_model
+from django.http import HttpResponseRedirect
 from django.test import TestCase
-from datetime import timedelta
 from django.utils import timezone
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from csluse.models import Booking, Borrow, Equipment, Pengujian, Room
+from csluse_auth.adapters import (
+    MICROSOFT_EXPECTED_EMAIL_SESSION_KEY,
+    CustomSocialAccountAdapter,
+)
 from csluse_auth.models import Profile
 from csluse_auth.permissions import ADMINISTRATOR, SUPER_ADMINISTRATOR, assign_role
 
@@ -267,6 +274,134 @@ class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
 
         self.assertEqual(profile_response.status_code, status.HTTP_200_OK)
         self.assertEqual(profile_response.data["email"], self.user.email)
+
+
+class LoginRouteViewTests(APITestCase):
+    def test_non_campus_email_uses_local_login(self):
+        response = self.client.post(
+            "/api/auth/login/route/",
+            {"email": "user@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"mode": "local"})
+
+    @patch("csluse_auth.views.is_microsoft_oauth_configured", return_value=True)
+    def test_campus_email_returns_microsoft_authorization_url(self, _configured):
+        response = self.client.post(
+            "/api/auth/login/route/",
+            {"email": "user@student.prasetiyamulya.ac.id"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["mode"], "microsoft")
+        self.assertIn("/api/auth/oauth/microsoft/login/", response.data["authorization_url"])
+        self.assertIn("email=user@student.prasetiyamulya.ac.id", response.data["authorization_url"])
+
+
+class MicrosoftSocialAccountAdapterTests(AuthBaseTestMixin, TestCase):
+    def setUp(self):
+        self.adapter = CustomSocialAccountAdapter()
+        self.request = MagicMock()
+        self.request.session = {}
+
+    def test_pre_social_login_links_existing_user_by_email(self):
+        existing_user = self.create_user(
+            email="existing@student.prasetiyamulya.ac.id",
+            user_type="Internal",
+            role="Guest",
+            verified=True,
+        )
+        sociallogin = MagicMock()
+        sociallogin.provider = "microsoft"
+        sociallogin.is_existing = False
+        sociallogin.user.email = existing_user.email
+        sociallogin.connect = MagicMock()
+        self.request.session[MICROSOFT_EXPECTED_EMAIL_SESSION_KEY] = existing_user.email
+
+        self.adapter.pre_social_login(self.request, sociallogin)
+
+        sociallogin.connect.assert_called_once_with(self.request, existing_user)
+
+    @patch("csluse_auth.adapters.DefaultSocialAccountAdapter.save_user")
+    def test_save_user_marks_email_verified_and_sets_internal_guest_profile(
+        self,
+        save_user_mock,
+    ):
+        user = User.objects.create_user(
+            username="ms_student",
+            email="new@student.prasetiyamulya.ac.id",
+            password="unusedpass123",
+        )
+        save_user_mock.return_value = user
+        sociallogin = MagicMock()
+        sociallogin.provider = "microsoft"
+
+        saved_user = self.adapter.save_user(self.request, sociallogin, form=None)
+        profile = saved_user.profile
+        email_address = EmailAddress.objects.get(user=saved_user, email=saved_user.email)
+
+        self.assertEqual(saved_user, user)
+        self.assertTrue(email_address.verified)
+        self.assertTrue(email_address.primary)
+        self.assertEqual(profile.user_type, "Internal")
+        self.assertEqual(profile.role, "Guest")
+
+
+class MicrosoftOAuthCallbackTests(AuthBaseTestMixin, APITestCase):
+    @patch("csluse_auth.views.complete_social_login")
+    @patch("csluse_auth.views.MicrosoftGraphOAuth2Adapter.complete_login")
+    @patch("csluse_auth.views.MicrosoftGraphOAuth2Adapter.parse_token")
+    @patch("csluse_auth.views.MicrosoftGraphOAuth2Adapter.get_access_token_data")
+    @patch("csluse_auth.views.MicrosoftGraphOAuth2Adapter.get_client")
+    @patch("csluse_auth.views.MicrosoftGraphOAuth2Adapter.get_provider")
+    @patch("csluse_auth.views.MicrosoftOAuth2CallbackView._get_state")
+    def test_callback_success_sets_jwt_cookies(
+        self,
+        get_state_mock,
+        get_provider_mock,
+        get_client_mock,
+        get_access_token_data_mock,
+        parse_token_mock,
+        complete_login_mock,
+        complete_social_login_mock,
+    ):
+        user = self.create_user(
+            email="callback@student.prasetiyamulya.ac.id",
+            user_type="Internal",
+            role="Guest",
+            verified=True,
+        )
+        get_state_mock.return_value = ({}, None)
+        provider = MagicMock()
+        provider.app = MagicMock(pk=1)
+        get_provider_mock.return_value = provider
+        get_client_mock.return_value = MagicMock()
+        get_access_token_data_mock.return_value = {"access_token": "token"}
+        parse_token_mock.return_value = MagicMock(app=None)
+        login = MagicMock()
+        login.user = user
+        complete_login_mock.return_value = login
+        complete_social_login_mock.return_value = HttpResponseRedirect("http://localhost:5173/dashboard/")
+
+        response = self.client.get(
+            "/api/auth/oauth/microsoft/login/callback/?code=test-code&state=test-state"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertIn("access", response.cookies)
+        self.assertIn("refresh", response.cookies)
+
+    def test_callback_cancel_redirects_to_login_error(self):
+        response = self.client.get(
+            "/api/auth/oauth/microsoft/login/callback/?error=access_denied&state=test-state"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertIn("/login", response["Location"])
+        self.assertIn("auth_error=microsoft_cancelled", response["Location"])
 
 
 class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
