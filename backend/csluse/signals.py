@@ -115,7 +115,6 @@ def validate_booking(sender, instance, **kwargs):
         validate_start_not_in_past(instance.start_time, "booking start time")
 
     validate_booking_working_hours(instance.start_time, instance.end_time)
-    validate_no_weekend_range(instance.start_time, instance.end_time, "booking time range")
 
     # approved_by must be room PIC or Admin (when set)
     if instance.approved_by_id:
@@ -165,8 +164,6 @@ def validate_borrow(sender, instance, **kwargs):
     )
     if start_time_changed:
         validate_start_not_in_past(instance.start_time, "borrow start time")
-
-    validate_no_weekend_range(instance.start_time, instance.end_time, "borrow time range")
 
     if instance.equipment_id:
         equipment_qty = instance.equipment.quantity

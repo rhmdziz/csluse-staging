@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
+import { addDays, addMonths } from "date-fns";
 import { Loader2 } from "lucide-react";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -93,6 +94,7 @@ export default function BorrowEquipmentFormPage() {
   const borrowId = typeof id === "string" ? id : "";
   const isEditMode = borrowId.length > 0;
   const today = useMemo(() => startOfToday(), []);
+  const earliestStartDate = useMemo(() => addDays(today, 2), [today]);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const { profile } = useLoadProfile();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -204,7 +206,20 @@ export default function BorrowEquipmentFormPage() {
       requesterMentorProfileId: "",
     }));
   }, [availablePurposeOptions, formData.purpose]);
-  const minEndDate = startDate ? new Date(startDate) : new Date(today);
+  const maxEndDate = useMemo(
+    () => (startDate ? addMonths(startDate, 3) : undefined),
+    [startDate],
+  );
+  const earliestStartDateLabel = useMemo(
+    () =>
+      earliestStartDate.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+    [earliestStartDate],
+  );
+  const minEndDate = startDate ? new Date(startDate) : new Date(earliestStartDate);
   if (minEndDate) {
     minEndDate.setHours(0, 0, 0, 0);
   }
@@ -215,6 +230,18 @@ export default function BorrowEquipmentFormPage() {
       ? startTime || undefined
       : undefined;
   const minStartTime = getMinSelectableTime(startDate, today);
+
+  useEffect(() => {
+    if (!startDate || !endDate || !maxEndDate) return;
+    if (endDate.getTime() <= maxEndDate.getTime()) return;
+
+    setEndDate(undefined);
+    setEndTime("");
+    setFormData((prev) => ({
+      ...prev,
+      endTime: "",
+    }));
+  }, [endDate, maxEndDate, startDate]);
 
   const handleChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -247,10 +274,21 @@ export default function BorrowEquipmentFormPage() {
   };
 
   const handleStartDateChange = (date: Date | undefined) => {
+    const nextMaxEndDate = date ? addMonths(date, 3) : undefined;
+    const shouldResetEndDate =
+      endDate !== undefined &&
+      nextMaxEndDate !== undefined &&
+      endDate.getTime() > nextMaxEndDate.getTime();
+
     setStartDate(date);
+    if (shouldResetEndDate) {
+      setEndDate(undefined);
+      setEndTime("");
+    }
     setFormData((prev) => ({
       ...prev,
       startTime: combineDateTime(date, startTime),
+      ...(shouldResetEndDate ? { endTime: "" } : {}),
     }));
     setValidationMessage("");
     setErrorMessage("");
@@ -302,6 +340,17 @@ export default function BorrowEquipmentFormPage() {
     if (!formData.endTime) return "Pilih waktu selesai peminjaman.";
     if (new Date(formData.endTime) <= new Date(formData.startTime)) {
       return "Waktu selesai harus setelah waktu mulai.";
+    }
+    const start = new Date(toWibIsoString(formData.startTime));
+    const end = new Date(toWibIsoString(formData.endTime));
+    const earliestStart = new Date(earliestStartDate);
+    earliestStart.setHours(0, 0, 0, 0);
+    if (start < earliestStart) {
+      return `Waktu mulai borrow minimal H+2 dari tanggal pengajuan (ajukan H-2). Pilih tanggal mulai paling cepat ${earliestStartDateLabel}.`;
+    }
+    const maxAllowedEnd = addMonths(start, 3);
+    if (end > maxAllowedEnd) {
+      return "Rentang borrow maksimal 3 bulan dari waktu mulai.";
     }
     if (!formData.purpose.trim()) return "Pilih tujuan peminjaman.";
     if (!availablePurposeOptions.some((option) => option.value === formData.purpose)) {
@@ -389,6 +438,10 @@ export default function BorrowEquipmentFormPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900 md:col-span-2">
+            Pengajuan peminjaman alat harus diajukan minimal H-2, sehingga tanggal mulai paling cepat {earliestStartDateLabel}.
+          </div>
+
           <div>
             <DashboardComboboxField
               label="Pilih Alat"
@@ -477,7 +530,7 @@ export default function BorrowEquipmentFormPage() {
             date={startDate}
             time={startTime}
             disabled={isSubmitting}
-            minDate={today}
+            minDate={earliestStartDate}
             minTime={minStartTime}
             onDateChange={handleStartDateChange}
             onTimeChange={handleStartTimeChange}
@@ -490,6 +543,7 @@ export default function BorrowEquipmentFormPage() {
             time={endTime}
             disabled={isSubmitting}
             minDate={minEndDate}
+            maxDate={maxEndDate}
             minTime={minEndTime}
             onDateChange={handleEndDateChange}
             onTimeChange={handleEndTimeChange}

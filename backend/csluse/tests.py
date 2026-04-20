@@ -147,6 +147,69 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
         self.assertEqual(response.data["purpose"], "Penelitian")
 
+    def test_booking_request_requires_h_plus_2_start_date(self):
+        start, end = self.future_window(days=1, start_hour=9)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("H+2", response.data["start_time"][0])
+
+    def test_booking_request_can_cross_weekend_when_within_three_months(self):
+        start, end = self.future_weekday_window(
+            4,
+            min_days=2,
+            start_hour=9,
+            duration_days=10,
+            duration_hours=7,
+        )
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_booking_request_cannot_exceed_three_months(self):
+        start, _ = self.future_window(days=3, start_hour=9)
+        end = start + timedelta(days=100)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("maksimal 3 bulan", response.data["end_time"][0])
+
     def test_lecturer_can_create_borrow_request(self):
         start, end = self.future_window(days=3, start_hour=11)
         self.client.force_authenticate(user=self.lecturer_user)
@@ -167,6 +230,69 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
         self.assertEqual(response.data["purpose"], "Penelitian")
 
+    def test_borrow_request_requires_h_plus_2_start_date(self):
+        start, end = self.future_window(days=1, start_hour=11)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("H+2", response.data["start_time"][0])
+
+    def test_borrow_request_can_cross_weekend_when_within_three_months(self):
+        start, end = self.future_weekday_window(
+            4,
+            min_days=2,
+            start_hour=11,
+            duration_days=10,
+            duration_hours=2,
+        )
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_borrow_request_cannot_exceed_three_months(self):
+        start, _ = self.future_window(days=3, start_hour=11)
+        end = start + timedelta(days=100)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("maksimal 3 bulan", response.data["end_time"][0])
+
     def future_window(self, *, days=1, start_hour=9, duration_hours=2):
         local_now = timezone.localtime(timezone.now()) + timedelta(days=days)
         start = local_now.replace(
@@ -176,6 +302,21 @@ class CsluseWorkflowRegressionTests(APITestCase):
             microsecond=0,
         )
         end = start + timedelta(hours=duration_hours)
+        return start, end
+
+    def future_weekday_window(self, weekday, *, min_days=2, start_hour=9, duration_days=0, duration_hours=2):
+        local_now = timezone.localtime(timezone.now())
+        days_until_weekday = (weekday - local_now.weekday()) % 7
+        while days_until_weekday < min_days:
+            days_until_weekday += 7
+
+        start = (local_now + timedelta(days=days_until_weekday)).replace(
+            hour=start_hour,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        end = start + timedelta(days=duration_days, hours=duration_hours)
         return start, end
 
     def create_booking(self, requested_by, *, purpose="Penelitian", requester_mentor_profile=None):

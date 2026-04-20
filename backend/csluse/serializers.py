@@ -1,4 +1,6 @@
 import re
+from calendar import monthrange
+from datetime import timedelta
 from typing import Optional
 
 from django.db.models import Sum
@@ -655,6 +657,17 @@ class BookingEquipmentItemDetailSerializer(serializers.ModelSerializer):
 # region Booking Main Serializers
 
 
+def _add_calendar_months(value, months):
+    if value is None:
+        return None
+
+    target_month_index = (value.month - 1) + months
+    year = value.year + (target_month_index // 12)
+    month = (target_month_index % 12) + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
 class BookingSerializer(serializers.ModelSerializer):
     requested_by_detail = ProfileSerializer(source="requested_by", read_only=True)
     approved_by_detail = ProfileSerializer(source="approved_by", read_only=True)
@@ -760,6 +773,31 @@ class BookingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"end_time": "Waktu selesai harus lebih besar dari waktu mulai."}
             )
+
+        if start_time and not self.context.get("allow_status_transition"):
+            local_start = timezone.localtime(start_time)
+            earliest_start_date = timezone.localdate() + timedelta(days=2)
+            if local_start.date() < earliest_start_date:
+                raise serializers.ValidationError(
+                    {
+                        "start_time": (
+                            "Waktu mulai booking minimal H+2 dari tanggal pengajuan (pengajuan dilakukan H-2)."
+                        )
+                    }
+                )
+
+        if start_time and end_time and not self.context.get("allow_status_transition"):
+            local_start = timezone.localtime(start_time)
+            local_end = timezone.localtime(end_time)
+            max_end_time = _add_calendar_months(local_start, 3)
+            if max_end_time and local_end > max_end_time:
+                raise serializers.ValidationError(
+                    {
+                        "end_time": (
+                            "Rentang booking maksimal 3 bulan dari waktu mulai."
+                        )
+                    }
+                )
 
         if room and start_time and end_time and next_status in {"Pending", "Approved"}:
             if next_status == "Approved" and end_time <= timezone.now():
@@ -1116,6 +1154,31 @@ class BorrowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"end_time": "Waktu selesai peminjaman harus setelah waktu mulai."}
             )
+
+        if start_time and not self.context.get("allow_status_transition"):
+            local_start = timezone.localtime(start_time)
+            earliest_start_date = timezone.localdate() + timedelta(days=2)
+            if local_start.date() < earliest_start_date:
+                raise serializers.ValidationError(
+                    {
+                        "start_time": (
+                            "Waktu mulai borrow minimal H+2 dari tanggal pengajuan (pengajuan dilakukan H-2)."
+                        )
+                    }
+                )
+
+        if start_time and end_time and not self.context.get("allow_status_transition"):
+            local_start = timezone.localtime(start_time)
+            local_end = timezone.localtime(end_time)
+            max_end_time = _add_calendar_months(local_start, 3)
+            if max_end_time and local_end > max_end_time:
+                raise serializers.ValidationError(
+                    {
+                        "end_time": (
+                            "Rentang borrow maksimal 3 bulan dari waktu mulai."
+                        )
+                    }
+                )
 
         if instance is None:
             equipment = attrs.get("equipment")
