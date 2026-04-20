@@ -69,14 +69,6 @@ const MENU_ACCESS_RULES: Record<string, readonly string[]> = {
     ROLE_VALUES.ADMIN,
     ROLE_VALUES.SUPER_ADMINISTRATOR,
   ],
-  "use-equipment": [
-    ROLE_VALUES.STUDENT,
-    ROLE_VALUES.GUEST,
-    ROLE_VALUES.LECTURER,
-    ROLE_VALUES.STAFF,
-    ROLE_VALUES.ADMIN,
-    ROLE_VALUES.SUPER_ADMINISTRATOR,
-  ],
   "borrow-equipment": [
     ROLE_VALUES.STUDENT,
     ROLE_VALUES.GUEST,

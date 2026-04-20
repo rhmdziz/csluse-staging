@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 REQUEST_DETAIL_PATHS = {
     "booking": "/booking-rooms/{id}",
     "borrow": "/borrow-equipment/{id}",
-    "use": "/use-equipment/{id}",
     "pengujian": "/sample-testing",
 }
 

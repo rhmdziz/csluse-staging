@@ -17,7 +17,6 @@ export type StatusOption = {
 
 export type ReviewActionKind =
   | "booking"
-  | "use"
   | "sample-testing"
   | "borrow";
 

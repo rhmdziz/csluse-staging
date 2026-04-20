@@ -129,9 +129,6 @@ export function getBookingProgressFlow(
   return baseSteps;
 }
 
-export function getUseProgressFlow(item: BasicProgressInput): ProgressStepItem[] {
-  return getBookingProgressFlow(item);
-}
 
 export function getSampleTestingProgressFlow(
   item: BasicProgressInput,

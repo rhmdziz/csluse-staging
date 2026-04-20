@@ -173,7 +173,6 @@ export function RequireFeatureScope({
   children: ReactElement;
   featurePath:
     | "/booking-rooms"
-    | "/use-equipment"
     | "/borrow-equipment"
     | "/sample-testing";
   scope: "requester" | "approval";
@@ -219,7 +218,6 @@ export function RequireMenuAccess({
     | "dashboard"
     | "schedule"
     | "booking-rooms"
-    | "use-equipment"
     | "borrow-equipment"
     | "sample-testing"
     | "notifications"

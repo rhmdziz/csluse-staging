@@ -13,7 +13,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room, Software, Use
+from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room, Software
 from csluse.viewsets import DefaultPagination
 
 from .audit import log_admin_action
@@ -478,7 +478,6 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             "total_software": Software.objects.count(),
             "total_bookings": Booking.objects.count(),
             "total_borrows": Borrow.objects.count(),
-            "total_uses": Use.objects.count(),
             "total_pengujians": Pengujian.objects.count(),
             "users_by_role": {
                 row["role"]: row["n"]
@@ -486,7 +485,6 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             },
             "bookings_by_status": _status_breakdown(Booking),
             "borrows_by_status": _status_breakdown(Borrow),
-            "uses_by_status": _status_breakdown(Use),
             "pengujians_by_status": _status_breakdown(Pengujian),
         }
         return Response(data)
@@ -512,7 +510,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
 
         ACTIVE_BORROW_STATUSES = ["Pending", "Approved", "Borrowed", "Returned Pending Inspection", "Overdue"]
         ACTIVE_BOOKING_STATUSES = ["Pending", "Approved"]
-        ACTIVE_USE_STATUSES = ["Pending", "Approved"]
         ACTIVE_PENGUJIAN_STATUSES = ["Pending", "Approved", "Diproses", "Menunggu Pembayaran"]
 
         active_services = []
@@ -543,19 +540,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
                 "end_time": bk.end_time,
             })
 
-        for u in Use.objects.select_related("equipment").filter(
-            requested_by=profile, status__in=ACTIVE_USE_STATUSES
-        ):
-            active_services.append({
-                "id": u.id,
-                "code": u.code,
-                "type": "use",
-                "label": u.equipment.name if u.equipment else "-",
-                "status": u.status,
-                "start_time": u.start_time,
-                "end_time": u.end_time,
-            })
-
         for p in Pengujian.objects.filter(
             requested_by=profile, status__in=ACTIVE_PENGUJIAN_STATUSES
         ):
@@ -571,7 +555,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
 
         borrow_count = sum(1 for s in active_services if s["type"] == "borrow")
         booking_count = sum(1 for s in active_services if s["type"] == "booking")
-        use_count = sum(1 for s in active_services if s["type"] == "use")
         pengujian_count = sum(1 for s in active_services if s["type"] == "pengujian")
 
         data = {
@@ -588,7 +571,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
                 "total_active": len(active_services),
                 "borrow_count": borrow_count,
                 "booking_count": booking_count,
-                "use_count": use_count,
                 "pengujian_count": pengujian_count,
             },
         }

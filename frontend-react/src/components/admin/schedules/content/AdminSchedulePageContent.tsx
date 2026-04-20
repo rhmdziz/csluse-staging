@@ -229,7 +229,6 @@ export default function AdminSchedulePage() {
   const monthKpis = useMemo(() => {
     const scheduleCount = monthEvents.filter((item) => item.source === "schedule").length;
     const bookingCount = monthEvents.filter((item) => item.source === "booking").length;
-    const useCount = monthEvents.filter((item) => item.source === "use").length;
     const roomCount = new Set(
       monthEvents.map((item) => item.room_name).filter(Boolean),
     ).size;
@@ -249,11 +248,6 @@ export default function AdminSchedulePage() {
         label: "Booking",
         value: String(bookingCount),
         tone: "from-amber-500/15 to-amber-100",
-      },
-      {
-        label: "Penggunaan Alat",
-        value: String(useCount),
-        tone: "from-orange-500/15 to-orange-100",
       },
       {
         label: "Ruangan Terpakai",
@@ -447,7 +441,7 @@ export default function AdminSchedulePage() {
     <section className="space-y-4 px-4">
       <AdminPageHeader
         title="Jadwal"
-        description="Kelola jadwal dan pantau agenda gabungan dari jadwal admin, peminjaman lab, dan penggunaan alat."
+        description="Kelola jadwal dan pantau agenda gabungan dari jadwal admin dan peminjaman lab."
         icon={<CalendarDays className="h-5 w-5 text-blue-100" />}
       />
 

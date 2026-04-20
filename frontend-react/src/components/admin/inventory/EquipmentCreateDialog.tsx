@@ -11,7 +11,7 @@ import { AdminDetailDialogShell, InlineErrorAlert } from "@/components/shared";
 
 import { Button, Input, DialogFooter } from "@/components/ui";
 
-import { BORROWABLE_OPTIONS, EQUIPMENT_CATEGORY_OPTIONS, MOVEABLE_OPTIONS, SHAREABLE_OPTIONS, USEABLE_OPTIONS } from "@/constants/equipments";
+import { BORROWABLE_OPTIONS, EQUIPMENT_CATEGORY_OPTIONS, MOVEABLE_OPTIONS, SHAREABLE_OPTIONS } from "@/constants/equipments";
 
 import { useCreateEquipment } from "@/hooks/shared/resources/equipments";
 
@@ -36,7 +36,6 @@ export default function EquipmentCreateDialog({
     isMoveable: "true",
     isShareable: "false",
     isBorrowable: "false",
-    isUseable: "false",
     description: "",
   });
   const { rooms, isLoading: isLoadingRooms, error: roomError } = useRoomOptions();
@@ -52,7 +51,6 @@ export default function EquipmentCreateDialog({
       isMoveable: "true",
       isShareable: "false",
       isBorrowable: "false",
-      isUseable: "false",
       description: "",
     });
   };
@@ -83,7 +81,6 @@ export default function EquipmentCreateDialog({
       isMoveable: formData.isMoveable === "true",
       isShareable: formData.isShareable === "true",
       isBorrowable: formData.isBorrowable === "true",
-      isUseable: formData.isUseable === "true",
       description: formData.description,
     });
 
@@ -207,23 +204,6 @@ export default function EquipmentCreateDialog({
             >
               <option value="">Pilih status</option>
               {BORROWABLE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium">Useable (Dapat Digunakan)</label>
-            <select
-              name="isUseable"
-              value={formData.isUseable}
-              onChange={handleChange}
-              className="h-9 w-full rounded-md border border-sky-300 bg-sky-50/60 px-3 text-sm shadow-sm outline-none focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-200"
-            >
-              <option value="">Pilih status</option>
-              {USEABLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

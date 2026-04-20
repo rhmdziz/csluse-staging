@@ -99,7 +99,6 @@ class Equipment(BaseModel):
     is_moveable = models.BooleanField(default=True)
     is_shareable = models.BooleanField(default=False)
     is_borrowable = models.BooleanField(default=False)
-    is_useable = models.BooleanField(default=False)
 
     def __str__(self):
         room_name = self.room.name if self.room else "Tanpa Ruangan"
@@ -264,81 +263,6 @@ class BookingEquipmentItem(BaseModel):
 # endregion Booking Models
 
 
-# region Equipment Use Models
-
-
-class Use(BaseModel):
-    STATUS_CHOICES = [
-        ("Pending", "Pending"),
-        ("Approved", "Approved"),
-        ("Rejected", "Rejected"),
-        ("Expired", "Expired"),
-        ("Completed", "Completed"),
-    ]
-
-    code = models.CharField(max_length=12, unique=True, editable=False, null=True)
-    requested_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="uses",
-    )
-    requester_phone = models.CharField(max_length=20, blank=True, null=True)
-    requester_mentor = models.CharField(max_length=255, blank=True, null=True)
-    requester_mentor_profile = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="requested_uses_as_mentor",
-    )
-    is_approved_by_mentor = models.BooleanField(default=False)
-    mentor_approved_at = models.DateTimeField(blank=True, null=True)
-
-    # if role == guest, then fill in institution and institution_address
-    institution = models.CharField(max_length=255, blank=True, null=True)
-    institution_address = models.CharField(max_length=555, blank=True, null=True)
-
-    equipment = models.ForeignKey(
-        Equipment,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="uses",
-    )
-    quantity = models.PositiveIntegerField(default=1)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField(blank=True, null=True)
-    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, default="Other")
-    note = models.CharField(max_length=2000, blank=True, null=True)
-    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="Pending")
-    approved_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="approved_uses",
-    )
-    approved_at = models.DateTimeField(blank=True, null=True)
-    rejected_at = models.DateTimeField(blank=True, null=True)
-    rejection_note = models.CharField(max_length=2000, blank=True, null=True)
-    expired_at = models.DateTimeField(blank=True, null=True)
-    completed_at = models.DateTimeField(blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        if not self.code:
-            now = timezone.localtime(timezone.now())
-            yymm = now.strftime("%y%m")
-            with transaction.atomic():
-                self.code = _next_code(Use, "PA", yymm)
-        return super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.code} - {self.equipment.name} - {self.requested_by.user.email} - {self.status}"
-
-
-# endregion Equipment Use Models
 
 
 # region Borrow Models

@@ -12,7 +12,6 @@ import {
   Package,
   ShieldCheck,
   UserRound,
-  Wrench,
 } from "lucide-react";
 
 import { hasMenuAccess, normalizeRoleValue } from "@/constants/roles";
@@ -56,14 +55,12 @@ const TOP_NAV_MENU_CONFIG: Array<Pick<TopNavItem, "id" | "label" | "href">> = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard" },
   { id: "schedule", label: "Lihat Jadwal", href: "/schedule" },
   { id: "booking-rooms", label: "Peminjaman Lab" },
-  { id: "use-equipment", label: "Penggunaan Alat" },
   { id: "borrow-equipment", label: "Peminjaman Alat" },
   { id: "sample-testing", label: "Pengujian Sampel" },
 ];
 
 const ADMIN_APPROVAL_DEFAULT_MENU_IDS = new Set([
   "booking-rooms",
-  "use-equipment",
   "borrow-equipment",
   "sample-testing",
 ]);
@@ -84,15 +81,6 @@ export function getHeaderIcon(menuId: string, actionId: string | null) {
       return ClipboardList;
     }
     return Building2;
-  }
-
-  if (menuId === "use-equipment") {
-    if (actionId === "request-form") return FilePenLine;
-    if (actionId === "request-list" || actionId === "all-requests") {
-      return ClipboardList;
-    }
-    if (actionId === "materials") return FlaskConical;
-    return Wrench;
   }
 
   if (menuId === "sample-testing") {
@@ -198,58 +186,28 @@ export const SIDEBAR_SHORTCUTS: SidebarShortcut[] = [
         id: "rooms",
         label: "Ruangan yang Tersedia",
         description: "Lihat daftar ruangan yang tersedia untuk peminjaman lab.",
-        href: "/rooms",
+        href: "/booking-rooms/rooms",
         allowedRoles: CATALOG_ACCESS_ROLES,
-      },
-    ],
-  },
-  {
-    id: "use-equipment",
-    label: "Penggunaan Alat",
-    description: "Kelola pengajuan penggunaan alat beserta formulirnya.",
-    href: "/use-equipment/form",
-    icon: Wrench,
-    actions: [
-      {
-        id: "request-form",
-        label: "Ajukan Penggunaan",
-        description: "Buat pengajuan penggunaan alat melalui formulir.",
-        href: "/use-equipment/form",
-        allowedRoles: REQUESTER_ACCESS_ROLES,
-      },
-      {
-        id: "request-list",
-        label: "Pengajuan Saya",
-        description: "Lihat daftar pengajuan penggunaan alat Anda.",
-        href: "/use-equipment",
-        allowedRoles: REQUESTER_ACCESS_ROLES,
-      },
-      {
-        id: "all-requests",
-        label: "Approval Penggunaan Alat",
-        description: "Lihat seluruh pengajuan penggunaan alat untuk diproses.",
-        href: "/use-equipment/approval",
-        allowedRoles: APPROVAL_ACCESS_ROLES,
       },
       {
         id: "equipment",
         label: "Peralatan yang Tersedia",
-        description: "Lihat daftar peralatan yang tersedia untuk pengajuan penggunaan alat.",
-        href: "/use-equipment/equipment",
+        description: "Lihat daftar peralatan yang tersedia di laboratorium.",
+        href: "/booking-rooms/equipment",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
       {
         id: "materials",
         label: "Bahan yang Tersedia",
         description: "Lihat daftar bahan habis pakai yang tersedia di laboratorium.",
-        href: "/use-equipment/materials",
+        href: "/booking-rooms/materials",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
       {
         id: "software",
         label: "Daftar Software",
         description: "Lihat daftar software yang tersedia pada peralatan laboratorium.",
-        href: "/use-equipment/software",
+        href: "/booking-rooms/software",
         allowedRoles: CATALOG_ACCESS_ROLES,
       },
     ],
@@ -463,28 +421,19 @@ export function parseDashboardPath(pathname: string) {
     if (parts[1] === "form") {
       return { menu: "booking-rooms", action: "request-form" };
     }
-    return { menu: "booking-rooms", action: "request-list" };
-  }
-  if (parts[0] === "rooms") {
-    return { menu: "booking-rooms", action: "rooms" };
-  }
-  if (parts[0] === "use-equipment") {
-    if (parts[1] === "approval") {
-      return { menu: "use-equipment", action: "all-requests" };
-    }
-    if (parts[1] === "form") {
-      return { menu: "use-equipment", action: "request-form" };
+    if (parts[1] === "rooms") {
+      return { menu: "booking-rooms", action: "rooms" };
     }
     if (parts[1] === "equipment") {
-      return { menu: "use-equipment", action: "equipment" };
-    }
-    if (parts[1] === "software") {
-      return { menu: "use-equipment", action: "software" };
+      return { menu: "booking-rooms", action: "equipment" };
     }
     if (parts[1] === "materials") {
-      return { menu: "use-equipment", action: "materials" };
+      return { menu: "booking-rooms", action: "materials" };
     }
-    return { menu: "use-equipment", action: "request-list" };
+    if (parts[1] === "software") {
+      return { menu: "booking-rooms", action: "software" };
+    }
+    return { menu: "booking-rooms", action: "request-list" };
   }
   if (parts[0] === "sample-testing") {
     if (parts[1] === "approval") {

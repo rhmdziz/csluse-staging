@@ -14,7 +14,6 @@ function isSameDay(left: Date, right: Date) {
 function getCalendarDotClass(source: string) {
   if (source === "schedule") return "bg-sky-500";
   if (source === "booking") return "bg-emerald-500";
-  if (source === "use") return "bg-amber-500";
   return "bg-slate-500";
 }
 
@@ -36,13 +35,10 @@ export default function Calendar({
 
     if (!dayItems.length) return null;
 
-    const hasUse = dayItems.some((item) => item.source === "use");
     const hasBooking = dayItems.some((item) => item.source === "booking");
-    const markerClass = hasUse
-      ? getCalendarDotClass("use")
-      : hasBooking
-        ? getCalendarDotClass("booking")
-        : getCalendarDotClass("schedule");
+    const markerClass = hasBooking
+      ? getCalendarDotClass("booking")
+      : getCalendarDotClass("schedule");
 
     return (
       <div className="mt-1 flex justify-center">

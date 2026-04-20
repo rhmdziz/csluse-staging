@@ -20,7 +20,6 @@ import type { LabClearanceActiveService } from "@/services/admin";
 const SERVICE_TYPE_LABEL: Record<string, string> = {
   borrow: "Peminjaman Alat",
   booking: "Peminjaman Lab",
-  use: "Penggunaan Alat",
   pengujian: "Pengujian Sampel",
 };
 
@@ -259,11 +258,6 @@ export default function AdminLabClearanceContent() {
                   {clearanceData.summary.bookingCount > 0 && (
                     <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
                       Peminjaman Lab: {clearanceData.summary.bookingCount}
-                    </span>
-                  )}
-                  {clearanceData.summary.useCount > 0 && (
-                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
-                      Penggunaan Alat: {clearanceData.summary.useCount}
                     </span>
                   )}
                   {clearanceData.summary.pengujianCount > 0 && (

@@ -1,7 +1,6 @@
 "use client";
 
 import type { BookingRow } from "@/hooks/booking-rooms";
-import type { UseRow } from "@/hooks/use-equipment";
 import type { BorrowRow } from "@/hooks/borrow-equipment";
 import type { SampleTestingRow } from "@/hooks/sample-testing";
 import type { UserRow } from "@/hooks/shared/resources/users";
@@ -35,20 +34,6 @@ export const BOOKING_EXPORT_COLUMNS: ExportColumn<BookingRow>[] = [
   { header: "Dibuat", cell: (booking) => formatDateTimeId(booking.createdAt) },
 ];
 
-export const USE_EXPORT_COLUMNS: ExportColumn<UseRow>[] = [
-  { header: "Kode", cell: (item) => item.code },
-  { header: "Status", cell: (item) => getStatusDisplayLabel(item.status) },
-  { header: "Alat", cell: (item) => item.equipmentName },
-  { header: "Ruangan", cell: (item) => item.roomName },
-  { header: "Pengguna", cell: (item) => item.requesterName },
-  { header: "Jumlah", cell: (item) => item.quantity },
-  { header: "Keperluan", cell: (item) => item.purpose },
-  { header: "Waktu Mulai", cell: (item) => formatDateTimeId(item.startTime) },
-  { header: "Waktu Selesai", cell: (item) => formatDateTimeId(item.endTime) },
-  { header: "Disetujui Oleh", cell: (item) => item.approvedByName || "-" },
-  { header: "Catatan", cell: (item) => item.note || "-" },
-  { header: "Dibuat", cell: (item) => formatDateTimeId(item.createdAt) },
-];
 
 export const BORROW_EXPORT_COLUMNS: ExportColumn<BorrowRow>[] = [
   { header: "Kode", cell: (item) => item.code },
@@ -117,7 +102,6 @@ export const EQUIPMENT_EXPORT_COLUMNS: ExportColumn<EquipmentRow>[] = [
   { header: "moveable", cell: (item) => (item.isMoveable ? "ya" : "tidak") },
   { header: "shareable", cell: (item) => (item.isShareable ? "ya" : "tidak") },
   { header: "borrowable", cell: (item) => (item.isBorrowable ? "ya" : "tidak") },
-  { header: "useable", cell: (item) => (item.isUseable ? "ya" : "tidak") },
   { header: "deskripsi", cell: (item) => item.description || "-" },
 ];
 

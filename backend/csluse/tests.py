@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from unittest.mock import patch
 
-from csluse.models import Borrow, Booking, BookingEquipmentItem, Equipment, Notification, Pengujian, Room, Use
+from csluse.models import Borrow, Booking, BookingEquipmentItem, Equipment, Notification, Pengujian, Room
 from csluse_auth.models import Profile
 
 User = get_user_model()
@@ -93,8 +93,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.student_profile.department = "Digital Business Technology"
         self.student_profile.save(update_fields=["department"])
         self.create_booking(self.student_profile)
-        self.create_use(self.student_profile)
-
         self.client.force_authenticate(user=self.admin_user)
         response = self.client.get("/api/bookings/all/requesters/")
 
@@ -140,26 +138,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
                 "start_time": start.isoformat(),
                 "end_time": end.isoformat(),
                 "attendee_count": 1,
-                "purpose": "Penelitian",
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
-        self.assertEqual(response.data["purpose"], "Penelitian")
-
-    def test_lecturer_can_create_use_request(self):
-        start, end = self.future_window(days=3, start_hour=10)
-        self.client.force_authenticate(user=self.lecturer_user)
-
-        response = self.client.post(
-            "/api/uses/",
-            {
-                "equipment": str(self.equipment.id),
-                "quantity": 1,
-                "start_time": start.isoformat(),
-                "end_time": end.isoformat(),
                 "purpose": "Penelitian",
             },
             format="json",
@@ -224,34 +202,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
             purpose="Penelitian",
         )
 
-    def create_use(self, requested_by, *, status="Pending", approved_by=None, purpose="Penelitian", requester_mentor_profile=None):
-        start, end = self.future_window(days=2, start_hour=10)
-        return Use.objects.create(
-            requested_by=requested_by,
-            equipment=self.equipment,
-            quantity=1,
-            start_time=start,
-            end_time=end,
-            purpose=purpose,
-            status=status,
-            approved_by=approved_by,
-            requester_mentor="Lecturer User" if requester_mentor_profile else None,
-            requester_mentor_profile=requester_mentor_profile,
-        )
-
-    def create_use_for_equipment(self, requested_by, equipment, *, status="Pending", approved_by=None):
-        start, end = self.future_window(days=2, start_hour=10)
-        return Use.objects.create(
-            requested_by=requested_by,
-            equipment=equipment,
-            quantity=1,
-            start_time=start,
-            end_time=end,
-            purpose="Penelitian",
-            status=status,
-            approved_by=approved_by,
-        )
-
     def create_borrow(self, requested_by, *, status="Pending", approved_by=None, purpose="Penelitian", requester_mentor_profile=None):
         start, end = self.future_window(days=2, start_hour=11)
         return Borrow.objects.create(
@@ -306,15 +256,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.client.force_authenticate(self.staff_user)
         response = self.client.get("/api/bookings/all/")
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_staff_cannot_access_use_approval_scope(self):
-        self.create_use_for_equipment(self.student_profile, self.equipment)
-        self.create_use_for_equipment(self.student_profile, self.other_equipment)
-
-        self.client.force_authenticate(self.staff_user)
-        response = self.client.get("/api/uses/all/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
@@ -402,34 +343,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "Approved")
 
-    def test_staff_cannot_self_approve_use(self):
-        use_item = self.create_use(self.staff_profile)
-
-        self.client.force_authenticate(self.staff_user)
-        response = self.client.post(
-            f"/api/uses/{use_item.id}/approve/",
-            {},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_requester_cannot_self_complete_use(self):
-        use_item = self.create_use(
-            self.student_profile,
-            status="Approved",
-            approved_by=self.admin_profile,
-        )
-
-        self.client.force_authenticate(self.student_user)
-        response = self.client.post(
-            f"/api/uses/{use_item.id}/complete/",
-            {},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
     def test_booking_approval_creates_notification_for_requester(self):
         booking = self.create_booking(self.student_profile)
 
@@ -443,20 +356,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(f"https://frontend.example.com/booking-rooms/{booking.id}", mail.outbox[0].body)
         self.assertIn("disetujui", mail.outbox[0].body)
-
-    def test_use_rejection_creates_notification_for_requester(self):
-        use_item = self.create_use(self.student_profile)
-
-        self.client.force_authenticate(self.admin_user)
-        response = self.client.post(f"/api/uses/{use_item.id}/reject/", {}, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        notification = Notification.objects.get(recipient=self.student_profile)
-        self.assertEqual(notification.category, "Rejected")
-        self.assertIn(use_item.code, notification.message)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn(f"https://frontend.example.com/use-equipment/{use_item.id}", mail.outbox[0].body)
-        self.assertIn("ditolak", mail.outbox[0].body)
 
     def test_overdue_borrow_creates_reminder_notification(self):
         borrow = self.create_borrow(
@@ -562,42 +461,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(final_response.status_code, status.HTTP_200_OK)
         self.assertEqual(final_response.data["status"], "Approved")
 
-    def test_mentor_must_approve_use_before_pic(self):
-        use_item = self.create_use(
-            self.student_profile,
-            purpose="Skripsi/TA",
-            requester_mentor_profile=self.lecturer_profile,
-        )
-
-        self.client.force_authenticate(self.admin_user)
-        early_response = self.client.post(f"/api/uses/{use_item.id}/approve/", {}, format="json")
-        self.assertEqual(early_response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        self.client.force_authenticate(self.lecturer_user)
-        mentor_response = self.client.post(f"/api/uses/{use_item.id}/approve/", {}, format="json")
-        self.assertEqual(mentor_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(mentor_response.data["status"], "Pending")
-        self.assertTrue(mentor_response.data["is_approved_by_mentor"])
-
-        self.client.force_authenticate(self.admin_user)
-        final_response = self.client.post(f"/api/uses/{use_item.id}/approve/", {}, format="json")
-        self.assertEqual(final_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(final_response.data["status"], "Approved")
-
-    def test_mentor_can_access_use_approval_scope_for_their_guidance_request(self):
-        use_item = self.create_use(
-            self.student_profile,
-            purpose="Skripsi/TA",
-            requester_mentor_profile=self.lecturer_profile,
-        )
-
-        self.client.force_authenticate(self.lecturer_user)
-        response = self.client.get("/api/uses/all/")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(response.data["results"][0]["id"], str(use_item.id))
-
     def test_mentor_must_approve_borrow_before_pic(self):
         borrow = self.create_borrow(
             self.student_profile,
@@ -686,29 +549,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         borrow.refresh_from_db()
         self.assertNotEqual(borrow.note, "Tidak boleh berubah")
-
-    def test_requester_can_delete_own_pending_use(self):
-        use_item = self.create_use(self.student_profile)
-
-        self.client.force_authenticate(self.student_user)
-        response = self.client.delete(f"/api/uses/{use_item.id}/")
-
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Use.objects.filter(id=use_item.id).exists())
-
-    def test_requester_cannot_update_other_pending_use(self):
-        use_item = self.create_use(self.student_profile)
-
-        self.client.force_authenticate(self.staff_user)
-        response = self.client.patch(
-            f"/api/uses/{use_item.id}/",
-            {"quantity": 4},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        use_item.refresh_from_db()
-        self.assertEqual(use_item.quantity, 1)
 
     def test_requester_can_update_own_pending_pengujian(self):
         pengujian = self.create_pengujian(self.student_profile)

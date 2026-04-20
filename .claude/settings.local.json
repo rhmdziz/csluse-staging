@@ -11,7 +11,14 @@
       "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
       "Bash(grep -v \"^\\\\.$\")",
       "Bash(python3 -m py_compile csluse/viewsets.py)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(python3 -m py_compile /Users/selunaa/Projects/csluse-staging/backend/csluse/viewsets.py)",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3)",
+      "Bash(python manage.py makemigrations csluse --name remove_use_table)",
+      "Bash(python3 manage.py makemigrations csluse --name remove_use_table)"
     ]
   }
 }

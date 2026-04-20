@@ -24,7 +24,6 @@ import {
   EQUIPMENT_STATUS_OPTIONS,
   MOVEABLE_OPTIONS,
   SHAREABLE_OPTIONS,
-  USEABLE_OPTIONS,
 } from "@/constants/equipments";
 
 import { useDeleteEquipment } from "@/hooks/shared/resources/equipments";
@@ -167,7 +166,6 @@ export default function AdminEquipmentDetailDialog({
     isMoveable: "true",
     isShareable: "false",
     isBorrowable: "false",
-    isUseable: "false",
     description: "",
   });
   const {
@@ -201,7 +199,6 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: String(equipment.isMoveable),
       isShareable: String(equipment.isShareable),
       isBorrowable: String(equipment.isBorrowable),
-      isUseable: String(equipment.isUseable),
       description: equipment.description,
     });
     setIsEditing(initialMode === "edit" && canManage);
@@ -224,7 +221,6 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: "true",
       isShareable: "false",
       isBorrowable: "false",
-      isUseable: "false",
       description: "",
     });
   };
@@ -251,7 +247,6 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: formData.isMoveable === "true",
       isShareable: formData.isShareable === "true",
       isBorrowable: formData.isBorrowable === "true",
-      isUseable: formData.isUseable === "true",
       description: formData.description,
     });
     if (!result.ok) return;
@@ -286,7 +281,6 @@ export default function AdminEquipmentDetailDialog({
       isMoveable: equipment.isMoveable,
       isShareable: equipment.isShareable,
       isBorrowable: equipment.isBorrowable,
-      isUseable: equipment.isUseable,
       description: equipment.description,
     });
     if (!result.ok) return;
@@ -448,21 +442,6 @@ export default function AdminEquipmentDetailDialog({
                     setFormData((prev) => ({ ...prev, isBorrowable: value }))
                   }
                 />
-                <SelectDetailField
-                  label="Useable (Dapat Digunakan)"
-                  value={
-                    isEditing
-                      ? formData.isUseable
-                      : equipment.isUseable
-                        ? "Ya"
-                        : "Tidak"
-                  }
-                  editable={isEditing}
-                  options={USEABLE_OPTIONS}
-                  onChange={(value) =>
-                    setFormData((prev) => ({ ...prev, isUseable: value }))
-                  }
-                />
                 {!isEditing ? (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-slate-700">Available</p>
@@ -543,7 +522,6 @@ export default function AdminEquipmentDetailDialog({
                       isMoveable: String(equipment.isMoveable),
                       isShareable: String(equipment.isShareable),
                       isBorrowable: String(equipment.isBorrowable),
-                      isUseable: String(equipment.isUseable),
                       description: equipment.description,
                     });
                   }}

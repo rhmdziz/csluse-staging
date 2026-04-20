@@ -7,7 +7,7 @@ export type { UserRow };
 export type LabClearanceActiveService = {
   id: string;
   code: string;
-  type: "borrow" | "booking" | "use" | "pengujian";
+  type: "borrow" | "booking" | "pengujian";
   label: string;
   status: string;
   startTime: string;
@@ -28,7 +28,6 @@ export type LabClearanceResult = {
     totalActive: number;
     borrowCount: number;
     bookingCount: number;
-    useCount: number;
     pengujianCount: number;
   };
 };
@@ -57,7 +56,6 @@ type ApiLabClearanceResponse = {
     total_active?: number | null;
     borrow_count?: number | null;
     booking_count?: number | null;
-    use_count?: number | null;
     pengujian_count?: number | null;
   } | null;
 };
@@ -87,7 +85,6 @@ function mapLabClearance(data: ApiLabClearanceResponse): LabClearanceResult {
       totalActive: Number(data.summary?.total_active ?? 0),
       borrowCount: Number(data.summary?.borrow_count ?? 0),
       bookingCount: Number(data.summary?.booking_count ?? 0),
-      useCount: Number(data.summary?.use_count ?? 0),
       pengujianCount: Number(data.summary?.pengujian_count ?? 0),
     },
   };

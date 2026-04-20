@@ -1,7 +1,7 @@
 "use client";
 
 
-import { ChevronDown, Download, FileSpreadsheet, Share2, BookOpen, Wrench, Trash2, X } from "lucide-react";
+import { ChevronDown, Download, FileSpreadsheet, Share2, BookOpen, Trash2, X } from "lucide-react";
 
 import {
   Button,
@@ -27,7 +27,6 @@ type InventoryBulkActionsProps = {
   onExportSelectedExcel: () => void;
   onSetShareable?: (value: boolean) => void;
   onSetBorrowable?: (value: boolean) => void;
-  onSetUseable?: (value: boolean) => void;
 };
 
 export default function InventoryBulkActions({
@@ -42,7 +41,6 @@ export default function InventoryBulkActions({
   onExportSelectedExcel,
   onSetShareable,
   onSetBorrowable,
-  onSetUseable,
 }: InventoryBulkActionsProps) {
   const isBusy = isDeleting || isBulkSettingFlag;
 
@@ -94,23 +92,7 @@ export default function InventoryBulkActions({
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         )}
-        {onSetUseable && (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger disabled={selectedCount === 0 || isBulkSettingFlag}>
-              <Wrench className="h-4 w-4" />
-              Tetapkan Useable
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-44">
-              <DropdownMenuItem onClick={() => onSetUseable(true)}>
-                Tandai sebagai Useable
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSetUseable(false)}>
-                Hapus Useable
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
-        {(onSetShareable || onSetBorrowable || onSetUseable) && <DropdownMenuSeparator />}
+        {(onSetShareable || onSetBorrowable) && <DropdownMenuSeparator />}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger disabled={selectedCount === 0 || isExportingSelectedPdf || isExportingSelectedExcel}>
             <Download className="h-4 w-4" />

@@ -1,4 +1,4 @@
-# Panduan Validasi: Booking, Peminjaman Alat, dan Penggunaan Alat
+# Panduan Validasi: Booking, Peminjaman Alat, dan Pengujian Sampel
 
 Dokumen ini dibagi dua bagian:
 - **Bagian 1 — Pemohon:** aturan yang berlaku saat mengisi dan mengirim pengajuan
@@ -53,28 +53,6 @@ Untuk setiap alat yang ditambahkan:
 
 ---
 
-## Penggunaan Alat (Use)
-
-### Aturan Umum
-- Waktu selesai harus lebih besar dari waktu mulai
-
-### Jadwal & Ruangan
-Sistem akan **menolak** pengajuan jika:
-- Ruangan tempat alat berada sudah memiliki jadwal praktikum di waktu yang sama
-- Ada booking Praktikum/Workshop yang disetujui di ruangan yang sama pada waktu yang sama
-- Total pengguna ruangan (booking lain + penggunaan alat lain + pengajuan ini) melebihi kapasitas ruangan
-
-### Stok Alat
-- Jumlah yang diminta tidak boleh melebihi total stok alat
-- Jika alat **tidak shareable**: sistem mengecek apakah stok masih tersedia di rentang waktu tersebut — jika tidak mencukupi, pengajuan ditolak
-- Jika alat **shareable**: tidak ada pembatasan stok berdasarkan waktu
-
-> **Catatan stok:** Hanya alat yang sudah di-**approve** di pengajuan lain yang dihitung sebagai terpakai. Pengajuan yang masih Menunggu tidak mempengaruhi stok.
-
----
-
----
-
 # BAGIAN 2 — PANDUAN APPROVER
 ### *(Ditampilkan di review-check sebagai bahan pertimbangan sebelum menyetujui)*
 
@@ -120,59 +98,46 @@ Review-check akan menampilkan masalah jika:
 
 ---
 
-## Penggunaan Alat (Use)
+## Pengujian Sampel
 
 ### Kelengkapan Data
-Pastikan pengaju sudah mengisi:
-- **Nomor telepon** — wajib ada
-- **Dosen pembimbing** — wajib jika tujuan Skripsi/TA
+Pastikan pemohon sudah mengisi data inti pengujian secara lengkap, terutama identitas pemohon, detail sampel, dan layanan uji yang diminta.
 
-### Kondisi & Stok Alat
-Review-check akan menampilkan masalah jika:
-- Status alat bukan **"Available"**
-- Jumlah yang diminta melebihi total stok alat
-- Alat **tidak shareable** dan stok tidak mencukupi di rentang waktu yang diminta
-- Alat **shareable** → ditampilkan sebagai lolos, tidak ada pembatasan waktu
-
-### Jadwal & Ruangan
-Review-check akan menampilkan masalah jika:
-- Ruangan sudah memiliki jadwal praktikum di waktu yang sama
-- Ada booking Praktikum/Workshop yang disetujui di ruangan yang sama pada waktu yang sama
-- Total pengguna ruangan melebihi kapasitas
-
----
-
----
+### Tindak Lanjut Approver
+Periksa bahwa:
+- data sampel dan layanan uji konsisten dengan kebutuhan pengajuan
+- status pengajuan sesuai tahapan dokumen dan proses pembayaran
+- dokumen lanjutan seperti surat perjanjian, invoice, bukti bayar, dan surat hasil uji diunggah pada tahap yang tepat
 
 ## Ringkasan Perbandingan
 
 ### Validasi Pemohon (saat buat/edit pengajuan)
 
-| Aturan | Booking | Peminjaman | Penggunaan |
+| Aturan | Booking | Peminjaman | Pengujian |
 |---|:---:|:---:|:---:|
-| Waktu selesai > waktu mulai | Ya | Ya | Ya |
+| Waktu selesai > waktu mulai | Ya | Ya | - |
 | Jumlah peserta > 0 | Ya | - | - |
-| Tidak melebihi kapasitas ruangan | Ya | - | Ya |
+| Tidak melebihi kapasitas ruangan | Ya | - | - |
 | Alat harus dari ruangan yang sama | Ya | - | - |
 | Alat harus berstatus bisa dipinjam | - | Ya | - |
-| Cek jadwal praktikum ruangan | Ya | - | Ya |
-| Cek booking eksklusif (Praktikum/Workshop) | Ya | - | Ya |
-| Cek stok alat (tidak shareable) | Ya | **Ya (semua)** | Ya |
-| Alat shareable bebas stok waktu | Ya | **Tidak** | Ya |
+| Cek jadwal praktikum ruangan | Ya | - | - |
+| Cek booking eksklusif (Praktikum/Workshop) | Ya | - | - |
+| Cek stok alat (tidak shareable) | Ya | **Ya (semua)** | - |
+| Alat shareable bebas stok waktu | Ya | **Tidak** | - |
 
 ### Review-Check Approver (bahan pertimbangan)
 
-| Hal yang Dicek | Booking | Peminjaman | Penggunaan |
+| Hal yang Dicek | Booking | Peminjaman | Pengujian |
 |---|:---:|:---:|:---:|
-| Nomor telepon diisi | Ya | Ya | Ya |
-| Dosen pembimbing (Skripsi/TA) | Ya | Ya | Ya |
+| Nomor telepon diisi | Ya | Ya | sesuai kebutuhan data pemohon |
+| Dosen pembimbing (Skripsi/TA) | Ya | Ya | sesuai kebutuhan flow |
 | Nama peserta (> 1 orang) | Ya | - | - |
 | Data workshop lengkap | Ya | - | - |
-| Status alat harus Available | - | Ya | Ya |
-| Cek jadwal & booking eksklusif | Ya | - | Ya |
-| Kapasitas ruangan | Ya | - | Ya |
-| Cek stok alat (tidak shareable) | Ya | **Ya (semua)** | Ya |
-| Alat shareable bebas stok waktu | Ya | **Tidak** | Ya |
+| Status alat harus Available | - | Ya | - |
+| Cek jadwal & booking eksklusif | Ya | - | - |
+| Kapasitas ruangan | Ya | - | - |
+| Cek stok alat (tidak shareable) | Ya | **Ya (semua)** | - |
+| Kelengkapan dokumen proses | - | - | Ya |
 
 ---
 

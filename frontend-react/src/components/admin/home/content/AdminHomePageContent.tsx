@@ -12,7 +12,6 @@ import {
   ShieldUser,
   Sparkles,
   Users,
-  Waypoints,
   Handshake,
   User,
 } from "lucide-react";
@@ -39,11 +38,9 @@ type AdminKpis = {
   totalBookings: number;
   totalBorrows: number;
   totalSampleTesting: number;
-  totalUseRequest: number;
   usersByRole: Record<string, number>;
   bookingsByStatus: Record<string, number>;
   borrowsByStatus: Record<string, number>;
-  usesByStatus: Record<string, number>;
   pengujiansByStatus: Record<string, number>;
 };
 
@@ -55,12 +52,10 @@ type AdminKpisResponse = {
   total_software?: number;
   total_bookings?: number;
   total_borrows?: number;
-  total_uses?: number;
   total_pengujians?: number;
   users_by_role?: Record<string, number>;
   bookings_by_status?: Record<string, number>;
   borrows_by_status?: Record<string, number>;
-  uses_by_status?: Record<string, number>;
   pengujians_by_status?: Record<string, number>;
 };
 
@@ -193,11 +188,9 @@ export default function Page() {
     totalBookings: 0,
     totalBorrows: 0,
     totalSampleTesting: 0,
-    totalUseRequest: 0,
     usersByRole: {},
     bookingsByStatus: {},
     borrowsByStatus: {},
-    usesByStatus: {},
     pengujiansByStatus: {},
   });
   const [isLoadingKpis, setIsLoadingKpis] = useState(true);
@@ -231,11 +224,9 @@ export default function Page() {
           totalBookings: payload.total_bookings ?? 0,
           totalBorrows: payload.total_borrows ?? 0,
           totalSampleTesting: payload.total_pengujians ?? 0,
-          totalUseRequest: payload.total_uses ?? 0,
           usersByRole: payload.users_by_role ?? {},
           bookingsByStatus: payload.bookings_by_status ?? {},
           borrowsByStatus: payload.borrows_by_status ?? {},
-          usesByStatus: payload.uses_by_status ?? {},
           pengujiansByStatus: payload.pengujians_by_status ?? {},
         });
       } catch (loadError) {
@@ -322,12 +313,6 @@ export default function Page() {
             value={isLoadingKpis ? "0" : String(kpis.totalBookings)}
             tone="bookings"
             statusBreakdown={isLoadingKpis ? undefined : kpis.bookingsByStatus}
-          />
-          <KpiCard
-            label="Penggunaan Alat"
-            value={isLoadingKpis ? "0" : String(kpis.totalUseRequest)}
-            tone="useRequest"
-            statusBreakdown={isLoadingKpis ? undefined : kpis.usesByStatus}
           />
           <KpiCard
             label="Peminjaman Alat"
@@ -461,8 +446,7 @@ type KpiTone =
   | "software"
   | "bookings"
   | "borrows"
-  | "sample-testing"
-  | "useRequest";
+  | "sample-testing";
 
 function getKpiIcon(tone: KpiTone) {
   if (tone === "users") return Users;
@@ -472,8 +456,7 @@ function getKpiIcon(tone: KpiTone) {
   if (tone === "software") return AppWindow;
   if (tone === "bookings") return CalendarCheck2;
   if (tone === "borrows") return Handshake;
-  if (tone === "sample-testing") return Sparkles;
-  return Waypoints;
+  return Sparkles;
 }
 
 function getKpiIconToneClass(tone: KpiTone) {
@@ -484,8 +467,7 @@ function getKpiIconToneClass(tone: KpiTone) {
   if (tone === "software") return "bg-fuchsia-100 text-fuchsia-700";
   if (tone === "bookings") return "bg-amber-100 text-amber-700";
   if (tone === "borrows") return "bg-rose-100 text-rose-700";
-  if (tone === "sample-testing") return "bg-cyan-100 text-cyan-700";
-  return "bg-indigo-100 text-indigo-700";
+  return "bg-cyan-100 text-cyan-700";
 }
 
 const STATUS_COLOR_MAP: Record<string, string> = {

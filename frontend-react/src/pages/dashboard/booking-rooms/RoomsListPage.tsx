@@ -80,7 +80,7 @@ export default function RoomsListPage() {
                         label="Lihat detail"
                         icon={<Eye className="h-3.5 w-3.5" />}
                         className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
-                        onClick={() => router.push(`/rooms/${room.id}`)}
+                        onClick={() => router.push(`/booking-rooms/rooms/${room.id}`)}
                       />
                       <TableActionIconButton
                         type="button"

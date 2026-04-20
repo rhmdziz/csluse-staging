@@ -17,7 +17,6 @@ router.register(r'calendar', views.CalendarViewSet, basename='calendar')
 router.register(r'dashboard-overview', views.DashboardOverviewViewSet, basename='dashboard-overview')
 router.register(r'faqs', views.FAQViewSet, basename='faqs')
 router.register(r'pengujians', views.PengujianViewSet, basename='pengujians')
-router.register(r'uses', views.UseViewSet, basename='uses')
 router.register(r'notifications', views.NotificationViewSet, basename='notifications')
 
 urlpatterns = [

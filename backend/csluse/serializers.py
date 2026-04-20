@@ -23,7 +23,6 @@ from .models import (
     Room,
     Schedule,
     Software,
-    Use,
 )
 
 
@@ -314,7 +313,6 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "is_moveable",
             "is_shareable",
             "is_borrowable",
-            "is_useable",
         ]
 
 
@@ -345,7 +343,6 @@ class EquipmentListSerializer(serializers.ModelSerializer):
             "is_moveable",
             "is_shareable",
             "is_borrowable",
-            "is_useable",
         ]
 
 
@@ -360,7 +357,6 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
             "quantity",
             "room_detail",
             "is_borrowable",
-            "is_useable",
         ]
 
 
@@ -608,10 +604,6 @@ class NotificationSerializer(serializers.ModelSerializer):
         if borrow is not None:
             return f"/borrow-equipment/{borrow}"
 
-        use = Use.objects.filter(code=identifier).values_list("id", flat=True).first()
-        if use is not None:
-            return f"/use-equipment/{use}"
-
         pengujian = Pengujian.objects.filter(code=identifier).values_list("id", flat=True).first()
         if pengujian is not None:
             return "/sample-testing"
@@ -830,18 +822,12 @@ class BookingSerializer(serializers.ModelSerializer):
                 total_approved = overlapping_approved.aggregate(
                     total=Sum("attendee_count")
                 )["total"] or 0
-                use_count_in_room = Use.objects.filter(
-                    equipment__room=room,
-                    status="Approved",
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                ).count()
-                if total_approved + use_count_in_room + attendee_count > room.capacity:
+                if total_approved + attendee_count > room.capacity:
                     raise serializers.ValidationError(
                         {
                             "non_field_errors": [
                                 f"Total peserta melebihi kapasitas ruangan ({room.capacity} orang) "
-                                f"jika digabung dengan booking dan penggunaan alat lain yang sudah disetujui pada waktu yang sama."
+                                f"jika digabung dengan booking lain yang sudah disetujui pada waktu yang sama."
                             ]
                         }
                     )
@@ -873,7 +859,7 @@ class BookingSerializer(serializers.ModelSerializer):
                     {"equipment_items": f"Jumlah {equipment.name} melebihi stok tersedia ({equipment.quantity})."}
                 )
 
-            # Time-overlap stock check: account for concurrent Booking/Use/Borrow allocations
+            # Time-overlap stock check: account for concurrent booking/borrow allocations
             if start_time and end_time and not equipment.is_shareable:
                 booking_allocated = (
                     Booking.objects.filter(
@@ -885,15 +871,6 @@ class BookingSerializer(serializers.ModelSerializer):
                     .exclude(pk=instance.pk if instance else None)
                     .aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
                 )
-                use_allocated = (
-                    Use.objects.filter(
-                        equipment_id=equipment.id,
-                        status__in=["Approved"],
-                        start_time__lt=end_time,
-                        end_time__gt=start_time,
-                    )
-                    .aggregate(total=Sum("quantity"))["total"] or 0
-                )
                 borrow_allocated = (
                     Borrow.objects.filter(
                         equipment_id=equipment.id,
@@ -903,7 +880,7 @@ class BookingSerializer(serializers.ModelSerializer):
                     )
                     .aggregate(total=Sum("quantity"))["total"] or 0
                 )
-                allocated = booking_allocated + use_allocated + borrow_allocated
+                allocated = booking_allocated + borrow_allocated
                 remaining = max(equipment.quantity - allocated, 0)
                 if quantity > remaining:
                     raise serializers.ValidationError(
@@ -1228,14 +1205,6 @@ class BorrowSerializer(serializers.ModelSerializer):
                     end_time__gt=start_time,
                 ).aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
             )
-            use_allocated = (
-                Use.objects.filter(
-                    equipment_id=equipment.id,
-                    status__in=["Approved"],
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                ).aggregate(total=Sum("quantity"))["total"] or 0
-            )
             borrow_allocated = (
                 Borrow.objects.filter(
                     equipment_id=equipment.id,
@@ -1245,7 +1214,7 @@ class BorrowSerializer(serializers.ModelSerializer):
                 ).exclude(pk=instance.pk if instance else None)
                 .aggregate(total=Sum("quantity"))["total"] or 0
             )
-            allocated = booking_allocated + use_allocated + borrow_allocated
+            allocated = booking_allocated + borrow_allocated
             remaining = max(equipment.quantity - allocated, 0)
             if quantity > remaining:
                 raise serializers.ValidationError(
@@ -1555,272 +1524,6 @@ class PengujianListSerializer(serializers.ModelSerializer):
 # endregion Sample Testing Serializers
 
 
-# region Equipment Use Serializers
-
-
-# region Equipment Use Main Serializers
-
-
-class UseSerializer(serializers.ModelSerializer):
-    requested_by_detail = ProfileSerializer(source="requested_by", read_only=True)
-    approved_by_detail = ProfileSerializer(source="approved_by", read_only=True)
-    requester_mentor_profile = serializers.PrimaryKeyRelatedField(
-        queryset=Profile.objects.filter(role__iexact="Lecturer", is_mentor=True),
-        required=False,
-        allow_null=True,
-    )
-    requester_mentor_profile_detail = ProfileSerializer(
-        source="requester_mentor_profile",
-        read_only=True,
-    )
-    equipment_detail = EquipmentSerializer(source="equipment", read_only=True)
-
-    def validate(self, attrs):
-        instance = getattr(self, "instance", None)
-        start_time = attrs.get("start_time", getattr(instance, "start_time", None))
-        end_time = attrs.get("end_time", getattr(instance, "end_time", None))
-        next_status = attrs.get("status", getattr(instance, "status", "Pending"))
-        rejection_note = attrs.get("rejection_note", getattr(instance, "rejection_note", None))
-        attrs = _apply_requester_mentor_rules(self, attrs)
-
-        if instance is None:
-            if attrs.get("status") not in (None, "Pending"):
-                raise serializers.ValidationError(
-                    {"status": "Status penggunaan alat hanya boleh di-set melalui action endpoint khusus."}
-                )
-            if attrs.get("approved_by") is not None:
-                raise serializers.ValidationError(
-                    {"approved_by": "approved_by tidak boleh diisi saat create."}
-                )
-        else:
-            if "status" in attrs:
-                if not self.context.get("allow_status_transition"):
-                    raise serializers.ValidationError(
-                        {"status": "Gunakan action status penggunaan alat yang spesifik untuk mengubah status."}
-                    )
-                allowed_next_status = self.context.get("allowed_next_status")
-                if allowed_next_status and attrs["status"] != allowed_next_status:
-                    raise serializers.ValidationError(
-                        {"status": f"Transisi status hanya boleh menuju {allowed_next_status}."}
-                    )
-
-            if "approved_by" in attrs:
-                raise serializers.ValidationError(
-                    {"approved_by": "approved_by tidak boleh diubah langsung."}
-                )
-            current_purpose = attrs.get("purpose") or (instance.purpose if instance else None)
-            if not self.context.get("allow_mentor_transition"):
-                if "is_approved_by_mentor" in attrs:
-                    if current_purpose == "Skripsi/TA":
-                        raise serializers.ValidationError(
-                            {"is_approved_by_mentor": "Status approval dosen pembimbing tidak boleh diubah langsung."}
-                        )
-                    else:
-                        attrs.pop("is_approved_by_mentor")
-                if "mentor_approved_at" in attrs:
-                    if current_purpose == "Skripsi/TA":
-                        raise serializers.ValidationError(
-                            {"mentor_approved_at": "mentor_approved_at tidak boleh diubah langsung."}
-                        )
-                    else:
-                        attrs.pop("mentor_approved_at")
-
-            if instance.status != "Pending" and not self.context.get("allow_status_transition"):
-                raise serializers.ValidationError(
-                    {
-                        "non_field_errors": [
-                            "Penggunaan alat yang sudah diproses tidak dapat diubah langsung."
-                        ]
-                    }
-                )
-
-        if next_status == "Approved":
-            effective_deadline = end_time or start_time
-            if effective_deadline and effective_deadline <= timezone.now():
-                raise serializers.ValidationError(
-                    {
-                        "non_field_errors": [
-                            "Pengajuan penggunaan alat ini sudah melewati waktu yang diminta dan tidak dapat disetujui."
-                        ]
-                    }
-                )
-
-        if next_status == "Rejected" and not str(rejection_note or "").strip():
-            raise serializers.ValidationError(
-                {"rejection_note": "Alasan penolakan wajib diisi."}
-            )
-
-        if next_status in {"Pending", "Approved"} and start_time and end_time:
-            equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
-            room = getattr(equipment, "room", None) if equipment else None
-            if room and not self.context.get("allow_status_transition"):
-                overlapping_schedules = Schedule.objects.filter(
-                    room=room,
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                )
-                if overlapping_schedules.exists():
-                    raise serializers.ValidationError(
-                        {
-                            "non_field_errors": [
-                                "Ruangan sudah memiliki jadwal praktikum pada rentang waktu tersebut."
-                            ]
-                        }
-                    )
-
-                EXCLUSIVE_PURPOSES = {"Praktikum", "Workshop"}
-                blocking_bookings = Booking.objects.filter(
-                    room=room,
-                    status="Approved",
-                    purpose__in=EXCLUSIVE_PURPOSES,
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                )
-                if blocking_bookings.exists():
-                    raise serializers.ValidationError(
-                        {
-                            "non_field_errors": [
-                                "Ruangan sudah memiliki booking Praktikum/Workshop yang disetujui pada rentang waktu tersebut."
-                            ]
-                        }
-                    )
-
-            if room:
-                total_booking_attendees = (
-                    Booking.objects.filter(
-                        room=room,
-                        status="Approved",
-                        start_time__lt=end_time,
-                        end_time__gt=start_time,
-                    ).aggregate(total=Sum("attendee_count"))["total"] or 0
-                )
-                total_use_count = (
-                    Use.objects.filter(
-                        equipment__room=room,
-                        status="Approved",
-                        start_time__lt=end_time,
-                        end_time__gt=start_time,
-                    ).exclude(pk=instance.pk if instance else None).count()
-                )
-                if total_booking_attendees + total_use_count + 1 > room.capacity:
-                    raise serializers.ValidationError(
-                        {
-                            "non_field_errors": [
-                                f"Total pengguna ruangan melebihi kapasitas ({room.capacity} orang) "
-                                f"jika digabung dengan booking dan penggunaan alat lain yang sudah disetujui."
-                            ]
-                        }
-                    )
-
-        equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
-        quantity = attrs.get("quantity", getattr(instance, "quantity", 0))
-        if equipment is not None and start_time and end_time and not getattr(equipment, "is_shareable", False):
-            if quantity > equipment.quantity:
-                raise serializers.ValidationError(
-                    {"quantity": f"Jumlah melebihi stok tersedia ({equipment.quantity})."}
-                )
-            booking_allocated = (
-                Booking.objects.filter(
-                    equipment_items__equipment_id=equipment.id,
-                    status__in=["Approved"],
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                ).aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
-            )
-            use_allocated = (
-                Use.objects.filter(
-                    equipment_id=equipment.id,
-                    status__in=["Approved"],
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                ).exclude(pk=instance.pk if instance else None)
-                .aggregate(total=Sum("quantity"))["total"] or 0
-            )
-            borrow_allocated = (
-                Borrow.objects.filter(
-                    equipment_id=equipment.id,
-                    status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
-                    start_time__lt=end_time,
-                    end_time__gt=start_time,
-                ).aggregate(total=Sum("quantity"))["total"] or 0
-            )
-            allocated = booking_allocated + use_allocated + borrow_allocated
-            remaining = max(equipment.quantity - allocated, 0)
-            if quantity > remaining:
-                raise serializers.ValidationError(
-                    {
-                        "quantity": (
-                            f"Stok {equipment.name} tidak mencukupi pada rentang waktu yang dipilih. "
-                            f"Stok total {equipment.quantity}, sudah teralokasi {allocated} unit "
-                            f"(sisa {remaining} unit)."
-                        )
-                    }
-                )
-
-        return attrs
-
-    class Meta:
-        model = Use
-        fields = "__all__"
-        read_only_fields = [
-            "requested_by",
-            "code",
-            "approved_by",
-            "is_approved_by_mentor",
-            "mentor_approved_at",
-        ]
-
-
-# endregion Equipment Use Main Serializers
-
-
-# region Equipment Use List Serializers
-
-
-class UseListSerializer(serializers.ModelSerializer):
-    requested_by_detail = RecordProfileListSerializer(source="requested_by", read_only=True)
-    approved_by_detail = RecordProfileListSerializer(source="approved_by", read_only=True)
-    requester_mentor_profile_detail = RecordProfileListSerializer(
-        source="requester_mentor_profile",
-        read_only=True,
-    )
-    equipment_detail = RecordEquipmentWithRoomSerializer(source="equipment", read_only=True)
-
-    class Meta:
-        model = Use
-        fields = [
-            "id",
-            "code",
-            "quantity",
-            "start_time",
-            "end_time",
-            "purpose",
-            "note",
-            "requester_phone",
-            "requester_mentor",
-            "requester_mentor_profile_detail",
-            "institution",
-            "institution_address",
-            "status",
-            "is_approved_by_mentor",
-            "requested_by_detail",
-            "approved_by_detail",
-            "mentor_approved_at",
-            "approved_at",
-            "rejected_at",
-            "rejection_note",
-            "expired_at",
-            "completed_at",
-            "equipment_detail",
-            "created_at",
-            "updated_at",
-        ]
-
-
-# endregion Equipment Use List Serializers
-
-
-# endregion Equipment Use Serializers
 
 
 # region Dashboard Overview Serializers
@@ -1865,63 +1568,6 @@ class DashboardOverviewSerializer(serializers.Serializer):
 
 
 # region Utilities
-
-
-def _resolve_requester_profile(serializer_instance):
-    request = serializer_instance.context.get("request")
-    request_user = getattr(request, "user", None)
-    request_profile = getattr(request_user, "profile", None)
-    if request_profile is not None:
-        return request_profile
-    instance = getattr(serializer_instance, "instance", None)
-    return getattr(instance, "requested_by", None)
-
-
-def _apply_requester_mentor_rules(serializer_instance, attrs):
-    purpose = attrs.get("purpose", getattr(serializer_instance.instance, "purpose", "Other"))
-    requester_profile = _resolve_requester_profile(serializer_instance)
-    mentor_profile = attrs.get(
-        "requester_mentor_profile",
-        getattr(serializer_instance.instance, "requester_mentor_profile", None),
-    )
-    is_internal_requester = (
-        requester_profile is not None
-        and str(getattr(requester_profile, "role", "") or "").strip().lower() != "guest"
-    )
-
-    if purpose != "Skripsi/TA":
-        attrs["requester_mentor"] = None
-        attrs["requester_mentor_profile"] = None
-        attrs["is_approved_by_mentor"] = False
-        attrs["mentor_approved_at"] = None
-        return attrs
-
-    if not is_internal_requester:
-        attrs["requester_mentor"] = None
-        attrs["requester_mentor_profile"] = None
-        attrs["is_approved_by_mentor"] = False
-        attrs["mentor_approved_at"] = None
-        return attrs
-
-    if mentor_profile is None:
-        raise serializers.ValidationError(
-            {"requester_mentor_profile": "Dosen pembimbing wajib dipilih untuk tujuan Skripsi/TA."}
-        )
-
-    if (
-        str(getattr(mentor_profile, "role", "") or "").strip().lower() != "lecturer"
-        or not bool(getattr(mentor_profile, "is_mentor", False))
-    ):
-        raise serializers.ValidationError(
-            {"requester_mentor_profile": "User yang dipilih harus lecturer yang terdaftar sebagai dosen pembimbing."}
-        )
-
-    attrs["requester_mentor"] = (
-        str(getattr(mentor_profile, "full_name", "") or "").strip()
-        or getattr(getattr(mentor_profile, "user", None), "email", None)
-        or None
-    )
-    return attrs
 
 
 # endregion Utilities

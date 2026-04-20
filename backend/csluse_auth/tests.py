@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from csluse.models import Booking, Borrow, Equipment, Pengujian, Room, Use
+from csluse.models import Booking, Borrow, Equipment, Pengujian, Room
 from csluse_auth.models import Profile
 from csluse_auth.permissions import ADMINISTRATOR, SUPER_ADMINISTRATOR, assign_role
 
@@ -324,12 +324,6 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
             start_time=start_time,
             end_time=end_time + timedelta(days=1),
         )
-        Use.objects.create(
-            requested_by=requester.profile,
-            equipment=equipment,
-            quantity=1,
-            start_time=start_time,
-        )
         Pengujian.objects.create(
             name="Sample Request",
             email="sample@example.com",
@@ -337,7 +331,7 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
             requested_by=requester.profile,
         )
 
-    def test_admin_dashboard_kpis_include_use_and_pengujian_totals(self):
+    def test_admin_dashboard_kpis_include_pengujian_totals(self):
         response = self.client.get("/api/admin/dashboard/kpis/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -345,5 +339,4 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["total_equipments"], 1)
         self.assertEqual(response.data["total_bookings"], 1)
         self.assertEqual(response.data["total_borrows"], 1)
-        self.assertEqual(response.data["total_uses"], 1)
         self.assertEqual(response.data["total_pengujians"], 1)

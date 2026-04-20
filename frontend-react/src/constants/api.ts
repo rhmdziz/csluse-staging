@@ -94,18 +94,6 @@ const API_BORROW_REVIEW_CHECK = (id: string | number) =>
   `${API_BORROWS}${id}/review-check/`;
 const API_BORROWS_BY_MONTH = `${API_BORROWS}by-month/`;
 
-// REGION: Uses API Endpoints
-const API_USES = `${API_BASE_URL}/uses/`;
-const API_USES_MY = `${API_USES}my/`;
-const API_USES_ALL = `${API_USES}all/`;
-const API_USES_EXPORT = `${API_USES}all/export/`;
-const API_USES_ALL_REQUESTERS = `${API_USES}all/requesters/`;
-const API_USES_BULK_DELETE = `${API_USES}bulk-delete/`;
-const API_USE_DETAIL = (id: string | number) => `${API_USES}${id}/`;
-const API_USE_APPROVE = (id: string | number) => `${API_USES}${id}/approve/`;
-const API_USE_REJECT = (id: string | number) => `${API_USES}${id}/reject/`;
-const API_USE_COMPLETE = (id: string | number) => `${API_USES}${id}/complete/`;
-const API_USE_REVIEW_CHECK = (id: string | number) => `${API_USES}${id}/review-check/`;
 
 // REGION: Pengujians API Endpoints
 const API_PENGUJIANS = `${API_BASE_URL}/pengujians/`;
@@ -134,7 +122,6 @@ const API_EQUIPMENTS_BULK_CREATE = `${API_EQUIPMENTS}bulk-create/`;
 const API_EQUIPMENTS_BULK_DELETE = `${API_EQUIPMENTS}bulk-delete/`;
 const API_EQUIPMENTS_BULK_SET_SHAREABLE = `${API_EQUIPMENTS}bulk-set-shareable/`;
 const API_EQUIPMENTS_BULK_SET_BORROWABLE = `${API_EQUIPMENTS}bulk-set-borrowable/`;
-const API_EQUIPMENTS_BULK_SET_USEABLE = `${API_EQUIPMENTS}bulk-set-useable/`;
 const API_EQUIPMENT_DETAIL = (id: string | number) =>
   `${API_EQUIPMENTS}${id}/`;
 const API_EQUIPMENT_AVAILABILITY = (id: string | number) =>
@@ -246,17 +233,6 @@ export {
   API_BORROW_RETURN,
   API_BORROW_REVIEW_CHECK,
   API_BORROWS_BY_MONTH,
-  API_USES,
-  API_USES_MY,
-  API_USES_ALL,
-  API_USES_EXPORT,
-  API_USES_ALL_REQUESTERS,
-  API_USES_BULK_DELETE,
-  API_USE_DETAIL,
-  API_USE_APPROVE,
-  API_USE_REJECT,
-  API_USE_COMPLETE,
-  API_USE_REVIEW_CHECK,
   API_PENGUJIANS,
   API_PENGUJIANS_MY,
   API_PENGUJIANS_ALL,
@@ -276,7 +252,6 @@ export {
   API_EQUIPMENTS_BULK_DELETE,
   API_EQUIPMENTS_BULK_SET_SHAREABLE,
   API_EQUIPMENTS_BULK_SET_BORROWABLE,
-  API_EQUIPMENTS_BULK_SET_USEABLE,
   API_EQUIPMENT_DETAIL,
   API_EQUIPMENT_AVAILABILITY,
   API_MATERIALS,
