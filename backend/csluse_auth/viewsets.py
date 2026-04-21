@@ -4,7 +4,7 @@ from allauth.account.models import EmailAddress
 from django.contrib.admin.models import CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -13,12 +13,13 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room, Software, Use
+from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room, Software
 from csluse.viewsets import DefaultPagination
 
 from .audit import log_admin_action
 from .models import Profile
 from .permissions import (
+    ADMINISTRATOR,
     SUPER_ADMINISTRATOR,
     IsAdministratorOrAbove,
     IsStaffOrAbove,
@@ -362,6 +363,15 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
     def dropdown(self, request):
         queryset = (
             self.get_queryset()
+            .order_by("profile__full_name", "email")
+        )
+        serializer = PicUserDropdownSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="assigned-dropdown")
+    def assigned_dropdown(self, request):
+        queryset = (
+            self.get_queryset()
             .filter(profile__rooms_as_pic__isnull=False)
             .distinct()
             .order_by("profile__full_name", "email")
@@ -442,7 +452,17 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
     http_method_names = ["get"]
 
     def get_queryset(self):
-        return LogEntry.objects.select_related("user", "content_type").order_by("-action_time")
+        admin_actor_filter = (
+            Q(user__is_superuser=True)
+            | Q(user__groups__name=ADMINISTRATOR)
+            | Q(user__groups__name=SUPER_ADMINISTRATOR)
+        )
+        return (
+            LogEntry.objects.select_related("user", "content_type")
+            .filter(admin_actor_filter)
+            .distinct()
+            .order_by("-action_time")
+        )
 
     @action(detail=False, methods=["get"], url_path="recent")
     def recent(self, request):
@@ -478,7 +498,6 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             "total_software": Software.objects.count(),
             "total_bookings": Booking.objects.count(),
             "total_borrows": Borrow.objects.count(),
-            "total_uses": Use.objects.count(),
             "total_pengujians": Pengujian.objects.count(),
             "users_by_role": {
                 row["role"]: row["n"]
@@ -486,7 +505,6 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             },
             "bookings_by_status": _status_breakdown(Booking),
             "borrows_by_status": _status_breakdown(Borrow),
-            "uses_by_status": _status_breakdown(Use),
             "pengujians_by_status": _status_breakdown(Pengujian),
         }
         return Response(data)
@@ -512,7 +530,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
 
         ACTIVE_BORROW_STATUSES = ["Pending", "Approved", "Borrowed", "Returned Pending Inspection", "Overdue"]
         ACTIVE_BOOKING_STATUSES = ["Pending", "Approved"]
-        ACTIVE_USE_STATUSES = ["Pending", "Approved"]
         ACTIVE_PENGUJIAN_STATUSES = ["Pending", "Approved", "Diproses", "Menunggu Pembayaran"]
 
         active_services = []
@@ -543,19 +560,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
                 "end_time": bk.end_time,
             })
 
-        for u in Use.objects.select_related("equipment").filter(
-            requested_by=profile, status__in=ACTIVE_USE_STATUSES
-        ):
-            active_services.append({
-                "id": u.id,
-                "code": u.code,
-                "type": "use",
-                "label": u.equipment.name if u.equipment else "-",
-                "status": u.status,
-                "start_time": u.start_time,
-                "end_time": u.end_time,
-            })
-
         for p in Pengujian.objects.filter(
             requested_by=profile, status__in=ACTIVE_PENGUJIAN_STATUSES
         ):
@@ -571,7 +575,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
 
         borrow_count = sum(1 for s in active_services if s["type"] == "borrow")
         booking_count = sum(1 for s in active_services if s["type"] == "booking")
-        use_count = sum(1 for s in active_services if s["type"] == "use")
         pengujian_count = sum(1 for s in active_services if s["type"] == "pengujian")
 
         data = {
@@ -588,7 +591,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
                 "total_active": len(active_services),
                 "borrow_count": borrow_count,
                 "booking_count": booking_count,
-                "use_count": use_count,
                 "pengujian_count": pengujian_count,
             },
         }

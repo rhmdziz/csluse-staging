@@ -35,6 +35,7 @@ const API_AUTH_USERS_EXPORT = `${API_AUTH_USERS}export/`;
 const API_AUTH_USERS_BULK_DELETE = `${API_AUTH_USERS}bulk-delete/`;
 const API_AUTH_PIC_USERS = `${API_ADMIN_BASE}/pic-users/`;
 const API_AUTH_PIC_USERS_DROPDOWN = `${API_AUTH_PIC_USERS}dropdown/`;
+const API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN = `${API_AUTH_PIC_USERS}assigned-dropdown/`;
 const API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS = `${API_AUTH_PIC_USERS}bulk-remove-assignments/`;
 const API_AUTH_PIC_USER_REMOVE_ASSIGNMENTS = (id: string | number) =>
   `${API_AUTH_PIC_USERS}${id}/remove-assignments/`;
@@ -62,6 +63,8 @@ const API_BOOKING_REJECT = (id: string | number) =>
   `${API_BOOKINGS}${id}/reject/`;
 const API_BOOKING_COMPLETE = (id: string | number) =>
   `${API_BOOKINGS}${id}/complete/`;
+const API_BOOKING_CANCEL = (id: string | number) =>
+  `${API_BOOKINGS}${id}/cancel/`;
 const API_BOOKING_REVIEW_CHECK = (id: string | number) =>
   `${API_BOOKINGS}${id}/review-check/`;
 const API_BOOKINGS_BY_MONTH = `${API_BOOKINGS}by-month/`;
@@ -78,6 +81,8 @@ const API_BORROW_APPROVE = (id: string | number) =>
   `${API_BORROWS}${id}/approve/`;
 const API_BORROW_REJECT = (id: string | number) =>
   `${API_BORROWS}${id}/reject/`;
+const API_BORROW_CANCEL = (id: string | number) =>
+  `${API_BORROWS}${id}/cancel/`;
 const API_BORROW_HANDOVER = (id: string | number) =>
   `${API_BORROWS}${id}/handover/`;
 const API_BORROW_RECEIVE_RETURN = (id: string | number) =>
@@ -94,18 +99,6 @@ const API_BORROW_REVIEW_CHECK = (id: string | number) =>
   `${API_BORROWS}${id}/review-check/`;
 const API_BORROWS_BY_MONTH = `${API_BORROWS}by-month/`;
 
-// REGION: Uses API Endpoints
-const API_USES = `${API_BASE_URL}/uses/`;
-const API_USES_MY = `${API_USES}my/`;
-const API_USES_ALL = `${API_USES}all/`;
-const API_USES_EXPORT = `${API_USES}all/export/`;
-const API_USES_ALL_REQUESTERS = `${API_USES}all/requesters/`;
-const API_USES_BULK_DELETE = `${API_USES}bulk-delete/`;
-const API_USE_DETAIL = (id: string | number) => `${API_USES}${id}/`;
-const API_USE_APPROVE = (id: string | number) => `${API_USES}${id}/approve/`;
-const API_USE_REJECT = (id: string | number) => `${API_USES}${id}/reject/`;
-const API_USE_COMPLETE = (id: string | number) => `${API_USES}${id}/complete/`;
-const API_USE_REVIEW_CHECK = (id: string | number) => `${API_USES}${id}/review-check/`;
 
 // REGION: Pengujians API Endpoints
 const API_PENGUJIANS = `${API_BASE_URL}/pengujians/`;
@@ -121,10 +114,16 @@ const API_PENGUJIAN_APPROVE = (id: string | number) =>
   `${API_PENGUJIANS}${id}/approve/`;
 const API_PENGUJIAN_REJECT = (id: string | number) =>
   `${API_PENGUJIANS}${id}/reject/`;
+const API_PENGUJIAN_CANCEL = (id: string | number) =>
+  `${API_PENGUJIANS}${id}/cancel/`;
 const API_PENGUJIAN_COMPLETE = (id: string | number) =>
   `${API_PENGUJIANS}${id}/complete/`;
 const API_PENGUJIAN_UPLOAD_DOCUMENT = (id: string | number) =>
   `${API_PENGUJIANS}${id}/documents/upload/`;
+const API_PENGUJIAN_DELETE_DOCUMENT = (
+  id: string | number,
+  documentType: string,
+) => `${API_PENGUJIANS}${id}/documents/delete/${documentType}/`;
 
 // REGION: Equipments API Endpoints
 const API_EQUIPMENTS = `${API_BASE_URL}/equipments/`;
@@ -134,7 +133,6 @@ const API_EQUIPMENTS_BULK_CREATE = `${API_EQUIPMENTS}bulk-create/`;
 const API_EQUIPMENTS_BULK_DELETE = `${API_EQUIPMENTS}bulk-delete/`;
 const API_EQUIPMENTS_BULK_SET_SHAREABLE = `${API_EQUIPMENTS}bulk-set-shareable/`;
 const API_EQUIPMENTS_BULK_SET_BORROWABLE = `${API_EQUIPMENTS}bulk-set-borrowable/`;
-const API_EQUIPMENTS_BULK_SET_USEABLE = `${API_EQUIPMENTS}bulk-set-useable/`;
 const API_EQUIPMENT_DETAIL = (id: string | number) =>
   `${API_EQUIPMENTS}${id}/`;
 const API_EQUIPMENT_AVAILABILITY = (id: string | number) =>
@@ -181,6 +179,15 @@ const API_NOTIFICATIONS = `${API_BASE_URL}/notifications/`;
 const API_FAQS = `${API_BASE_URL}/faqs/`;
 const API_FAQS_BULK_DELETE = `${API_FAQS}bulk-delete/`;
 
+const API_SURAT_BEBAS_LAB = `${API_BASE_URL}/surat-bebas-lab/`;
+const API_SURAT_BEBAS_LAB_MY = `${API_SURAT_BEBAS_LAB}my/`;
+const API_SURAT_BEBAS_LAB_ALL = `${API_SURAT_BEBAS_LAB}all/`;
+const API_SURAT_BEBAS_LAB_DETAIL = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/`;
+const API_SURAT_BEBAS_LAB_DELETE_DOCUMENT = (id: string, documentType: string) =>
+  `${API_SURAT_BEBAS_LAB}${id}/documents/delete/${documentType}/`;
+const API_SURAT_BEBAS_LAB_APPROVE = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/approve/`;
+const API_SURAT_BEBAS_LAB_REJECT = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/reject/`;
+
 export {
   API_BASE_URL,
   API_AUTH_BASE,
@@ -204,6 +211,7 @@ export {
   API_AUTH_USERS,
   API_AUTH_USERS_EXPORT,
   API_AUTH_USERS_BULK_DELETE,
+  API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN,
   API_AUTH_PIC_USERS,
   API_AUTH_PIC_USERS_DROPDOWN,
   API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS,
@@ -227,6 +235,7 @@ export {
   API_BOOKING_APPROVE,
   API_BOOKING_REJECT,
   API_BOOKING_COMPLETE,
+  API_BOOKING_CANCEL,
   API_BOOKING_REVIEW_CHECK,
   API_BOOKINGS_BY_MONTH,
   API_BORROWS,
@@ -238,6 +247,7 @@ export {
   API_BORROW_DETAIL,
   API_BORROW_APPROVE,
   API_BORROW_REJECT,
+  API_BORROW_CANCEL,
   API_BORROW_HANDOVER,
   API_BORROW_RECEIVE_RETURN,
   API_BORROW_FINALIZE_RETURN,
@@ -246,17 +256,6 @@ export {
   API_BORROW_RETURN,
   API_BORROW_REVIEW_CHECK,
   API_BORROWS_BY_MONTH,
-  API_USES,
-  API_USES_MY,
-  API_USES_ALL,
-  API_USES_EXPORT,
-  API_USES_ALL_REQUESTERS,
-  API_USES_BULK_DELETE,
-  API_USE_DETAIL,
-  API_USE_APPROVE,
-  API_USE_REJECT,
-  API_USE_COMPLETE,
-  API_USE_REVIEW_CHECK,
   API_PENGUJIANS,
   API_PENGUJIANS_MY,
   API_PENGUJIANS_ALL,
@@ -267,8 +266,10 @@ export {
   API_PENGUJIAN_DETAIL,
   API_PENGUJIAN_APPROVE,
   API_PENGUJIAN_REJECT,
+  API_PENGUJIAN_CANCEL,
   API_PENGUJIAN_COMPLETE,
   API_PENGUJIAN_UPLOAD_DOCUMENT,
+  API_PENGUJIAN_DELETE_DOCUMENT,
   API_EQUIPMENTS,
   API_EQUIPMENTS_DROPDOWN,
   API_EQUIPMENTS_EXPORT,
@@ -276,7 +277,6 @@ export {
   API_EQUIPMENTS_BULK_DELETE,
   API_EQUIPMENTS_BULK_SET_SHAREABLE,
   API_EQUIPMENTS_BULK_SET_BORROWABLE,
-  API_EQUIPMENTS_BULK_SET_USEABLE,
   API_EQUIPMENT_DETAIL,
   API_EQUIPMENT_AVAILABILITY,
   API_MATERIALS,
@@ -311,4 +311,11 @@ export {
   API_NOTIFICATIONS,
   API_FAQS,
   API_FAQS_BULK_DELETE,
+  API_SURAT_BEBAS_LAB,
+  API_SURAT_BEBAS_LAB_MY,
+  API_SURAT_BEBAS_LAB_ALL,
+  API_SURAT_BEBAS_LAB_DETAIL,
+  API_SURAT_BEBAS_LAB_DELETE_DOCUMENT,
+  API_SURAT_BEBAS_LAB_APPROVE,
+  API_SURAT_BEBAS_LAB_REJECT,
 };

@@ -4,9 +4,11 @@
 import { useState } from "react";
 
 import { ArrowLeft, ClipboardList, FlaskConical, UserRound } from "lucide-react";
+import { toast } from "sonner";
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 
+import { DeleteRequestConfirmDialog } from "@/components/dialogs";
 import { DashboardDetailReviewPanel } from "@/components/dashboard/layout";
 
 import {
@@ -20,7 +22,10 @@ import { RequestInformationCard, RequestProgressDialog, ProgressSteps } from "@/
 
 import { Button, Skeleton } from "@/components/ui";
 
-import { useSampleTestingDetail } from "@/hooks/sample-testing";
+import {
+  useSampleTestingDetail,
+  useUpdateSampleTestingStatus,
+} from "@/hooks/sample-testing";
 
 import { formatDateTimeWib } from "@/lib/date";
 
@@ -29,6 +34,7 @@ import { getSampleTestingProgressFlow } from "@/lib/request";
 import {
   getSampleTestingStatusDisplayLabel,
   getStatusBadgeClass,
+  normalizeStatus,
 } from "@/lib/request";
 
 function SampleTestingDetailSkeleton() {
@@ -44,7 +50,7 @@ function SampleTestingDetailSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -105,6 +111,9 @@ export default function SampleTestingDetailPage() {
   const sampleTestingId = Array.isArray(id) ? id[0] : id;
   const [reloadKey, setReloadKey] = useState(0);
   const [progressOpen, setProgressOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const { updateSampleTestingStatus, pendingAction } =
+    useUpdateSampleTestingStatus();
   const { sampleTesting: item, isLoading, error } = useSampleTestingDetail(
     sampleTestingId ?? null,
     reloadKey,
@@ -116,6 +125,8 @@ export default function SampleTestingDetailPage() {
   const backLabel = isApprovalPage
     ? "Kembali ke Daftar Pengajuan"
     : "Kembali ke Pengajuan Saya";
+  const canCancelSampleTesting =
+    !isApprovalPage && normalizeStatus(item?.status) === "approved";
 
   if (isLoading) return <SampleTestingDetailSkeleton />;
 
@@ -144,6 +155,17 @@ export default function SampleTestingDetailPage() {
       </section>
     );
   }
+
+  const handleCancelSampleTesting = async () => {
+    const result = await updateSampleTestingStatus(item.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success("Pengajuan pengujian sampel berhasil dibatalkan.");
+    setCancelOpen(false);
+    setReloadKey((prev) => prev + 1);
+  };
 
   return (
     <section className="space-y-4">
@@ -179,7 +201,7 @@ export default function SampleTestingDetailPage() {
       </div>
 
       {isApprovalPage ? (
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
           <div className="space-y-4">
             <SampleTestingDocumentsSection
               item={item}
@@ -244,6 +266,7 @@ export default function SampleTestingDetailPage() {
               status={item.status}
               onStatusClick={() => setProgressOpen(true)}
               approvedByName={item.approvedByName}
+              itemGridClassName="md:grid-cols-[124px_minmax(0,1fr)]"
             >
               <SampleTestingMetaItem
                 label="Tanggal Dibuat"
@@ -257,7 +280,7 @@ export default function SampleTestingDetailPage() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
           <div className="space-y-4">
             <SampleTestingDocumentsSection
               item={item}
@@ -318,6 +341,7 @@ export default function SampleTestingDetailPage() {
               status={item.status}
               onStatusClick={() => setProgressOpen(true)}
               approvedByName={item.approvedByName}
+              itemGridClassName="md:grid-cols-[124px_minmax(0,1fr)]"
             >
               <SampleTestingMetaItem
                 label="Tanggal Dibuat"
@@ -328,9 +352,38 @@ export default function SampleTestingDetailPage() {
                 value={formatDateTimeWib(item.updatedAt)}
               />
             </RequestInformationCard>
+
+            {canCancelSampleTesting ? (
+              <section className="rounded-xl border border-rose-200 bg-rose-50/70 p-5">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Batalkan Pengajuan
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Pengajuan yang sudah disetujui dapat dibatalkan oleh pemohon sebelum proses lanjutan berjalan.
+                </p>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="mt-4"
+                  onClick={() => setCancelOpen(true)}
+                  disabled={pendingAction.sampleTestingId === item.id}
+                >
+                  Batalkan Pengajuan
+                </Button>
+              </section>
+            ) : null}
           </div>
         </div>
       )}
+      <DeleteRequestConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onConfirm={() => void handleCancelSampleTesting()}
+        isSubmitting={pendingAction.sampleTestingId === item.id}
+        title="Batalkan pengajuan pengujian sampel ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan tidak akan diproses lebih lanjut."
+        confirmLabel="Ya, Batalkan"
+      />
       <RequestProgressDialog
         open={progressOpen}
         onOpenChange={setProgressOpen}

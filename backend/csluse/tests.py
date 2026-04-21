@@ -2,13 +2,14 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from unittest.mock import patch
 
-from csluse.models import Borrow, Booking, BookingEquipmentItem, Equipment, Notification, Pengujian, Room, Use
+from csluse.models import Borrow, Booking, BookingEquipmentItem, Document, Equipment, Notification, Pengujian, Room
 from csluse_auth.models import Profile
 
 User = get_user_model()
@@ -43,6 +44,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
             "admin@example.com",
             "Admin",
             "Admin User",
+        )
+        self.second_admin_user, self.second_admin_profile = self.create_user_with_profile(
+            "admin2@example.com",
+            "Admin",
+            "Second Admin User",
         )
 
         self.room = Room.objects.create(
@@ -93,8 +99,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.student_profile.department = "Digital Business Technology"
         self.student_profile.save(update_fields=["department"])
         self.create_booking(self.student_profile)
-        self.create_use(self.student_profile)
-
         self.client.force_authenticate(user=self.admin_user)
         response = self.client.get("/api/bookings/all/requesters/")
 
@@ -149,25 +153,68 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
         self.assertEqual(response.data["purpose"], "Penelitian")
 
-    def test_lecturer_can_create_use_request(self):
-        start, end = self.future_window(days=3, start_hour=10)
+    def test_booking_request_requires_h_plus_2_start_date(self):
+        start, end = self.future_window(days=1, start_hour=9)
         self.client.force_authenticate(user=self.lecturer_user)
 
         response = self.client.post(
-            "/api/uses/",
+            "/api/bookings/",
             {
-                "equipment": str(self.equipment.id),
-                "quantity": 1,
+                "room": str(self.room.id),
                 "start_time": start.isoformat(),
                 "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("H+2", response.data["start_time"][0])
+
+    def test_booking_request_can_cross_weekend_when_within_three_months(self):
+        start, end = self.future_weekday_window(
+            4,
+            min_days=2,
+            start_hour=9,
+            duration_days=10,
+            duration_hours=7,
+        )
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
                 "purpose": "Penelitian",
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
-        self.assertEqual(response.data["purpose"], "Penelitian")
+
+    def test_booking_request_cannot_exceed_three_months(self):
+        start, _ = self.future_window(days=3, start_hour=9)
+        end = start + timedelta(days=100)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("maksimal 3 bulan", response.data["end_time"][0])
 
     def test_lecturer_can_create_borrow_request(self):
         start, end = self.future_window(days=3, start_hour=11)
@@ -189,6 +236,69 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
         self.assertEqual(response.data["purpose"], "Penelitian")
 
+    def test_borrow_request_requires_h_plus_2_start_date(self):
+        start, end = self.future_window(days=1, start_hour=11)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("H+2", response.data["start_time"][0])
+
+    def test_borrow_request_can_cross_weekend_when_within_three_months(self):
+        start, end = self.future_weekday_window(
+            4,
+            min_days=2,
+            start_hour=11,
+            duration_days=10,
+            duration_hours=2,
+        )
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_borrow_request_cannot_exceed_three_months(self):
+        start, _ = self.future_window(days=3, start_hour=11)
+        end = start + timedelta(days=100)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("maksimal 3 bulan", response.data["end_time"][0])
+
     def future_window(self, *, days=1, start_hour=9, duration_hours=2):
         local_now = timezone.localtime(timezone.now()) + timedelta(days=days)
         start = local_now.replace(
@@ -198,6 +308,21 @@ class CsluseWorkflowRegressionTests(APITestCase):
             microsecond=0,
         )
         end = start + timedelta(hours=duration_hours)
+        return start, end
+
+    def future_weekday_window(self, weekday, *, min_days=2, start_hour=9, duration_days=0, duration_hours=2):
+        local_now = timezone.localtime(timezone.now())
+        days_until_weekday = (weekday - local_now.weekday()) % 7
+        while days_until_weekday < min_days:
+            days_until_weekday += 7
+
+        start = (local_now + timedelta(days=days_until_weekday)).replace(
+            hour=start_hour,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        end = start + timedelta(days=duration_days, hours=duration_hours)
         return start, end
 
     def create_booking(self, requested_by, *, purpose="Penelitian", requester_mentor_profile=None):
@@ -222,34 +347,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
             end_time=end,
             attendee_count=1,
             purpose="Penelitian",
-        )
-
-    def create_use(self, requested_by, *, status="Pending", approved_by=None, purpose="Penelitian", requester_mentor_profile=None):
-        start, end = self.future_window(days=2, start_hour=10)
-        return Use.objects.create(
-            requested_by=requested_by,
-            equipment=self.equipment,
-            quantity=1,
-            start_time=start,
-            end_time=end,
-            purpose=purpose,
-            status=status,
-            approved_by=approved_by,
-            requester_mentor="Lecturer User" if requester_mentor_profile else None,
-            requester_mentor_profile=requester_mentor_profile,
-        )
-
-    def create_use_for_equipment(self, requested_by, equipment, *, status="Pending", approved_by=None):
-        start, end = self.future_window(days=2, start_hour=10)
-        return Use.objects.create(
-            requested_by=requested_by,
-            equipment=equipment,
-            quantity=1,
-            start_time=start,
-            end_time=end,
-            purpose="Penelitian",
-            status=status,
-            approved_by=approved_by,
         )
 
     def create_borrow(self, requested_by, *, status="Pending", approved_by=None, purpose="Penelitian", requester_mentor_profile=None):
@@ -309,15 +406,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_staff_cannot_access_use_approval_scope(self):
-        self.create_use_for_equipment(self.student_profile, self.equipment)
-        self.create_use_for_equipment(self.student_profile, self.other_equipment)
-
-        self.client.force_authenticate(self.staff_user)
-        response = self.client.get("/api/uses/all/")
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
     def test_staff_cannot_access_borrow_approval_scope(self):
         self.create_borrow_for_equipment(self.student_profile, self.equipment)
         self.create_borrow_for_equipment(self.student_profile, self.other_equipment)
@@ -351,6 +439,12 @@ class CsluseWorkflowRegressionTests(APITestCase):
         )
 
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        mail.outbox = []
         pengujian_id = create_response.data["id"]
 
         self.client.force_authenticate(self.staff_user)
@@ -359,7 +453,10 @@ class CsluseWorkflowRegressionTests(APITestCase):
             {},
             format="json",
         )
-        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(
+            denied_response.status_code,
+            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
+        )
 
         self.client.force_authenticate(self.admin_user)
         approve_response = self.client.post(
@@ -375,6 +472,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertIn("pengujian sampel", notification.message.lower())
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Update status request", mail.outbox[0].subject)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertCountEqual(
+            mail.outbox[0].cc,
+            ["admin@example.com", "admin2@example.com"],
+        )
         self.assertIn("https://frontend.example.com/sample-testing", mail.outbox[0].body)
 
     def test_student_cannot_self_approve_booking(self):
@@ -402,34 +504,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "Approved")
 
-    def test_staff_cannot_self_approve_use(self):
-        use_item = self.create_use(self.staff_profile)
-
-        self.client.force_authenticate(self.staff_user)
-        response = self.client.post(
-            f"/api/uses/{use_item.id}/approve/",
-            {},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_requester_cannot_self_complete_use(self):
-        use_item = self.create_use(
-            self.student_profile,
-            status="Approved",
-            approved_by=self.admin_profile,
-        )
-
-        self.client.force_authenticate(self.student_user)
-        response = self.client.post(
-            f"/api/uses/{use_item.id}/complete/",
-            {},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
     def test_booking_approval_creates_notification_for_requester(self):
         booking = self.create_booking(self.student_profile)
 
@@ -441,22 +515,13 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(notification.category, "Approved")
         self.assertIn(booking.code, notification.message)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertCountEqual(
+            mail.outbox[0].cc,
+            ["admin@example.com", "admin2@example.com"],
+        )
         self.assertIn(f"https://frontend.example.com/booking-rooms/{booking.id}", mail.outbox[0].body)
         self.assertIn("disetujui", mail.outbox[0].body)
-
-    def test_use_rejection_creates_notification_for_requester(self):
-        use_item = self.create_use(self.student_profile)
-
-        self.client.force_authenticate(self.admin_user)
-        response = self.client.post(f"/api/uses/{use_item.id}/reject/", {}, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        notification = Notification.objects.get(recipient=self.student_profile)
-        self.assertEqual(notification.category, "Rejected")
-        self.assertIn(use_item.code, notification.message)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn(f"https://frontend.example.com/use-equipment/{use_item.id}", mail.outbox[0].body)
-        self.assertIn("ditolak", mail.outbox[0].body)
 
     def test_overdue_borrow_creates_reminder_notification(self):
         borrow = self.create_borrow(
@@ -477,6 +542,8 @@ class CsluseWorkflowRegressionTests(APITestCase):
         notification = Notification.objects.get(recipient=self.student_profile, category="Reminder")
         self.assertIn("overdue", notification.message.lower())
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertEqual(mail.outbox[0].cc, ["admin@example.com"])
         self.assertIn("Pengingat pengembalian alat", mail.outbox[0].subject)
         self.assertIn(f"https://frontend.example.com/borrow-equipment/{borrow.id}", mail.outbox[0].body)
 
@@ -512,6 +579,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertCountEqual(
+            mail.outbox[0].cc,
+            ["admin@example.com", "admin2@example.com"],
+        )
         self.assertIn(f"https://frontend.example.com/borrow-equipment/{borrow.id}", mail.outbox[0].body)
 
     def test_notification_email_failure_does_not_break_booking_approval(self):
@@ -561,42 +633,6 @@ class CsluseWorkflowRegressionTests(APITestCase):
         final_response = self.client.post(f"/api/bookings/{booking.id}/approve/", {}, format="json")
         self.assertEqual(final_response.status_code, status.HTTP_200_OK)
         self.assertEqual(final_response.data["status"], "Approved")
-
-    def test_mentor_must_approve_use_before_pic(self):
-        use_item = self.create_use(
-            self.student_profile,
-            purpose="Skripsi/TA",
-            requester_mentor_profile=self.lecturer_profile,
-        )
-
-        self.client.force_authenticate(self.admin_user)
-        early_response = self.client.post(f"/api/uses/{use_item.id}/approve/", {}, format="json")
-        self.assertEqual(early_response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        self.client.force_authenticate(self.lecturer_user)
-        mentor_response = self.client.post(f"/api/uses/{use_item.id}/approve/", {}, format="json")
-        self.assertEqual(mentor_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(mentor_response.data["status"], "Pending")
-        self.assertTrue(mentor_response.data["is_approved_by_mentor"])
-
-        self.client.force_authenticate(self.admin_user)
-        final_response = self.client.post(f"/api/uses/{use_item.id}/approve/", {}, format="json")
-        self.assertEqual(final_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(final_response.data["status"], "Approved")
-
-    def test_mentor_can_access_use_approval_scope_for_their_guidance_request(self):
-        use_item = self.create_use(
-            self.student_profile,
-            purpose="Skripsi/TA",
-            requester_mentor_profile=self.lecturer_profile,
-        )
-
-        self.client.force_authenticate(self.lecturer_user)
-        response = self.client.get("/api/uses/all/")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(response.data["results"][0]["id"], str(use_item.id))
 
     def test_mentor_must_approve_borrow_before_pic(self):
         borrow = self.create_borrow(
@@ -687,28 +723,55 @@ class CsluseWorkflowRegressionTests(APITestCase):
         borrow.refresh_from_db()
         self.assertNotEqual(borrow.note, "Tidak boleh berubah")
 
-    def test_requester_can_delete_own_pending_use(self):
-        use_item = self.create_use(self.student_profile)
+    def test_requester_can_cancel_own_approved_booking(self):
+        booking = self.create_booking(self.student_profile, status="Approved")
+        booking.approved_by = self.admin_profile
+        booking.save(update_fields=["approved_by"])
 
         self.client.force_authenticate(self.student_user)
-        response = self.client.delete(f"/api/uses/{use_item.id}/")
+        response = self.client.post(f"/api/bookings/{booking.id}/cancel/", format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Use.objects.filter(id=use_item.id).exists())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, "Canceled")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
 
-    def test_requester_cannot_update_other_pending_use(self):
-        use_item = self.create_use(self.student_profile)
+    def test_requester_can_cancel_own_approved_borrow_before_handover(self):
+        borrow = self.create_borrow(self.student_profile, status="Approved")
+        borrow.approved_by = self.admin_profile
+        borrow.save(update_fields=["approved_by"])
 
-        self.client.force_authenticate(self.staff_user)
-        response = self.client.patch(
-            f"/api/uses/{use_item.id}/",
-            {"quantity": 4},
-            format="json",
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(f"/api/borrows/{borrow.id}/cancel/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        borrow.refresh_from_db()
+        self.assertEqual(borrow.status, "Canceled")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
+
+    def test_requester_cannot_cancel_borrow_after_borrowed(self):
+        borrow = self.create_borrow(
+            self.student_profile,
+            status="Borrowed",
+            approved_by=self.admin_profile,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        use_item.refresh_from_db()
-        self.assertEqual(use_item.quantity, 1)
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(f"/api/borrows/{borrow.id}/cancel/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        borrow.refresh_from_db()
+        self.assertEqual(borrow.status, "Borrowed")
 
     def test_requester_can_update_own_pending_pengujian(self):
         pengujian = self.create_pengujian(self.student_profile)
@@ -733,6 +796,169 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Pengujian.objects.filter(id=pengujian.id).exists())
+
+    def test_requester_can_cancel_own_approved_pengujian(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Approved")
+        pengujian.approved_by = self.admin_profile
+        pengujian.save(update_fields=["approved_by"])
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/cancel/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Canceled")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
+
+    def test_requester_can_delete_own_sample_testing_document_and_storage_file(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Diproses")
+        document = Document.objects.create(
+            pengujian=pengujian,
+            document_type="payment_proof",
+            document=SimpleUploadedFile(
+                "payment-proof.pdf",
+                b"test payment proof",
+                content_type="application/pdf",
+            ),
+            original_name="payment-proof.pdf",
+            mime_type="application/pdf",
+            size=18,
+            uploaded_by=self.student_profile,
+        )
+        storage = document.document.storage
+
+        self.client.force_authenticate(self.student_user)
+        with patch.object(storage, "delete", wraps=storage.delete) as delete_mock:
+            response = self.client.delete(
+                f"/api/pengujians/{pengujian.id}/documents/delete/payment_proof/"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        delete_mock.assert_called_once_with(document.document.name)
+        self.assertFalse(Document.objects.filter(id=document.id).exists())
+
+    def test_pengujian_status_becomes_diproses_after_testing_agreement_upload(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Approved")
+        pengujian.approved_by = self.admin_profile
+        pengujian.save(update_fields=["approved_by"])
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/documents/upload/",
+            {
+                "document_type": "testing_agreement",
+                "file": SimpleUploadedFile(
+                    "testing-agreement.pdf",
+                    b"testing agreement",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Diproses")
+
+    def test_pengujian_status_completed_after_receipt_and_test_result_letter_uploaded(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Diproses")
+        pengujian.approved_by = self.admin_profile
+        pengujian.save(update_fields=["approved_by"])
+
+        self.client.force_authenticate(self.admin_user)
+        receipt_response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/documents/upload/",
+            {
+                "document_type": "receipt",
+                "file": SimpleUploadedFile(
+                    "receipt.pdf",
+                    b"receipt file",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        self.assertEqual(receipt_response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Diproses")
+
+        result_response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/documents/upload/",
+            {
+                "document_type": "test_result_letter",
+                "file": SimpleUploadedFile(
+                    "test-result-letter.pdf",
+                    b"test result letter",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        self.assertEqual(result_response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Completed")
+
+    def test_booking_submission_for_thesis_notifies_mentor_then_pic_after_mentor_approval(self):
+        start, end = self.future_window(days=3, start_hour=9)
+        self.client.force_authenticate(user=self.student_user)
+
+        create_response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Skripsi/TA",
+                "requester_mentor_profile": str(self.lecturer_profile.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["lecturer@example.com"])
+        self.assertIn(f"/booking-rooms/approval/{create_response.data['id']}", mail.outbox[0].body)
+
+        mail.outbox = []
+        self.client.force_authenticate(self.lecturer_user)
+        approve_response = self.client.post(
+            f"/api/bookings/{create_response.data['id']}/approve/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["admin@example.com"])
+        self.assertIn(f"/booking-rooms/approval/{create_response.data['id']}", mail.outbox[0].body)
+
+    def test_pengujian_submission_notifies_all_admins(self):
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(
+            "/api/pengujians/",
+            {
+                "name": "Pemohon Uji",
+                "email": "pemohon@example.com",
+                "sample_type": "Food Sample",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertIn(f"/sample-testing/approval/{response.data['id']}", mail.outbox[0].body)
 
     def test_notifications_endpoint_returns_current_user_notifications(self):
         booking = self.create_booking(self.student_profile)
@@ -806,3 +1032,134 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(availability_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(availability_response.data["occupied"]), 1)
         self.assertEqual(availability_response.data["occupied"][0]["type"], "booking")
+
+    def test_canceled_booking_does_not_block_room_availability(self):
+        booking = self.create_booking(self.student_profile, status="Canceled")
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.get(
+            f"/api/rooms/{self.room.id}/availability/",
+            {
+                "start": booking.start_time.isoformat(),
+                "end": booking.end_time.isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["occupied"], [])
+
+    def test_canceled_booking_does_not_block_equipment_availability(self):
+        booking = self.create_booking(self.student_profile, status="Canceled")
+        BookingEquipmentItem.objects.create(
+            booking=booking,
+            equipment=self.equipment,
+            quantity=1,
+        )
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.get(
+            f"/api/equipments/{self.equipment.id}/availability/",
+            {
+                "start": booking.start_time.isoformat(),
+                "end": booking.end_time.isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["occupied"], [])
+
+    def test_canceled_booking_does_not_count_toward_room_capacity_validation(self):
+        cancelled_booking = self.create_booking(
+            self.student_profile,
+            status="Canceled",
+        )
+        cancelled_booking.attendee_count = 18
+        cancelled_booking.save(update_fields=["attendee_count", "updated_at"])
+
+        other_student_user, _ = self.create_user_with_profile(
+            "capacity-student@example.com",
+            "Student",
+            "Capacity Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "purpose": "Penelitian",
+                "start_time": cancelled_booking.start_time.isoformat(),
+                "end_time": cancelled_booking.end_time.isoformat(),
+                "attendee_count": 10,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_canceled_booking_does_not_count_toward_equipment_stock_validation(self):
+        cancelled_booking = self.create_booking(
+            self.student_profile,
+            status="Canceled",
+        )
+        BookingEquipmentItem.objects.create(
+            booking=cancelled_booking,
+            equipment=self.equipment,
+            quantity=5,
+        )
+
+        other_student_user, _ = self.create_user_with_profile(
+            "equipment-student@example.com",
+            "Student",
+            "Equipment Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "purpose": "Penelitian",
+                "start_time": cancelled_booking.start_time.isoformat(),
+                "end_time": cancelled_booking.end_time.isoformat(),
+                "attendee_count": 2,
+                "equipment_items": [
+                    {
+                        "equipment": str(self.equipment.id),
+                        "quantity": 5,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_canceled_borrow_does_not_count_toward_equipment_stock_validation(self):
+        cancelled_borrow = self.create_borrow(
+            self.student_profile,
+            status="Canceled",
+        )
+        cancelled_borrow.quantity = 5
+        cancelled_borrow.save(update_fields=["quantity", "updated_at"])
+
+        other_student_user, _ = self.create_user_with_profile(
+            "borrow-student@example.com",
+            "Student",
+            "Borrow Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 5,
+                "start_time": cancelled_borrow.start_time.isoformat(),
+                "end_time": cancelled_borrow.end_time.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

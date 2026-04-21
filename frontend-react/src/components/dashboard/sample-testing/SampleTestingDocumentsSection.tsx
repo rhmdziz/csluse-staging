@@ -5,6 +5,7 @@ import { FileText, Loader2, Upload, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  DeleteRequestConfirmDialog,
   SubmissionConfirmDialog,
   SubmissionSummaryItem,
 } from "@/components/dialogs";
@@ -15,7 +16,10 @@ import {
   type SampleTestingDocumentType,
   type SampleTestingRow,
 } from "@/hooks/sample-testing";
-import { useUploadSampleTestingDocument } from "@/hooks/sample-testing";
+import {
+  useDeleteSampleTestingDocument,
+  useUploadSampleTestingDocument,
+} from "@/hooks/sample-testing";
 import { formatDateTimeWib } from "@/lib/date";
 
 import { SampleTestingSectionCard } from "./content/SampleTestingDetailContent";
@@ -49,6 +53,11 @@ const DOCUMENT_DEFINITIONS: DocumentDefinition[] = [
     owner: "requester",
   },
   {
+    type: "receipt",
+    label: "Kuitansi",
+    owner: "approver",
+  },
+  {
     type: "test_result_letter",
     label: "Surat hasil uji",
     owner: "approver",
@@ -56,24 +65,6 @@ const DOCUMENT_DEFINITIONS: DocumentDefinition[] = [
   },
 ];
 const DOCUMENT_DEFINITIONS_DISPLAY = [...DOCUMENT_DEFINITIONS].reverse();
-
-const DOCUMENT_PREVIOUS_STAGE_MAP: Partial<
-  Record<SampleTestingDocumentType, SampleTestingDocumentType>
-> = {
-  signed_testing_agreement: "testing_agreement",
-  invoice: "signed_testing_agreement",
-  payment_proof: "invoice",
-  test_result_letter: "payment_proof",
-};
-
-const DOCUMENT_NEXT_STAGE_MAP: Partial<
-  Record<SampleTestingDocumentType, SampleTestingDocumentType>
-> = {
-  testing_agreement: "signed_testing_agreement",
-  signed_testing_agreement: "invoice",
-  invoice: "payment_proof",
-  payment_proof: "test_result_letter",
-};
 const MAX_DOCUMENT_SIZE = 5 * 1024 * 1024;
 
 function isPreviewableDocument(document: SampleTestingDocument) {
@@ -100,69 +91,12 @@ function getDocumentByType(
 
 function canShowSection(status: string) {
   const normalized = status.trim().toLowerCase();
-  return [
-    "approved",
-    "diproses",
-    "menunggu pembayaran",
-    "completed",
-  ].includes(normalized);
+  return ["approved", "diproses", "completed"].includes(normalized);
 }
 
-function getUploadBlockReason(
-  documents: SampleTestingDocument[],
-  documentType: SampleTestingDocumentType,
-) {
-  const previousType = DOCUMENT_PREVIOUS_STAGE_MAP[documentType];
-  if (!previousType) return "";
-
-  const previousDocument = getDocumentByType(documents, previousType);
-  if (previousDocument) return "";
-
-  const previousDefinition = DOCUMENT_DEFINITIONS.find(
-    (item) => item.type === previousType,
-  );
-  return previousDefinition
-    ? `Upload ${previousDefinition.label} terlebih dahulu.`
-    : "Dokumen tahap sebelumnya belum tersedia.";
-}
-
-function canReplaceDocument(
-  documents: SampleTestingDocument[],
-  documentType: SampleTestingDocumentType,
-) {
-  const nextType = DOCUMENT_NEXT_STAGE_MAP[documentType];
-  if (!nextType) return true;
-  return !getDocumentByType(documents, nextType);
-}
-
-function shouldRenderDocumentForViewer(
-  documents: SampleTestingDocument[],
-  documentType: SampleTestingDocumentType,
-) {
-  const testingAgreement = getDocumentByType(documents, "testing_agreement");
-  const signedAgreement = getDocumentByType(
-    documents,
-    "signed_testing_agreement",
-  );
-  const invoice = getDocumentByType(documents, "invoice");
-  const paymentProof = getDocumentByType(documents, "payment_proof");
-  const currentDocument = getDocumentByType(documents, documentType);
-
-  if (documentType === "testing_agreement") return true;
-  if (documentType === "signed_testing_agreement") {
-    return Boolean(testingAgreement || currentDocument);
-  }
-  if (documentType === "invoice") {
-    return Boolean(signedAgreement || currentDocument);
-  }
-  if (documentType === "payment_proof") {
-    return Boolean(invoice || currentDocument);
-  }
-  if (documentType === "test_result_letter") {
-    return Boolean(paymentProof || currentDocument);
-  }
-
-  return true;
+function canMutateDocument(status: string) {
+  const normalized = status.trim().toLowerCase();
+  return ["approved", "diproses"].includes(normalized);
 }
 
 export default function SampleTestingDocumentsSection({
@@ -179,6 +113,10 @@ export default function SampleTestingDocumentsSection({
   allowActions?: boolean;
 }) {
   const { uploadDocument, pendingDocumentType } = useUploadSampleTestingDocument();
+  const {
+    deleteDocument,
+    pendingDocumentType: pendingDeleteDocumentType,
+  } = useDeleteSampleTestingDocument();
   const inputRefs = useRef<
     Partial<Record<SampleTestingDocumentType, HTMLInputElement | null>>
   >({});
@@ -189,10 +127,16 @@ export default function SampleTestingDocumentsSection({
   } | null>(null);
   const [previewDocument, setPreviewDocument] =
     useState<SampleTestingDocument | null>(null);
+  const [deleteDraft, setDeleteDraft] = useState<{
+    documentType: SampleTestingDocumentType;
+    label: string;
+  } | null>(null);
 
   if (!canShowSection(item.status)) {
     return null;
   }
+
+  const canManageDocuments = canMutateDocument(item.status);
 
   const handleUpload = async () => {
     if (!uploadDraft) return;
@@ -218,28 +162,36 @@ export default function SampleTestingDocumentsSection({
     onUploaded?.();
   };
 
+  const handleDelete = async () => {
+    if (!deleteDraft) return;
+
+    const result = await deleteDocument(item.id, deleteDraft.documentType);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Dokumen berhasil dihapus.");
+    setDeleteDraft(null);
+    setPreviewDocument((current) =>
+      current?.documentType === deleteDraft.documentType ? null : current,
+    );
+    onUploaded?.();
+  };
+
   const content = (
     <>
       <div className="space-y-3">
         {DOCUMENT_DEFINITIONS_DISPLAY.map((definition) => {
-          if (
-            !shouldRenderDocumentForViewer(
-              item.documents,
-              definition.type,
-            )
-          ) {
-            return null;
-          }
-
           const document = getDocumentByType(item.documents, definition.type);
           const isOwner = viewerRole === definition.owner;
-          const uploadBlockReason = getUploadBlockReason(
-            item.documents,
-            definition.type,
-          );
-          const canUpload = allowActions && isOwner && !uploadBlockReason;
-          const canReplace = canReplaceDocument(item.documents, definition.type);
+          const canUpload = allowActions && isOwner && canManageDocuments;
+          const canReplace = canManageDocuments;
+          const canDelete = canManageDocuments;
           const canPreview = document ? isPreviewableDocument(document) : false;
+          const isPendingAction =
+            pendingDocumentType === definition.type ||
+            pendingDeleteDocumentType === definition.type;
 
           return (
             <div
@@ -265,15 +217,36 @@ export default function SampleTestingDocumentsSection({
                           <button
                             type="button"
                             className="inline text-sky-700 underline-offset-2 hover:underline"
-                            disabled={
-                              pendingDocumentType === definition.type || !canUpload
-                            }
+                            disabled={isPendingAction || !canUpload}
                             onClick={() =>
                               inputRefs.current[definition.type]?.click()
                             }
                           >
                             Ganti Dokumen
                           </button>
+                          {canDelete ? (
+                            <>
+                              <span
+                                className="mx-2 text-slate-300"
+                                aria-hidden="true"
+                              >
+                                |
+                              </span>
+                              <button
+                                type="button"
+                                className="inline text-rose-700 underline-offset-2 hover:underline"
+                                disabled={isPendingAction || !canUpload}
+                                onClick={() =>
+                                  setDeleteDraft({
+                                    documentType: definition.type,
+                                    label: definition.label,
+                                  })
+                                }
+                              >
+                                Hapus Dokumen
+                              </button>
+                            </>
+                          ) : null}
                         </>
                       ) : null}
                     </p>
@@ -318,9 +291,7 @@ export default function SampleTestingDocumentsSection({
                         type="file"
                         accept=".pdf,.doc,.docx,image/*"
                         className="hidden"
-                        disabled={
-                          pendingDocumentType === definition.type || !canUpload
-                        }
+                        disabled={isPendingAction || !canUpload}
                         onChange={(event) => {
                           const file = event.target.files?.[0] ?? null;
                           if (!file) return;
@@ -341,22 +312,17 @@ export default function SampleTestingDocumentsSection({
                           type="button"
                           className="w-full border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
                           disabled={
-                            pendingDocumentType === definition.type || !canUpload
+                            isPendingAction || !canUpload
                           }
                           onClick={() => inputRefs.current[definition.type]?.click()}
                         >
-                          {pendingDocumentType === definition.type ? (
+                          {isPendingAction ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Upload className="h-4 w-4" />
                           )}
                           Upload Dokumen
                         </Button>
-                      ) : null}
-                      {uploadBlockReason ? (
-                        <p className="text-xs text-slate-500">
-                          {uploadBlockReason}
-                        </p>
                       ) : null}
                     </>
                   ) : null}
@@ -403,6 +369,24 @@ export default function SampleTestingDocumentsSection({
           }
         />
       </SubmissionConfirmDialog>
+
+      <DeleteRequestConfirmDialog
+        open={Boolean(deleteDraft)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDraft(null);
+          }
+        }}
+        title="Hapus Dokumen"
+        description={`Dokumen ${deleteDraft?.label ?? ""} akan dihapus permanen dari data pengujian dan storage.`}
+        isSubmitting={Boolean(
+          deleteDraft && pendingDeleteDocumentType === deleteDraft.documentType,
+        )}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        confirmLabel="Ya, Hapus Dokumen"
+      />
 
       <DocumentPreviewDialog
         open={Boolean(previewDocument)}

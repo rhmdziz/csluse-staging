@@ -58,30 +58,20 @@ const BookingRoomsDetailPage = lazyWithReload(
 );
 const RoomsListPage = lazyWithReload(() => import("@/pages/dashboard/booking-rooms/RoomsListPage"));
 const RoomDetailPage = lazyWithReload(() => import("@/pages/dashboard/booking-rooms/RoomDetailPage"));
-const UseEquipmentListPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/UseEquipmentListPage"),
+const BookingEquipmentListPage = lazyWithReload(
+  () => import("@/pages/dashboard/booking-rooms/EquipmentListPage"),
 );
-const UseEquipmentAllListPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/UseEquipmentAllListPage"),
+const BookingEquipmentDetailPage = lazyWithReload(
+  () => import("@/pages/dashboard/booking-rooms/EquipmentDetailPage"),
 );
-const UseEquipmentFormPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/UseEquipmentFormPage"),
+const BookingMaterialListPage = lazyWithReload(
+  () => import("@/pages/dashboard/booking-rooms/MaterialListPage"),
 );
-const EquipmentListPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/EquipmentListPage"),
+const BookingMaterialDetailPage = lazyWithReload(
+  () => import("@/pages/dashboard/booking-rooms/MaterialDetailPage"),
 );
-const MaterialListPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/MaterialListPage"),
-);
-const MaterialDetailPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/MaterialDetailPage"),
-);
-const SoftwareListPage = lazyWithReload(() => import("@/pages/dashboard/use-equipment/SoftwareListPage"));
-const EquipmentDetailPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/EquipmentDetailPage"),
-);
-const UseEquipmentDetailPage = lazyWithReload(
-  () => import("@/pages/dashboard/use-equipment/UseEquipmentDetailPage"),
+const BookingSoftwareListPage = lazyWithReload(
+  () => import("@/pages/dashboard/booking-rooms/SoftwareListPage"),
 );
 const SampleTestingListPage = lazyWithReload(
   () => import("@/pages/dashboard/sample-testing/SampleTestingListPage"),
@@ -110,6 +100,9 @@ const BorrowEquipmentAvailablePage = lazyWithReload(
 const BorrowEquipmentDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentDetailPage"),
 );
+const LabClearancePage = lazyWithReload(
+  () => import("@/pages/dashboard/lab-clearance/LabClearancePage"),
+);
 const NotificationsPage = lazyWithReload(() => import("@/pages/dashboard/account/NotificationsPage"));
 const MyProfilePage = lazyWithReload(() => import("@/pages/dashboard/account/MyProfilePage"));
 const AdminHomePage = lazyWithReload(() => import("@/pages/admin/home/AdminHomePage"));
@@ -124,9 +117,6 @@ const AdminSoftwarePage = lazyWithReload(() => import("@/pages/admin/inventory/A
 const AdminRoomPage = lazyWithReload(() => import("@/pages/admin/inventory/AdminRoomPage"));
 const AdminRoomBookingHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminRoomBookingHistoryPage"),
-);
-const AdminEquipmentUsageHistoryPage = lazyWithReload(
-  () => import("@/pages/admin/history/AdminEquipmentUsageHistoryPage"),
 );
 const AdminEquipmentBorrowHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminEquipmentBorrowHistoryPage"),
@@ -293,119 +283,33 @@ export const router = createBrowserRouter([
               </RequireFeatureScope>
             ),
           },
-        ],
-      },
-      {
-        path: "rooms",
-        element: (
-          <RequireMenuAccess menuId="booking-rooms">
-            {renderPage(RoomsListPage)}
-          </RequireMenuAccess>
-        ),
-      },
-      {
-        path: "rooms/:id",
-        element: (
-          <RequireMenuAccess menuId="booking-rooms">
-            {renderPage(RoomDetailPage)}
-          </RequireMenuAccess>
-        ),
-      },
-      {
-        path: "use-equipment",
-        element: (
-          <RequireMenuAccess menuId="use-equipment">
-            <Outlet />
-          </RequireMenuAccess>
-        ),
-        children: [
           {
-            index: true,
-            element: (
-              <RequireFeatureScope featurePath="/use-equipment" scope="requester">
-                {renderPage(UseEquipmentListPage)}
-              </RequireFeatureScope>
-            ),
+            path: "rooms",
+            element: renderPage(RoomsListPage),
           },
           {
-            path: "form",
-            element: (
-              <RequireFeatureScope featurePath="/use-equipment" scope="requester">
-                {renderPage(UseEquipmentFormPage)}
-              </RequireFeatureScope>
-            ),
-          },
-          {
-            path: "approval",
-            element: (
-              <RequireFeatureScope featurePath="/use-equipment" scope="approval">
-                {renderPage(UseEquipmentAllListPage)}
-              </RequireFeatureScope>
-            ),
-          },
-          {
-            path: "approval/:id",
-            element: (
-              <RequireFeatureScope featurePath="/use-equipment" scope="approval">
-                {renderPage(UseEquipmentDetailPage)}
-              </RequireFeatureScope>
-            ),
-          },
-          {
-            path: ":id/edit",
-            element: (
-              <RequireFeatureScope featurePath="/use-equipment" scope="requester">
-                {renderPage(UseEquipmentFormPage)}
-              </RequireFeatureScope>
-            ),
-          },
-          {
-            path: ":id",
-            element: (
-              <RequireFeatureScope featurePath="/use-equipment" scope="requester">
-                {renderPage(UseEquipmentDetailPage)}
-              </RequireFeatureScope>
-            ),
+            path: "rooms/:id",
+            element: renderPage(RoomDetailPage),
           },
           {
             path: "equipment",
-            element: (
-              <RequireMenuAccess menuId="use-equipment">
-                {renderPage(EquipmentListPage)}
-              </RequireMenuAccess>
-            ),
+            element: renderPage(BookingEquipmentListPage),
           },
           {
             path: "equipment/:id",
-            element: (
-              <RequireMenuAccess menuId="use-equipment">
-                {renderPage(EquipmentDetailPage)}
-              </RequireMenuAccess>
-            ),
-          },
-          {
-            path: "software",
-            element: (
-              <RequireMenuAccess menuId="use-equipment">
-                {renderPage(SoftwareListPage)}
-              </RequireMenuAccess>
-            ),
+            element: renderPage(BookingEquipmentDetailPage),
           },
           {
             path: "materials",
-            element: (
-              <RequireMenuAccess menuId="use-equipment">
-                {renderPage(MaterialListPage)}
-              </RequireMenuAccess>
-            ),
+            element: renderPage(BookingMaterialListPage),
           },
           {
             path: "materials/:id",
-            element: (
-              <RequireMenuAccess menuId="use-equipment">
-                {renderPage(MaterialDetailPage)}
-              </RequireMenuAccess>
-            ),
+            element: renderPage(BookingMaterialDetailPage),
+          },
+          {
+            path: "software",
+            element: renderPage(BookingSoftwareListPage),
           },
         ],
       },
@@ -520,7 +424,7 @@ export const router = createBrowserRouter([
             path: "equipment/:id",
             element: (
               <RequireFeatureScope featurePath="/borrow-equipment" scope="requester">
-                {renderPage(EquipmentDetailPage)}
+                {renderPage(BookingEquipmentDetailPage)}
               </RequireFeatureScope>
             ),
           },
@@ -533,6 +437,14 @@ export const router = createBrowserRouter([
             ),
           },
         ],
+      },
+      {
+        path: "bebas-laboratorium",
+        element: (
+          <RequireMenuAccess menuId="bebas-laboratorium">
+            {renderPage(LabClearancePage)}
+          </RequireMenuAccess>
+        ),
       },
       {
         path: "notifications",
@@ -594,7 +506,6 @@ export const router = createBrowserRouter([
         path: "history",
         children: [
           { path: "room-bookings", element: renderPage(AdminRoomBookingHistoryPage) },
-          { path: "equipment-usage", element: renderPage(AdminEquipmentUsageHistoryPage) },
           { path: "equipment-borrows", element: renderPage(AdminEquipmentBorrowHistoryPage) },
           { path: "sample-testing", element: renderPage(AdminSampleTestingHistoryPage) },
         ],

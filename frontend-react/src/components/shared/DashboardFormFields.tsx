@@ -132,6 +132,7 @@ type DateTimePickerFieldProps = {
   disabled?: boolean;
   required?: boolean;
   minDate?: Date;
+  maxDate?: Date;
   minTime?: string;
   onDateChange: (date: Date | undefined) => void;
   onTimeChange: (time: string) => void;
@@ -145,6 +146,7 @@ export function DashboardDateTimePickerField({
   disabled,
   required = true,
   minDate,
+  maxDate,
   minTime,
   onDateChange,
   onTimeChange,
@@ -165,7 +167,11 @@ export function DashboardDateTimePickerField({
           defaultMonth={date}
           clearable={!required}
           calendarDisabled={
-            minDate ? (calendarDate) => calendarDate < minDate : undefined
+            minDate || maxDate
+              ? (calendarDate) =>
+                  (minDate ? calendarDate < minDate : false) ||
+                  (maxDate ? calendarDate > maxDate : false)
+              : undefined
           }
           className="w-full sm:flex-1"
           buttonClassName={cn("w-full", !date && "text-slate-400")}

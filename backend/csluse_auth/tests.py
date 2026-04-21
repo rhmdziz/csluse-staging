@@ -8,8 +8,9 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from csluse.models import Booking, Borrow, Equipment, Pengujian, Room, Use
+from csluse.models import Booking, Borrow, Equipment, Pengujian, Room
 from csluse_auth.models import Profile
+from csluse_auth.audit import log_admin_action
 from csluse_auth.permissions import ADMINISTRATOR, SUPER_ADMINISTRATOR, assign_role
 
 User = get_user_model()
@@ -207,6 +208,41 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["aggregates"]["student"], 0)
 
 
+class AdminActionViewSetTests(AuthBaseTestMixin, APITestCase):
+    def setUp(self):
+        self.admin = self.create_user(
+            email="audit-admin@example.com",
+            full_name="Audit Admin",
+            role="Admin",
+        )
+        assign_role(self.admin, ADMINISTRATOR)
+        self.client.force_authenticate(user=self.admin)
+
+    def test_recent_only_returns_actions_from_admin_actors(self):
+        student = self.create_user(
+            email="student-audit@example.com",
+            full_name="Student Audit",
+            role="Student",
+            verified=True,
+        )
+        admin_target = self.create_user(
+            email="managed-user@example.com",
+            full_name="Managed User",
+            role="Guest",
+            verified=True,
+        )
+
+        log_admin_action(self.admin, admin_target.profile, DELETION, "Admin deleted a managed profile.")
+        log_admin_action(student, student.profile, DELETION, "Student updated own profile.")
+
+        response = self.client.get("/api/admin/actions/recent/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["actor"], self.admin.email)
+        self.assertEqual(response.data[0]["object_id"], str(admin_target.profile.pk))
+
+
 class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
     def setUp(self):
         self.user = self.create_user(
@@ -237,7 +273,6 @@ class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
         self.client.cookies["access"] = self._expired_access_token()
 
         response = self.client.get("/api/auth/user/profile/")
-
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_refresh_endpoint_uses_refresh_cookie_to_issue_new_access_token(self):
@@ -268,6 +303,65 @@ class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
 
         self.assertEqual(profile_response.status_code, status.HTTP_200_OK)
         self.assertEqual(profile_response.data["email"], self.user.email)
+
+
+class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
+    def setUp(self):
+        self.admin = self.create_user(
+            email="pic-admin@example.com",
+            full_name="PIC Admin",
+            role="Admin",
+        )
+        assign_role(self.admin, ADMINISTRATOR)
+        self.client.force_authenticate(user=self.admin)
+
+    def test_dropdown_returns_all_eligible_pic_candidates(self):
+        assigned_lecturer = self.create_user(
+            email="assigned-lecturer@example.com",
+            full_name="Assigned Lecturer",
+            role="Lecturer",
+        )
+        eligible_admin = self.create_user(
+            email="eligible-admin@example.com",
+            full_name="Eligible Admin",
+            role="Admin",
+        )
+        self.create_user(
+            email="staff-user@example.com",
+            full_name="Staff User",
+            role="Staff",
+        )
+        room = Room.objects.create(name="Lab A", number="101")
+        room.pics.add(assigned_lecturer.profile)
+
+        response = self.client.get("/api/admin/pic-users/dropdown/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(str(assigned_lecturer.profile.id), returned_ids)
+        self.assertIn(str(eligible_admin.profile.id), returned_ids)
+        self.assertNotIn(str(self.admin.profile.id), returned_ids)
+
+    def test_assigned_dropdown_returns_only_assigned_pic_users(self):
+        assigned_lecturer = self.create_user(
+            email="assigned-only@example.com",
+            full_name="Assigned Only",
+            role="Lecturer",
+        )
+        unassigned_admin = self.create_user(
+            email="unassigned-admin@example.com",
+            full_name="Unassigned Admin",
+            role="Admin",
+        )
+        room = Room.objects.create(name="Lab B", number="102")
+        room.pics.add(assigned_lecturer.profile)
+
+        response = self.client.get("/api/admin/pic-users/assigned-dropdown/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(str(assigned_lecturer.profile.id), returned_ids)
+        self.assertNotIn(str(unassigned_admin.profile.id), returned_ids)
 
 
 class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
@@ -324,12 +418,6 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
             start_time=start_time,
             end_time=end_time + timedelta(days=1),
         )
-        Use.objects.create(
-            requested_by=requester.profile,
-            equipment=equipment,
-            quantity=1,
-            start_time=start_time,
-        )
         Pengujian.objects.create(
             name="Sample Request",
             email="sample@example.com",
@@ -337,7 +425,7 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
             requested_by=requester.profile,
         )
 
-    def test_admin_dashboard_kpis_include_use_and_pengujian_totals(self):
+    def test_admin_dashboard_kpis_include_pengujian_totals(self):
         response = self.client.get("/api/admin/dashboard/kpis/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -345,5 +433,4 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["total_equipments"], 1)
         self.assertEqual(response.data["total_bookings"], 1)
         self.assertEqual(response.data["total_borrows"], 1)
-        self.assertEqual(response.data["total_uses"], 1)
         self.assertEqual(response.data["total_pengujians"], 1)

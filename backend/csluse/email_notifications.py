@@ -12,8 +12,13 @@ logger = logging.getLogger(__name__)
 REQUEST_DETAIL_PATHS = {
     "booking": "/booking-rooms/{id}",
     "borrow": "/borrow-equipment/{id}",
-    "use": "/use-equipment/{id}",
     "pengujian": "/sample-testing",
+}
+
+REQUEST_APPROVAL_PATHS = {
+    "booking": "/booking-rooms/approval/{id}",
+    "borrow": "/borrow-equipment/approval/{id}",
+    "pengujian": "/sample-testing/approval/{id}",
 }
 
 
@@ -48,12 +53,15 @@ def _render_notification_template(template_name, context):
     return re.sub(r"{{\s*(?P<key>[a-zA-Z0-9_]+)\s*}}", replace, content)
 
 
-def notification_cta_url(kind, instance):
+def notification_cta_url(kind, instance, audience="requester"):
     frontend_url = _frontend_url()
     if not frontend_url:
         return ""
 
-    path_template = REQUEST_DETAIL_PATHS.get(kind, "/notifications")
+    if audience == "approval":
+        path_template = REQUEST_APPROVAL_PATHS.get(kind, "/notifications")
+    else:
+        path_template = REQUEST_DETAIL_PATHS.get(kind, "/notifications")
     instance_id = getattr(instance, "pk", None)
     if "{id}" in path_template:
         if instance_id is None:
@@ -70,13 +78,45 @@ def notification_cta_label(kind):
     return "Lihat Detail Request"
 
 
+def approval_cta_label(kind):
+    if kind == "pengujian":
+        return "Buka Approval Pengujian"
+    return "Buka Halaman Approval"
+
+
+def _normalize_email_list(value):
+    if not value:
+        return []
+    if isinstance(value, str):
+        values = [value]
+    else:
+        values = list(value)
+
+    normalized = []
+    seen = set()
+    for item in values:
+        email = str(item or "").strip()
+        if not email:
+            continue
+        lowered = email.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        normalized.append(email)
+    return normalized
+
+
 def send_notification_email(
     recipient_email,
     *,
     template_base,
     context,
+    cc_emails=None,
 ):
-    if not recipient_email:
+    to_emails = _normalize_email_list(recipient_email)
+    cc_emails = _normalize_email_list(cc_emails)
+
+    if not to_emails:
         return False
 
     try:
@@ -91,13 +131,18 @@ def send_notification_email(
         message = EmailMultiAlternatives(
             subject=subject,
             body=text_body,
-            to=[recipient_email],
+            to=to_emails,
+            cc=cc_emails,
         )
         message.attach_alternative(html_body, "text/html")
         message.send()
         return True
     except Exception:
-        logger.exception("Failed to send notification email to %s", recipient_email)
+        logger.exception(
+            "Failed to send notification email to to=%s cc=%s",
+            to_emails,
+            cc_emails,
+        )
         return False
 
 

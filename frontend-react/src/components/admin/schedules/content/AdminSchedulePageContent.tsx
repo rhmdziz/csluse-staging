@@ -35,6 +35,7 @@ import { Button } from "@/components/ui";
 import { useBookingDetail } from "@/hooks/booking-rooms";
 
 import { useCalendarEvents } from "@/hooks/shared/calendar";
+import type { CalendarEvent } from "@/hooks/shared/calendar";
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
@@ -82,6 +83,43 @@ function isSameDay(left: Date, right: Date) {
     left.getMonth() === right.getMonth() &&
     left.getDate() === right.getDate()
   );
+}
+
+function isWeekend(date: Date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function eventCoversDay(event: { start_time: string; end_time?: string | null }, date: Date) {
+  const start = new Date(event.start_time);
+  const end = event.end_time ? new Date(event.end_time) : new Date(event.start_time);
+  const sel = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  return sel >= startDay && sel <= endDay;
+}
+
+const wibDateFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Jakarta",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function adjustEventForDay(event: CalendarEvent, date: Date): CalendarEvent {
+  const startDate = new Date(event.start_time);
+  const endDate = event.end_time ? new Date(event.end_time) : startDate;
+  if (isSameDay(startDate, endDate)) return event;
+
+  const dayPrefix = wibDateFormatter.format(date);
+  const isStartDay = isSameDay(startDate, date);
+  const isEndDay = isSameDay(endDate, date);
+
+  return {
+    ...event,
+    start_time: isStartDay ? event.start_time : `${dayPrefix}T08:00:00+07:00`,
+    end_time: isEndDay ? event.end_time : `${dayPrefix}T17:00:00+07:00`,
+  };
 }
 
 function isSameMonth(left: Date, right: Date) {
@@ -229,7 +267,6 @@ export default function AdminSchedulePage() {
   const monthKpis = useMemo(() => {
     const scheduleCount = monthEvents.filter((item) => item.source === "schedule").length;
     const bookingCount = monthEvents.filter((item) => item.source === "booking").length;
-    const useCount = monthEvents.filter((item) => item.source === "use").length;
     const roomCount = new Set(
       monthEvents.map((item) => item.room_name).filter(Boolean),
     ).size;
@@ -251,11 +288,6 @@ export default function AdminSchedulePage() {
         tone: "from-amber-500/15 to-amber-100",
       },
       {
-        label: "Penggunaan Alat",
-        value: String(useCount),
-        tone: "from-orange-500/15 to-orange-100",
-      },
-      {
         label: "Ruangan Terpakai",
         value: String(roomCount),
         tone: "from-violet-500/15 to-violet-100",
@@ -264,8 +296,10 @@ export default function AdminSchedulePage() {
   }, [monthEvents]);
 
   const selectedDayEvents = useMemo(() => {
+    if (isWeekend(selectedDate)) return [];
     return filteredEvents
-      .filter((item) => isSameDay(new Date(item.start_time), selectedDate))
+      .filter((item) => eventCoversDay(item, selectedDate))
+      .map((item) => adjustEventForDay(item, selectedDate))
       .sort(
         (left, right) =>
           new Date(left.start_time).getTime() - new Date(right.start_time).getTime(),
@@ -447,7 +481,7 @@ export default function AdminSchedulePage() {
     <section className="space-y-4 px-4">
       <AdminPageHeader
         title="Jadwal"
-        description="Kelola jadwal dan pantau agenda gabungan dari jadwal admin, peminjaman lab, dan penggunaan alat."
+        description="Kelola jadwal dan pantau agenda gabungan dari jadwal admin dan peminjaman lab."
         icon={<CalendarDays className="h-5 w-5 text-blue-100" />}
       />
 

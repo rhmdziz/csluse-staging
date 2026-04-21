@@ -1,0 +1,12 @@
+Halo,
+
+{{ notification_message }}
+
+Silakan buka tautan berikut untuk melihat detail terkait:
+{{ cta_url }}
+
+Terima kasih,
+
+CSL USE
+School of Science, Technology, Engineering, Mathematic
+Universitas Prasetiya Mulya

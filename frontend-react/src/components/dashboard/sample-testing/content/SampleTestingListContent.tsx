@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   CheckCircle2,
-  CircleDollarSign,
   FileText,
   Eye,
   FlaskConical,
@@ -15,7 +14,9 @@ import {
   RotateCcw,
   Settings2,
   Trash2,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -49,6 +50,7 @@ import { toEndOfDay, toStartOfDay } from "@/lib/date";
 import {
   useCreateSampleTesting,
   useSampleTestingList,
+  useUpdateSampleTestingStatus,
   type SampleTestingListScope,
 } from "@/hooks/sample-testing";
 
@@ -56,9 +58,7 @@ const PAGE_SIZE = 10;
 
 function canShowDocumentAction(status: string) {
   const normalized = normalizeStatus(status);
-  return ["approved", "diproses", "menunggu pembayaran", "completed"].includes(
-    normalized,
-  );
+  return ["approved", "diproses", "completed"].includes(normalized);
 }
 
 type SampleTestingListContentProps = {
@@ -85,6 +85,10 @@ export default function SampleTestingListContent({
     id: string;
     code: string;
   } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
+    id: string;
+    code: string;
+  } | null>(null);
   const status = searchParams.get("status") ?? "";
   const search = searchParams.get("q") ?? "";
   const createdAfter = searchParams.get("created_after") ?? "";
@@ -96,6 +100,8 @@ export default function SampleTestingListContent({
 
   const { deleteSampleTesting, isSubmitting: isDeletingSampleTesting } =
     useCreateSampleTesting();
+  const { updateSampleTestingStatus, pendingAction } =
+    useUpdateSampleTestingStatus();
   const {
     sampleTestings,
     totalCount,
@@ -129,6 +135,9 @@ export default function SampleTestingListContent({
   const canManageSampleTesting = (statusValue: string) =>
     scope !== "all" && normalizeStatus(statusValue) === "pending";
 
+  const canCancelSampleTesting = (statusValue: string) =>
+    scope !== "all" && normalizeStatus(statusValue) === "approved";
+
   const handleDeleteSampleTesting = async () => {
     if (!deleteTarget) return;
 
@@ -139,9 +148,23 @@ export default function SampleTestingListContent({
     setReloadKey((prev) => prev + 1);
   };
 
+  const handleCancelSampleTesting = async () => {
+    if (!cancelTarget) return;
+
+    const result = await updateSampleTestingStatus(cancelTarget.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Pengajuan pengujian sampel berhasil dibatalkan.");
+    setCancelTarget(null);
+    setReloadKey((prev) => prev + 1);
+  };
+
   return (
     <section className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <SampleTestingSummaryCard
           label="Total Pengajuan"
           value={aggregates.total}
@@ -165,12 +188,6 @@ export default function SampleTestingListContent({
           value={aggregates.diproses}
           icon={<Settings2 className="h-4 w-4" />}
           tone={getStatusSummaryTone("Diproses")}
-        />
-        <SampleTestingSummaryCard
-          label="Menunggu Bayar"
-          value={aggregates.menungguPembayaran}
-          icon={<CircleDollarSign className="h-4 w-4" />}
-          tone={getStatusSummaryTone("menunggu pembayaran")}
         />
         <SampleTestingSummaryCard
           label="Selesai"
@@ -305,6 +322,20 @@ export default function SampleTestingListContent({
                           />
                         </>
                       ) : null}
+                      {canCancelSampleTesting(item.status) ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Batalkan"
+                          icon={<X className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                          onClick={() =>
+                            setCancelTarget({
+                              id: String(item.id),
+                              code: item.code,
+                            })
+                          }
+                        />
+                      ) : null}
                       <TableActionIconButton
                         type="button"
                         label="Lihat detail"
@@ -372,6 +403,17 @@ export default function SampleTestingListContent({
             ? `Pengajuan ${deleteTarget.code} akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`
             : "Pengajuan ini akan dihapus permanen."
         }
+      />
+      <DeleteRequestConfirmDialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        onConfirm={() => void handleCancelSampleTesting()}
+        isSubmitting={pendingAction.sampleTestingId === cancelTarget?.id}
+        title="Batalkan pengajuan pengujian sampel ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan tidak akan diproses lebih lanjut."
+        confirmLabel="Ya, Batalkan"
       />
     </section>
   );

@@ -5,13 +5,11 @@ from django.core.management.base import BaseCommand
 from csluse.viewsets import (
     sync_booking_statuses,
     sync_borrow_statuses,
-    sync_use_statuses,
 )
 
 
 SYNC_HANDLERS = {
     "booking": sync_booking_statuses,
-    "use": sync_use_statuses,
     "borrow": sync_borrow_statuses,
 }
 

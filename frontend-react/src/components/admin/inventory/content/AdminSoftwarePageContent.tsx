@@ -52,7 +52,7 @@ import {
   type SoftwareRow,
 } from "@/hooks/shared/resources/softwares";
 
-import { usePicUsers } from "@/hooks/shared/resources/users";
+import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { SOFTWARE_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
@@ -86,7 +86,7 @@ export default function AdminSoftwarePage() {
   const { equipments: equipmentOptions, isLoading: isLoadingEquipments } =
     useEquipmentOptions();
   const { picUsers: filterPicUsers, isLoading: isLoadingFilterPics } =
-    usePicUsers();
+    useAssignedPicUsers();
   const { deleteSoftware, deleteSoftwares, isDeleting } = useDeleteSoftware();
 
   useEffect(() => {

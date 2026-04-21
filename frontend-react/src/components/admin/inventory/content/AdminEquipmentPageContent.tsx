@@ -43,7 +43,6 @@ import {
   EQUIPMENT_CATEGORY_OPTIONS,
   EQUIPMENT_STATUS_OPTIONS,
   MOVEABLE_OPTIONS,
-  USEABLE_OPTIONS,
 } from "@/constants/equipments";
 
 import { API_EQUIPMENTS_EXPORT } from "@/constants/api";
@@ -64,7 +63,7 @@ import { equipmentsService } from "@/services/shared/resources/equipments.servic
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
-import { usePicUsers } from "@/hooks/shared/resources/users";
+import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { EQUIPMENT_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
@@ -122,7 +121,6 @@ export default function AdminEquipmentsPage() {
   const [pic, setPic] = useState("");
   const [moveable, setMoveable] = useState("");
   const [borrowable, setBorrowable] = useState("");
-  const [useable, setUseable] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
@@ -148,7 +146,7 @@ export default function AdminEquipmentsPage() {
   const { rooms: filterRooms, isLoading: isLoadingFilterRooms } =
     useRoomOptions();
   const { picUsers: filterPicUsers, isLoading: isLoadingFilterPics } =
-    usePicUsers();
+    useAssignedPicUsers();
   const { deleteEquipment, deleteEquipments, isDeleting } =
     useDeleteEquipment();
   const { updateEquipment } = useUpdateEquipment();
@@ -170,7 +168,6 @@ export default function AdminEquipmentsPage() {
         pic,
         is_moveable: moveable,
         is_borrowable: borrowable,
-        is_useable: useable,
       },
       reloadKey,
     );
@@ -230,7 +227,6 @@ export default function AdminEquipmentsPage() {
         pic,
         is_moveable: moveable,
         is_borrowable: borrowable,
-        is_useable: useable,
         q: debouncedSearch,
       },
       mapItem: mapEquipment,
@@ -252,7 +248,6 @@ export default function AdminEquipmentsPage() {
     setPic("");
     setMoveable("");
     setBorrowable("");
-    setUseable("");
     setPage(1);
   };
 
@@ -287,7 +282,6 @@ export default function AdminEquipmentsPage() {
       isMoveable: item.isMoveable,
       isShareable: item.isShareable,
       isBorrowable: item.isBorrowable,
-      isUseable: item.isUseable,
       description: item.description,
     });
     setTogglingEquipmentId(null);
@@ -353,19 +347,6 @@ export default function AdminEquipmentsPage() {
     }
     setReloadKey((prev) => prev + 1);
     toast.success(`${selectedIds.length} peralatan ditandai sebagai ${value ? "borrowable" : "tidak borrowable"}.`);
-  };
-
-  const handleBulkSetUseable = async (value: boolean) => {
-    if (!selectedIds.length) return;
-    setIsBulkSettingFlag(true);
-    const result = await equipmentsService.bulkSetUseable(selectedIds, value);
-    setIsBulkSettingFlag(false);
-    if (!result.ok) {
-      toast.error("Gagal mengubah useable peralatan terpilih.");
-      return;
-    }
-    setReloadKey((prev) => prev + 1);
-    toast.success(`${selectedIds.length} peralatan ditandai sebagai ${value ? "useable" : "tidak useable"}.`);
   };
 
   const handleExportSelectedPdf = async () => {
@@ -484,15 +465,6 @@ export default function AdminEquipmentsPage() {
                     setPage(1);
                   }}
                 />
-                <FilterSelectField
-                  label="Useable"
-                  value={useable}
-                  options={USEABLE_OPTIONS}
-                  onChange={(value) => {
-                    setUseable(value);
-                    setPage(1);
-                  }}
-                />
                 <AdminFilterField label="Ruangan">
                   <select
                     value={room}
@@ -554,7 +526,6 @@ export default function AdminEquipmentsPage() {
               onExportSelectedExcel={() => { void handleExportSelectedExcel(); }}
               onSetShareable={(value) => { void handleBulkSetShareable(value); }}
               onSetBorrowable={(value) => { void handleBulkSetBorrowable(value); }}
-              onSetUseable={(value) => { void handleBulkSetUseable(value); }}
             />
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-end">
               <p className="text-xs text-muted-foreground sm:text-right">

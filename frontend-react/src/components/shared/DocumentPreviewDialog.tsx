@@ -10,9 +10,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
-import { type SampleTestingDocument } from "@/hooks/sample-testing";
 
-function isImageDocument(document: SampleTestingDocument) {
+type PreviewDocument = {
+  id: string;
+  documentType: string;
+  documentLabel: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  uploadedById: string;
+  uploadedByName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function isImageDocument(document: PreviewDocument) {
   const mimeType = String(document.mimeType || "").toLowerCase();
   const fileName = String(document.originalName || "").toLowerCase();
 
@@ -25,7 +38,7 @@ function isImageDocument(document: SampleTestingDocument) {
   );
 }
 
-function isPdfDocument(document: SampleTestingDocument) {
+function isPdfDocument(document: PreviewDocument) {
   const mimeType = String(document.mimeType || "").toLowerCase();
   const fileName = String(document.originalName || "").toLowerCase();
 
@@ -39,7 +52,7 @@ export default function DocumentPreviewDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  document: SampleTestingDocument | null;
+  document: PreviewDocument | null;
 }) {
   const canRenderImage = document ? isImageDocument(document) : false;
   const canRenderPdf = document ? isPdfDocument(document) : false;

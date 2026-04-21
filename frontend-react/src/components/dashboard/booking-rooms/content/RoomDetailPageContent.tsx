@@ -137,14 +137,6 @@ function EquipmentStatusBadge({ status }: { status: string }) {
     );
   }
 
-  if (normalized === "in use") {
-    return (
-      <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-        In Use
-      </span>
-    );
-  }
-
   return (
     <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
       {status || "-"}
@@ -331,7 +323,7 @@ export default function RoomDetailPageContent() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push("/rooms")}
+          onClick={() => router.push("/booking-rooms/rooms")}
         >
           <ArrowLeft className="h-4 w-4" />
           Kembali ke Daftar Ruangan
@@ -347,7 +339,7 @@ export default function RoomDetailPageContent() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push("/rooms")}
+          onClick={() => router.push("/booking-rooms/rooms")}
         >
           <ArrowLeft className="h-4 w-4" />
           Kembali ke Daftar Ruangan
@@ -378,7 +370,7 @@ export default function RoomDetailPageContent() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push("/rooms")}
+            onClick={() => router.push("/booking-rooms/rooms")}
           >
             <ArrowLeft className="h-4 w-4" />
             Kembali

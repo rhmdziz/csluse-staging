@@ -9,20 +9,22 @@ import {
   NotebookPen,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 
+import { DeleteRequestConfirmDialog } from "@/components/dialogs";
 import { Button, Skeleton } from "@/components/ui";
 
 import { DashboardDetailReviewPanel } from "@/components/dashboard/layout";
 
 import { ProgressSteps, RequestInformationCard, RequestProgressDialog } from "@/components/shared";
 
-import { useBookingDetail } from "@/hooks/booking-rooms";
+import { useBookingDetail, useUpdateBookingStatus } from "@/hooks/booking-rooms";
 
 import { formatDateTimeWib } from "@/lib/date";
 
-import { getBookingProgressFlow } from "@/lib/request";
+import { getBookingProgressFlow, normalizeStatus } from "@/lib/request";
 
 import {
   getMentorApprovalStageLabel,
@@ -84,7 +86,7 @@ function DetailMetaItem({
   if (!hasDisplayValue(value)) return null;
 
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-xs leading-5 text-slate-800 break-words">{value}</p>
     </div>
@@ -104,7 +106,7 @@ function BookingDetailSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]">
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -171,6 +173,8 @@ export default function BookingRoomsDetailPage() {
   const isApprovalPage = pathname.startsWith("/booking-rooms/approval/");
   const [reloadKey, setReloadKey] = useState(0);
   const [progressOpen, setProgressOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const { updateBookingStatus, pendingAction } = useUpdateBookingStatus();
 
   const { booking, isLoading, error } = useBookingDetail(id, reloadKey);
 
@@ -213,6 +217,18 @@ export default function BookingRoomsDetailPage() {
   }
 
   const flowSteps = getBookingProgressFlow(booking);
+  const canCancelBooking = !isApprovalPage && normalizeStatus(booking.status) === "approved";
+
+  const handleCancelBooking = async () => {
+    const result = await updateBookingStatus(booking.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success("Pengajuan peminjaman lab berhasil dibatalkan.");
+    setCancelOpen(false);
+    setReloadKey((prev) => prev + 1);
+  };
 
   return (
     <section className="space-y-4">
@@ -249,8 +265,8 @@ export default function BookingRoomsDetailPage() {
       <div
         className={
           isApprovalPage
-            ? "grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
-            : "grid gap-4 xl:grid-cols-[1.1fr_0.9fr]"
+            ? "grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]"
+            : "grid gap-4 xl:grid-cols-[minmax(0,1.22fr)_minmax(340px,0.92fr)]"
         }
       >
         {isApprovalPage ? (
@@ -311,7 +327,7 @@ export default function BookingRoomsDetailPage() {
                   {booking.equipmentItems.map((item) => (
                     <div
                       key={item.id || `${item.equipmentName}-${item.quantity}`}
-                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
+                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4"
                     >
                       <p className="text-xs text-slate-500">Peralatan</p>
                       <p className="text-xs leading-5 text-slate-800 break-words">
@@ -330,6 +346,7 @@ export default function BookingRoomsDetailPage() {
                 onStatusClick={() => setProgressOpen(true)}
                 approvedByName={booking.approvedByName}
                 rejectionNote={booking.rejectionNote}
+                itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
               >
                 {hasMentorApprovalTrace(booking) ? (
                   <>
@@ -414,7 +431,7 @@ export default function BookingRoomsDetailPage() {
                   {booking.equipmentItems.map((item) => (
                     <div
                       key={item.id || `${item.equipmentName}-${item.quantity}`}
-                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
+                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4"
                     >
                       <p className="text-xs text-slate-500">Peralatan</p>
                       <p className="text-xs leading-5 text-slate-800 break-words">
@@ -435,6 +452,7 @@ export default function BookingRoomsDetailPage() {
                 onStatusClick={() => setProgressOpen(true)}
                 approvedByName={booking.approvedByName}
                 rejectionNote={booking.rejectionNote}
+                itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
               >
                 {hasMentorApprovalTrace(booking) ? (
                   <>
@@ -449,10 +467,39 @@ export default function BookingRoomsDetailPage() {
                   </>
                 ) : null}
               </RequestInformationCard>
+
+              {canCancelBooking ? (
+                <section className="rounded-xl border border-rose-200 bg-rose-50/70 p-5">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Batalkan Pengajuan
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Pengajuan yang sudah disetujui masih dapat dibatalkan oleh pemohon sebelum pelaksanaan selesai.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="mt-4"
+                    onClick={() => setCancelOpen(true)}
+                    disabled={pendingAction.bookingId === booking.id}
+                  >
+                    Batalkan Pengajuan
+                  </Button>
+                </section>
+              ) : null}
             </div>
           </>
         )}
       </div>
+      <DeleteRequestConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onConfirm={() => void handleCancelBooking()}
+        isSubmitting={pendingAction.bookingId === booking.id}
+        title="Batalkan pengajuan peminjaman lab ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan tidak dapat diproses lanjut."
+        confirmLabel="Ya, Batalkan"
+      />
       <RequestProgressDialog
         open={progressOpen}
         onOpenChange={setProgressOpen}

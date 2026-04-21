@@ -52,6 +52,7 @@ export type SampleTestingDocumentType =
   | "signed_testing_agreement"
   | "invoice"
   | "payment_proof"
+  | "receipt"
   | "test_result_letter";
 
 export type SampleTestingDocument = {
@@ -128,7 +129,6 @@ type ApiSampleTestingsResponse = {
     pending?: number;
     approved?: number;
     diproses?: number;
-    menunggu_pembayaran?: number;
     completed?: number;
     rejected?: number;
   } | null;
@@ -139,7 +139,6 @@ export type SampleTestingAggregates = {
   pending: number;
   approved: number;
   diproses: number;
-  menungguPembayaran: number;
   completed: number;
   rejected: number;
 };
@@ -303,7 +302,6 @@ export function useSampleTestingList(
     pending: 0,
     approved: 0,
     diproses: 0,
-    menungguPembayaran: 0,
     completed: 0,
     rejected: 0,
   });
@@ -337,7 +335,6 @@ export function useSampleTestingList(
           pending: Array.isArray(payload) ? 0 : Number(payload.aggregates?.pending ?? 0),
           approved: Array.isArray(payload) ? 0 : Number(payload.aggregates?.approved ?? 0),
           diproses: Array.isArray(payload) ? 0 : Number(payload.aggregates?.diproses ?? 0),
-          menungguPembayaran: Array.isArray(payload) ? 0 : Number(payload.aggregates?.menunggu_pembayaran ?? 0),
           completed: Array.isArray(payload) ? 0 : Number(payload.aggregates?.completed ?? 0),
           rejected: Array.isArray(payload) ? 0 : Number(payload.aggregates?.rejected ?? 0),
         });

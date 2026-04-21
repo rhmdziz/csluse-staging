@@ -6,7 +6,6 @@ import {
   API_EQUIPMENTS_BULK_DELETE,
   API_EQUIPMENTS_BULK_SET_BORROWABLE,
   API_EQUIPMENTS_BULK_SET_SHAREABLE,
-  API_EQUIPMENTS_BULK_SET_USEABLE,
   API_EQUIPMENTS_DROPDOWN,
   API_IMAGE_DETAIL,
   API_IMAGES,
@@ -20,7 +19,6 @@ export type EquipmentFilters = {
   pic?: string;
   is_moveable?: string;
   is_borrowable?: string;
-  is_useable?: string;
   search?: string;
 };
 
@@ -37,7 +35,6 @@ export type EquipmentRow = {
   isMoveable: boolean;
   isShareable: boolean;
   isBorrowable: boolean;
-  isUseable: boolean;
   imageId: string | number | null;
   imageUrl: string;
 };
@@ -54,7 +51,6 @@ type ApiEquipment = {
   is_moveable?: boolean | null;
   is_shareable?: boolean | null;
   is_borrowable?: boolean | null;
-  is_useable?: boolean | null;
   room_detail?: { name?: string | null; number?: string | null } | null;
   room?: string | number | null;
   image?: string | number | null;
@@ -74,7 +70,6 @@ export type CreateEquipmentPayload = {
   isMoveable: boolean;
   isShareable: boolean;
   isBorrowable: boolean;
-  isUseable: boolean;
   description?: string;
 };
 
@@ -87,18 +82,16 @@ export type UpdateEquipmentPayload = {
   isMoveable: boolean;
   isShareable: boolean;
   isBorrowable: boolean;
-  isUseable: boolean;
   description?: string;
   imageId?: string | number | null;
   imageFile?: File | null;
 };
 
-export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "isShareable" | "isBorrowable" | "isUseable"> & {
+export type BulkEquipmentRow = Omit<CreateEquipmentPayload, "roomId" | "isShareable" | "isBorrowable"> & {
   index: number;
   roomId?: string;
   isShareable?: boolean;
   isBorrowable?: boolean;
-  isUseable?: boolean;
 };
 
 export type BulkEquipmentResult = {
@@ -148,7 +141,6 @@ export function mapEquipment(item: ApiEquipment): EquipmentRow {
     isMoveable: Boolean(item.is_moveable),
     isShareable: Boolean(item.is_shareable),
     isBorrowable: Boolean(item.is_borrowable),
-    isUseable: item.is_useable ?? true,
     imageId: item.image ?? null,
     imageUrl: resolveAssetUrl(item.image_detail?.url ?? ""),
   };
@@ -193,9 +185,6 @@ export const equipmentsService = {
     if (filters.is_borrowable !== undefined && filters.is_borrowable !== "") {
       url.searchParams.set("is_borrowable", filters.is_borrowable);
     }
-    if (filters.is_useable !== undefined && filters.is_useable !== "") {
-      url.searchParams.set("is_useable", filters.is_useable);
-    }
     if (filters.search) url.searchParams.set("search", filters.search);
 
     const response = await authFetch(url.toString(), { method: "GET", signal });
@@ -237,7 +226,6 @@ export const equipmentsService = {
       is_moveable: payload.isMoveable,
       is_shareable: payload.isShareable,
       is_borrowable: payload.isBorrowable,
-      is_useable: payload.isUseable,
     };
 
     if (payload.description?.trim()) body.description = payload.description.trim();
@@ -271,7 +259,6 @@ export const equipmentsService = {
       is_moveable: payload.isMoveable,
       is_shareable: payload.isShareable,
       is_borrowable: payload.isBorrowable,
-      is_useable: payload.isUseable,
       description: payload.description?.trim() || "",
     };
     if (payload.status?.trim()) body.status = payload.status.trim();
@@ -336,15 +323,6 @@ export const equipmentsService = {
     return parseMutationResponse(response);
   },
 
-  async bulkSetUseable(equipmentIds: Array<string | number>, value: boolean) {
-    const response = await authFetch(API_EQUIPMENTS_BULK_SET_USEABLE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: equipmentIds, value }),
-    });
-    return parseMutationResponse(response);
-  },
-
   async bulkCreate(rows: BulkEquipmentRow[]) {
     const response = await authFetch(API_EQUIPMENTS_BULK_CREATE, {
       method: "POST",
@@ -358,7 +336,6 @@ export const equipmentsService = {
           room: row.roomId || "",
           is_moveable: row.isMoveable,
           is_shareable: row.isShareable ?? false,
-          is_useable: row.isUseable ?? true,
           is_borrowable: row.isBorrowable ?? false,
           description: row.description?.trim() || "",
         })),
@@ -368,7 +345,7 @@ export const equipmentsService = {
   },
 
   async getOptions(
-    params: { status?: string; room?: string; isMoveable?: boolean; isBorrowable?: boolean; isUseable?: boolean; category?: string } = {},
+    params: { status?: string; room?: string; isMoveable?: boolean; isBorrowable?: boolean; category?: string } = {},
     signal?: AbortSignal,
   ) {
     const url = new URL(API_EQUIPMENTS_DROPDOWN, window.location.origin);
@@ -380,9 +357,6 @@ export const equipmentsService = {
     }
     if (typeof params.isBorrowable === "boolean") {
       url.searchParams.set("is_borrowable", String(params.isBorrowable));
-    }
-    if (typeof params.isUseable === "boolean") {
-      url.searchParams.set("is_useable", String(params.isUseable));
     }
 
     const response = await authFetch(url.toString(), { method: "GET", signal });

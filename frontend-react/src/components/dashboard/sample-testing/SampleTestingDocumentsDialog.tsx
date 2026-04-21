@@ -31,6 +31,11 @@ export default function SampleTestingDocumentsDialog({
     enabled: open && Boolean(sampleTestingId),
   });
 
+  const handleUploaded = () => {
+    onUploaded?.();
+    onOpenChange(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto border-slate-200 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:max-w-3xl">
@@ -64,7 +69,7 @@ export default function SampleTestingDocumentsDialog({
             <SampleTestingDocumentsSection
               item={sampleTesting}
               viewerRole={viewerRole}
-              onUploaded={onUploaded}
+              onUploaded={handleUploaded}
               embedded
               allowActions={allowActions}
             />

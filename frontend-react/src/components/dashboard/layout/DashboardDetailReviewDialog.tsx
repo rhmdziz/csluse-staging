@@ -15,8 +15,6 @@ function getReviewDialogTitle(context: Exclude<ReviewContext, null>) {
   switch (context.kind) {
     case "booking":
       return "Review Pengajuan Peminjaman Lab";
-    case "use":
-      return "Review Pengajuan Penggunaan Alat";
     case "borrow":
       return "Review Pengajuan Peminjaman Alat";
     case "sample-testing":

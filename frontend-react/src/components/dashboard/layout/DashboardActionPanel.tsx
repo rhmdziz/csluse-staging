@@ -24,7 +24,6 @@ import { Button, DateRangePicker, Input } from "@/components/ui";
 import {
   API_BOOKINGS_ALL_REQUESTERS,
   API_BORROWS_ALL_REQUESTERS,
-  API_USES_ALL_REQUESTERS,
 } from "@/constants/api";
 
 import {
@@ -232,22 +231,12 @@ export function DashboardActionPanel({
   const needsRoomOptions =
     menu.id === "schedule" ||
     menu.id === "booking-rooms" ||
-    menu.id === "use-equipment" ||
     menu.id === "borrow-equipment";
   const { rooms } = useRoomOptions(needsRoomOptions);
-  const { equipments: useEquipmentOptionsList } = useEquipmentOptions(
-    "",
-    "",
-    menu.id === "use-equipment",
-    undefined,
-    "",
-    undefined,
-    true,
-  );
   const { equipments: softwareEquipmentOptionsList } = useEquipmentOptions(
     "",
     "",
-    menu.id === "use-equipment",
+    menu.id === "booking-rooms",
     undefined,
     "Computer",
   );
@@ -283,9 +272,6 @@ export function DashboardActionPanel({
   const borrowRequester = searchParams.get("requested_by") ?? "";
   const borrowCreatedAfter = searchParams.get("created_after") ?? "";
   const borrowCreatedBefore = searchParams.get("created_before") ?? "";
-  const useEquipment = searchParams.get("equipment") ?? "";
-  const useRoom = searchParams.get("room") ?? "";
-  const useRequester = searchParams.get("requested_by") ?? "";
   const bookingCreatedRange: DateRange | undefined =
     bookingCreatedAfter || bookingCreatedBefore
       ? {
@@ -334,12 +320,10 @@ export function DashboardActionPanel({
   const softwareEquipment = searchParams.get("equipment") ?? "";
   const isBookingRequestListPage = pathname === "/booking-rooms";
   const isBookingAllRequestsPage = pathname === "/booking-rooms/approval";
-  const isRoomsListPage = pathname === "/rooms";
-  const isUseRequestListPage = pathname === "/use-equipment";
-  const isUseAllRequestsPage = pathname === "/use-equipment/approval";
-  const isEquipmentListPage = pathname === "/use-equipment/equipment";
-  const isSoftwareListPage = pathname === "/use-equipment/software";
-  const isMaterialsListPage = pathname === "/use-equipment/materials";
+  const isRoomsListPage = pathname === "/booking-rooms/rooms";
+  const isEquipmentListPage = pathname === "/booking-rooms/equipment";
+  const isSoftwareListPage = pathname === "/booking-rooms/software";
+  const isMaterialsListPage = pathname === "/booking-rooms/materials";
   const materialKeyword = searchParams.get("q") ?? "";
   const materialStatus = searchParams.get("status") ?? "";
   const materialCategory = searchParams.get("category") ?? "";
@@ -352,10 +336,6 @@ export function DashboardActionPanel({
   const { requesters: bookingRequesters } = useHistoryRequesterOptions(
     API_BOOKINGS_ALL_REQUESTERS,
     isBookingAllRequestsPage,
-  );
-  const { requesters: useRequesters } = useHistoryRequesterOptions(
-    API_USES_ALL_REQUESTERS,
-    isUseAllRequestsPage,
   );
   const { requesters: borrowRequesters } = useHistoryRequesterOptions(
     API_BORROWS_ALL_REQUESTERS,
@@ -864,7 +844,6 @@ export function DashboardActionPanel({
                   <option value="">Semua Kategori</option>
                   <option value="schedule">Jadwal Praktikum</option>
                   <option value="booking">Peminjaman Lab</option>
-                  <option value="use">Penggunaan Alat</option>
                 </select>
               </FilterField>
               <FilterField label="Ruangan">
@@ -911,26 +890,18 @@ export function DashboardActionPanel({
                   actionIsActive &&
                   action.id === "rooms" &&
                   isRoomsListPage;
-                const showUseFilters =
-                  menu.id === "use-equipment" &&
-                  isActionPathActive(
-                    action.id,
-                    "request-list",
-                    isUseRequestListPage,
-                    isUseAllRequestsPage,
-                  );
                 const showEquipmentFilters =
-                  menu.id === "use-equipment" &&
+                  menu.id === "booking-rooms" &&
                   actionIsActive &&
                   action.id === "equipment" &&
                   isEquipmentListPage;
                 const showSoftwareFilters =
-                  menu.id === "use-equipment" &&
+                  menu.id === "booking-rooms" &&
                   actionIsActive &&
                   action.id === "software" &&
                   isSoftwareListPage;
                 const showMaterialFilters =
-                  menu.id === "use-equipment" &&
+                  menu.id === "booking-rooms" &&
                   actionIsActive &&
                   action.id === "materials" &&
                   isMaterialsListPage;
@@ -1047,85 +1018,6 @@ export function DashboardActionPanel({
                       {renderRoomFilters()}
                     </AnimatedFilterSection>
 
-                    <AnimatedFilterSection show={showUseFilters}>
-                      {renderRequestFilters({
-                          keyword: bookingKeyword,
-                          status: bookingStatus,
-                          dateRange: bookingCreatedRange,
-                          placeholder: "Cari pengajuan...",
-                          statusOptions: REQUEST_STATUS_OPTIONS,
-                          extraFields: (
-                            <>
-                              <FilterField label="Alat">
-                                <select
-                                  value={useEquipment}
-                                  onChange={(event) =>
-                                    updateBookingFilter("equipment", event.target.value)
-                                  }
-                                  className={FILTER_CONTROL_CLASS}
-                                >
-                                  <option value="">Semua Alat</option>
-                                  {useEquipmentOptionsList.map((equipment) => (
-                                    <option key={equipment.id} value={equipment.id}>
-                                      {equipment.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </FilterField>
-                              <FilterField label="Ruangan">
-                                <select
-                                  value={useRoom}
-                                  onChange={(event) =>
-                                    updateBookingFilter("room", event.target.value)
-                                  }
-                                  className={FILTER_CONTROL_CLASS}
-                                >
-                                  <option value="">Semua Ruangan</option>
-                                  {rooms.map((room) => (
-                                    <option key={room.id} value={room.id}>
-                                      {room.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </FilterField>
-                              {isUseAllRequestsPage ? (
-                                <FilterField label="Pemohon">
-                                  <select
-                                    value={useRequester}
-                                    onChange={(event) =>
-                                      updateBookingFilter("requested_by", event.target.value)
-                                    }
-                                    className={FILTER_CONTROL_CLASS}
-                                  >
-                                    <option value="">Semua Pemohon</option>
-                                    {useRequesters.map((requester) => (
-                                      <option key={requester.id} value={requester.id}>
-                                        {requester.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </FilterField>
-                              ) : null}
-                            </>
-                          ),
-                          onKeywordChange: (value) =>
-                            updateBookingFilter("q", value),
-                          onStatusChange: (value) =>
-                            updateBookingFilter("status", value),
-                          onDateRangeChange: (value) =>
-                            updateDateRangeFilter("booking", value),
-                          onReset: () =>
-                            resetFilters([
-                              "q",
-                              "status",
-                              "equipment",
-                              "room",
-                              "requested_by",
-                              "created_after",
-                              "created_before",
-                            ]),
-                        })}
-                    </AnimatedFilterSection>
 
                     <AnimatedFilterSection show={showEquipmentFilters}>
                       {renderEquipmentFilters({

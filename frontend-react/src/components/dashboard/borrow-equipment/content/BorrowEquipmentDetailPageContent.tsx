@@ -11,16 +11,18 @@ import {
   TriangleAlert,
   Wrench,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 
+import { DeleteRequestConfirmDialog } from "@/components/dialogs";
 import { Button, Skeleton } from "@/components/ui";
 
 import { DashboardDetailReviewPanel } from "@/components/dashboard/layout";
 
 import { ProgressSteps, RequestInformationCard, RequestProgressDialog } from "@/components/shared";
 
-import { useBorrowDetail } from "@/hooks/borrow-equipment";
+import { useBorrowDetail, useUpdateBorrowStatus } from "@/hooks/borrow-equipment";
 
 import { formatDateTimeWib } from "@/lib/date";
 
@@ -34,6 +36,7 @@ import {
 import {
   getBorrowStatusDisplayLabel,
   getStatusBadgeClass,
+  normalizeStatus as normalizeRequestStatus,
 } from "@/lib/request";
 
 function hasDisplayValue(value?: string | null) {
@@ -91,7 +94,7 @@ function DetailMetaItem({
   if (!hasDisplayValue(value)) return null;
 
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-xs leading-5 text-slate-800 break-words">{value}</p>
     </div>
@@ -111,7 +114,7 @@ function BorrowDetailSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]">
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -174,6 +177,8 @@ export default function BorrowEquipmentDetailPage() {
   const borrowId = Array.isArray(id) ? id[0] : id;
   const [reloadKey, setReloadKey] = useState(0);
   const [progressOpen, setProgressOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const { updateBorrowStatus, pendingAction } = useUpdateBorrowStatus();
   const { borrow: item, isLoading, error } = useBorrowDetail(borrowId, reloadKey);
 
   const isAllPage = pathname.startsWith("/borrow-equipment/approval/");
@@ -213,6 +218,19 @@ export default function BorrowEquipmentDetailPage() {
   }
 
   const flowSteps = getBorrowProgressFlow(item);
+  const canCancelBorrow =
+    !isAllPage && normalizeRequestStatus(item.status) === "approved";
+
+  const handleCancelBorrow = async () => {
+    const result = await updateBorrowStatus(item.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success("Pengajuan peminjaman alat berhasil dibatalkan.");
+    setCancelOpen(false);
+    setReloadKey((prev) => prev + 1);
+  };
 
   return (
     <section className="space-y-4">
@@ -253,7 +271,7 @@ export default function BorrowEquipmentDetailPage() {
       <div
         className={
           isAllPage
-            ? "grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
+            ? "grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]"
             : "space-y-4"
         }
       >
@@ -300,6 +318,7 @@ export default function BorrowEquipmentDetailPage() {
                 onStatusClick={() => setProgressOpen(true)}
                 approvedByName={item.approvedByName}
                 rejectionNote={item.rejectionNote}
+                itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
               >
                 {hasMentorApprovalTrace(item) ? (
                   <>
@@ -360,7 +379,7 @@ export default function BorrowEquipmentDetailPage() {
           </>
         ) : (
           <>
-            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.22fr)_minmax(340px,0.92fr)]">
               <div className="space-y-4">
                 <DetailCard
                   title="Detail Peminjaman Alat"
@@ -404,6 +423,7 @@ export default function BorrowEquipmentDetailPage() {
                   onStatusClick={() => setProgressOpen(true)}
                   approvedByName={item.approvedByName}
                   rejectionNote={item.rejectionNote}
+                  itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
                 >
                   {hasMentorApprovalTrace(item) ? (
                     <>
@@ -448,11 +468,40 @@ export default function BorrowEquipmentDetailPage() {
                     </dl>
                   </section>
                 ) : null}
+
+                {canCancelBorrow ? (
+                  <section className="rounded-xl border border-rose-200 bg-rose-50/70 p-5">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Batalkan Pengajuan
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Pengajuan yang sudah disetujui masih dapat dibatalkan selama alat belum diserahterimakan.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="mt-4"
+                      onClick={() => setCancelOpen(true)}
+                      disabled={pendingAction.borrowId === item.id}
+                    >
+                      Batalkan Pengajuan
+                    </Button>
+                  </section>
+                ) : null}
               </div>
             </div>
           </>
         )}
       </div>
+      <DeleteRequestConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onConfirm={() => void handleCancelBorrow()}
+        isSubmitting={pendingAction.borrowId === item.id}
+        title="Batalkan pengajuan peminjaman alat ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan proses peminjaman dihentikan."
+        confirmLabel="Ya, Batalkan"
+      />
       <RequestProgressDialog
         open={progressOpen}
         onOpenChange={setProgressOpen}

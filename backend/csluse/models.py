@@ -99,7 +99,6 @@ class Equipment(BaseModel):
     is_moveable = models.BooleanField(default=True)
     is_shareable = models.BooleanField(default=False)
     is_borrowable = models.BooleanField(default=False)
-    is_useable = models.BooleanField(default=False)
 
     def __str__(self):
         room_name = self.room.name if self.room else "Tanpa Ruangan"
@@ -165,6 +164,7 @@ class Booking(BaseModel):
     STATUS_CHOICES = [
         ("Pending", "Pending"),
         ("Approved", "Approved"),
+        ("Canceled", "Canceled"),
         ("Rejected", "Rejected"),
         ("Expired", "Expired"),
         ("Completed", "Completed"),
@@ -264,81 +264,6 @@ class BookingEquipmentItem(BaseModel):
 # endregion Booking Models
 
 
-# region Equipment Use Models
-
-
-class Use(BaseModel):
-    STATUS_CHOICES = [
-        ("Pending", "Pending"),
-        ("Approved", "Approved"),
-        ("Rejected", "Rejected"),
-        ("Expired", "Expired"),
-        ("Completed", "Completed"),
-    ]
-
-    code = models.CharField(max_length=12, unique=True, editable=False, null=True)
-    requested_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="uses",
-    )
-    requester_phone = models.CharField(max_length=20, blank=True, null=True)
-    requester_mentor = models.CharField(max_length=255, blank=True, null=True)
-    requester_mentor_profile = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="requested_uses_as_mentor",
-    )
-    is_approved_by_mentor = models.BooleanField(default=False)
-    mentor_approved_at = models.DateTimeField(blank=True, null=True)
-
-    # if role == guest, then fill in institution and institution_address
-    institution = models.CharField(max_length=255, blank=True, null=True)
-    institution_address = models.CharField(max_length=555, blank=True, null=True)
-
-    equipment = models.ForeignKey(
-        Equipment,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="uses",
-    )
-    quantity = models.PositiveIntegerField(default=1)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField(blank=True, null=True)
-    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, default="Other")
-    note = models.CharField(max_length=2000, blank=True, null=True)
-    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="Pending")
-    approved_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="approved_uses",
-    )
-    approved_at = models.DateTimeField(blank=True, null=True)
-    rejected_at = models.DateTimeField(blank=True, null=True)
-    rejection_note = models.CharField(max_length=2000, blank=True, null=True)
-    expired_at = models.DateTimeField(blank=True, null=True)
-    completed_at = models.DateTimeField(blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        if not self.code:
-            now = timezone.localtime(timezone.now())
-            yymm = now.strftime("%y%m")
-            with transaction.atomic():
-                self.code = _next_code(Use, "PA", yymm)
-        return super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.code} - {self.equipment.name} - {self.requested_by.user.email} - {self.status}"
-
-
-# endregion Equipment Use Models
 
 
 # region Borrow Models
@@ -348,6 +273,7 @@ class Borrow(BaseModel):
     STATUS_CHOICES = [
         ("Pending", "Pending"),
         ("Approved", "Approved"),
+        ("Canceled", "Canceled"),
         ("Rejected", "Rejected"),
         ("Expired", "Expired"),
         ("Borrowed", "Borrowed"),
@@ -436,8 +362,8 @@ class Pengujian(BaseModel):
     STATUS_CHOICES = [
         ("Pending", "Pending"),
         ("Approved", "Approved"),
+        ("Canceled", "Canceled"),
         ("Diproses", "Diproses"),
-        ("Menunggu Pembayaran", "Menunggu Pembayaran"),
         ("Rejected", "Rejected"),
         ("Completed", "Completed"),
     ]
@@ -488,21 +414,70 @@ class Pengujian(BaseModel):
         return f"{self.name} - {self.email}"
 
 
+class SuratBebasLab(BaseModel):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Rejected", "Rejected"),
+    ]
+
+    code = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    requested_by = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="surat_bebas_lab_requests",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
+    note = models.TextField(blank=True, default="")
+    reviewed_by = models.ForeignKey(
+        Profile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="surat_bebas_lab_reviews",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            now = timezone.localtime(timezone.now())
+            yymm = now.strftime("%y%m")
+            with transaction.atomic():
+                self.code = _next_code(SuratBebasLab, "BL", yymm)
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} - {self.requested_by}"
+
+
 class Document(BaseModel):
     DOCUMENT_TYPE_CHOICES = [
         ("testing_agreement", "Surat perjanjian pengujian"),
         ("signed_testing_agreement", "Surat perjanjian pengujian yang sudah ditandatangani"),
         ("invoice", "Invoice"),
         ("payment_proof", "Bukti bayar"),
+        ("receipt", "Kuitansi"),
         ("test_result_letter", "Surat hasil uji"),
+        ("form_alat_kecil", "F-027A Peminjaman dan Pengembalian Alat Kecil"),
+        ("form_alat_besar", "F-027B Pemakaian Alat Besar"),
+        ("form_permintaan_bahan", "F-028 Permintaan Bahan"),
     ]
 
     pengujian = models.ForeignKey(
         Pengujian,
         on_delete=models.CASCADE,
         related_name="documents",
+        null=True,
+        blank=True,
     )
-    document = models.FileField(upload_to="documents/sample-testing/")
+    surat_bebas_lab = models.ForeignKey(
+        SuratBebasLab,
+        on_delete=models.CASCADE,
+        related_name="documents",
+        null=True,
+        blank=True,
+    )
+    document = models.FileField(upload_to="documents/")
     document_type = models.CharField(max_length=64, choices=DOCUMENT_TYPE_CHOICES)
     original_name = models.CharField(max_length=255, blank=True)
     mime_type = models.CharField(max_length=255, blank=True)
@@ -519,12 +494,20 @@ class Document(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["pengujian", "document_type"],
+                condition=models.Q(pengujian__isnull=False),
                 name="unique_pengujian_document_type",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["surat_bebas_lab", "document_type"],
+                condition=models.Q(surat_bebas_lab__isnull=False),
+                name="unique_surat_bebas_lab_document_type",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.pengujian.code} - {self.document_type}"
+        parent = self.pengujian or self.surat_bebas_lab
+        code = getattr(parent, "code", str(self.id))
+        return f"{code} - {self.document_type}"
 
 
 # endregion Sample Testing Models

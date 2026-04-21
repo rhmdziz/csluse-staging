@@ -97,6 +97,16 @@ export function getBookingProgressFlow(
     baseSteps[completedIndex].state = "process";
     return baseSteps;
   }
+  if (status === "canceled" || status === "cancelled") {
+    const canceledIndex = hasMentorApprovalTrace(booking) ? 2 : 1;
+    baseSteps[canceledIndex] = {
+      key: "canceled",
+      label: "Dibatalkan",
+      time: pickTime(booking.updatedAt),
+      state: "error",
+    };
+    return baseSteps.slice(0, canceledIndex + 1);
+  }
   if (status === "completed") {
     const approvedIndex = hasMentorApprovalTrace(booking) ? 2 : 1;
     const completedIndex = hasMentorApprovalTrace(booking) ? 3 : 2;
@@ -129,9 +139,6 @@ export function getBookingProgressFlow(
   return baseSteps;
 }
 
-export function getUseProgressFlow(item: BasicProgressInput): ProgressStepItem[] {
-  return getBookingProgressFlow(item);
-}
 
 export function getSampleTestingProgressFlow(
   item: BasicProgressInput,
@@ -155,11 +162,6 @@ export function getSampleTestingProgressFlow(
       state: "wait",
     },
     {
-      key: "waiting-payment",
-      label: "Menunggu Pembayaran",
-      state: "wait",
-    },
-    {
       key: "completed",
       label: "Selesai",
       state: "wait",
@@ -173,22 +175,20 @@ export function getSampleTestingProgressFlow(
     steps[2].state = "process";
     return steps;
   }
+  if (status === "canceled" || status === "cancelled") {
+    steps[1] = {
+      key: "canceled",
+      label: "Dibatalkan",
+      time: pickTime(item.updatedAt),
+      state: "error",
+    };
+    return steps.slice(0, 2);
+  }
   if (status === "diproses") {
     steps[1].state = "finish";
     steps[1].time = pickTime(item.approvedAt, item.updatedAt);
     steps[2].state = "finish";
     steps[2].time = pickTime(item.updatedAt);
-    steps[3].state = "process";
-    return steps;
-  }
-  if (status === "menunggu pembayaran") {
-    steps[1].state = "finish";
-    steps[1].time = pickTime(item.approvedAt, item.updatedAt);
-    steps[2].state = "finish";
-    steps[2].time = pickTime(item.updatedAt);
-    steps[3].state = "finish";
-    steps[3].time = pickTime(item.updatedAt);
-    steps[4].state = "process";
     return steps;
   }
   if (status === "completed") {
@@ -197,9 +197,7 @@ export function getSampleTestingProgressFlow(
     steps[2].state = "finish";
     steps[2].time = pickTime(item.updatedAt);
     steps[3].state = "finish";
-    steps[3].time = pickTime(item.updatedAt);
-    steps[4].state = "finish";
-    steps[4].time = pickTime(item.completedAt, item.updatedAt);
+    steps[3].time = pickTime(item.completedAt, item.updatedAt);
     return steps;
   }
   if (status === "rejected") {
@@ -261,6 +259,16 @@ export function getBorrowProgressFlow(
     baseSteps[approvedIndex].time = pickTime(item.approvedAt, item.updatedAt);
     baseSteps[borrowedIndex].state = "process";
     return baseSteps;
+  }
+  if (status === "canceled" || status === "cancelled") {
+    const canceledIndex = hasMentorApprovalTrace(item) ? 2 : 1;
+    baseSteps[canceledIndex] = {
+      key: "canceled",
+      label: "Dibatalkan",
+      time: pickTime(item.updatedAt),
+      state: "error",
+    };
+    return baseSteps.slice(0, canceledIndex + 1);
   }
   if (status === "borrowed") {
     const approvedIndex = hasMentorApprovalTrace(item) ? 2 : 1;

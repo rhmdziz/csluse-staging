@@ -7,7 +7,7 @@ import { authFetch } from "@/lib/auth";
 
 export type CalendarEvent = {
   id: string;
-  source: "schedule" | "booking" | "use" | string;
+  source: "schedule" | "booking" | string;
   title: string;
   start_time: string;
   end_time?: string | null;

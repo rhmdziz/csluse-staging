@@ -35,7 +35,6 @@ import {
 import {
   API_BOOKING_REVIEW_CHECK,
   API_BORROW_REVIEW_CHECK,
-  API_USE_REVIEW_CHECK,
 } from "@/constants/api";
 
 import { WORKSHOP_PURPOSE } from "@/constants/request-purpose";
@@ -64,10 +63,6 @@ import {
 
 import { useUpdateSampleTestingStatus } from "@/hooks/sample-testing";
 
-import { useUseDetail, type UseRow } from "@/hooks/use-equipment";
-
-import { useUpdateUseStatus } from "@/hooks/use-equipment";
-
 import { formatDateTimeWib } from "@/lib/date";
 
 import {
@@ -78,7 +73,6 @@ import {
 
 export type ReviewContext =
   | { kind: "booking"; id: string }
-  | { kind: "use"; id: string }
   | { kind: "borrow"; id: string }
   | { kind: "sample-testing"; id: string }
   | null;
@@ -268,29 +262,14 @@ function getPengujianStatusHint(
     return {
       title: "Pengujian sedang diproses",
       message: reviewer
-        ? "Lengkapi tahapan dokumen sampai invoice diterbitkan."
-        : "Lengkapi dokumen requester agar proses dapat lanjut ke tahap pembayaran.",
+        ? "Lengkapi dokumen proses pengujian sampai kuitansi dan surat hasil uji tersedia."
+        : "Lengkapi dokumen requester yang dibutuhkan selama proses pengujian berjalan.",
       indicators: reviewer
-        ? ["Upload invoice saat tahap administrasi pengujian siap masuk pembayaran."]
-        : ["Upload surat perjanjian yang sudah ditandatangani bila belum tersedia."],
+        ? ["Upload kuitansi dan surat hasil uji, atau tandai selesai secara manual bila proses sudah berakhir."]
+        : ["Upload surat perjanjian yang sudah ditandatangani atau bukti bayar bila diminta."],
       className: "border-blue-200 bg-blue-50/80",
       titleClassName: "text-blue-800",
       textClassName: "text-blue-900",
-    };
-  }
-
-  if (normalized === "menunggu pembayaran") {
-    return {
-      title: "Menunggu pembayaran",
-      message: reviewer
-        ? "Sistem sedang menunggu bukti bayar dan surat hasil uji untuk menyelesaikan pengujian."
-        : "Upload bukti bayar, lalu surat hasil uji untuk menyelesaikan proses.",
-      indicators: reviewer
-        ? ["Pantau dokumen requester pada section dokumen pengujian."]
-        : ["Setelah bukti bayar terunggah, lanjutkan upload surat hasil uji pada tahap akhir."],
-      className: "border-violet-200 bg-violet-50/80",
-      titleClassName: "text-violet-800",
-      textClassName: "text-violet-900",
     };
   }
 
@@ -725,311 +704,6 @@ function BookingReviewPanel({
   );
 }
 
-function UseReviewPanel({
-  id,
-  onActionComplete,
-  initialUseItem,
-}: {
-  id: string;
-  onActionComplete?: () => void;
-  initialUseItem?: UseRow | null;
-}) {
-  const { profile } = useLoadProfile();
-  const { useItem, setUseItem, isLoading, error } = useUseDetail(id, 0, {
-    enabled: !initialUseItem,
-    initialUseItem,
-  });
-  const { updateUseStatus, pendingAction } = useUpdateUseStatus();
-  const [reviewIssues, setReviewIssues] = useState<ReviewIssue[]>([]);
-  const [passedIndicators, setPassedIndicators] = useState<string[]>([]);
-  const [issuesLoading, setIssuesLoading] = useState(true);
-  const [confirmType, setConfirmType] = useState<
-    "approve" | "reject" | "complete" | null
-  >(null);
-  const shouldShowUseReviewCheck = isPendingStatus(useItem?.status ?? "");
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadIssues = async () => {
-      if (!useItem) {
-        if (isMounted) {
-          setReviewIssues([]);
-          setPassedIndicators([]);
-          setIssuesLoading(false);
-        }
-        return;
-      }
-
-      if (!shouldShowUseReviewCheck) {
-        if (isMounted) {
-          setReviewIssues([]);
-          setPassedIndicators([]);
-          setIssuesLoading(false);
-        }
-        return;
-      }
-
-      setIssuesLoading(true);
-      try {
-        const result = await loadReviewIssues(API_USE_REVIEW_CHECK(useItem.id));
-        if (isMounted) {
-          setReviewIssues(result.issues);
-          setPassedIndicators(result.passedIndicators);
-          setIssuesLoading(false);
-        }
-      } catch {
-        if (isMounted) {
-          setReviewIssues([
-            {
-              label: "Review check belum tersedia",
-              value:
-                "Sistem tidak berhasil memeriksa catatan review saat ini. Cek ulang data sebelum approve.",
-            },
-          ]);
-          setPassedIndicators([]);
-          setIssuesLoading(false);
-        }
-      }
-    };
-
-    void loadIssues();
-    return () => {
-      isMounted = false;
-    };
-  }, [useItem?.id, shouldShowUseReviewCheck]);
-
-  if (isLoading) return <PanelLoadingState />;
-  if (error || !useItem) {
-    return (
-      <PanelErrorState
-        message={error || "Data penggunaan alat tidak ditemukan."}
-      />
-    );
-  }
-
-  const waitingForMentorApproval = isWaitingForMentorApproval(useItem);
-  const showUseReviewCheck =
-    shouldShowUseReviewCheck && !waitingForMentorApproval;
-  const reviewer = isReviewerRole(profile?.role);
-  const canReviewUse = canCurrentUserReviewPendingRequest(
-    useItem,
-    profile?.id,
-    profile?.role,
-  );
-  const canCompleteUse =
-    isApprovedStatus(useItem.status) &&
-    canCurrentUserFinalizeRequest(useItem, profile?.id, profile?.role);
-  const mentorHint = getMentorApprovalHint(
-    waitingForMentorApproval,
-    String(profile?.id ?? "") === useItem.requesterMentorProfileId,
-  );
-  const isGuestRequester = isGuestRole(useItem.requesterRole);
-  const useStatusHint = getCompleteStatusHint(useItem.status, reviewer, {
-    readyTitle: "Penggunaan alat siap diselesaikan",
-    reviewerMessage:
-      "Pengajuan sudah disetujui. Tandai sebagai selesai setelah periode penggunaan alat benar-benar berakhir.",
-    requesterMessage:
-      "Pengajuan sudah disetujui dan akan ditandai selesai oleh petugas setelah periode penggunaan alat berakhir.",
-    reviewerIndicator:
-      "Gunakan aksi Tandai Selesai setelah penggunaan alat selesai.",
-    requesterIndicator:
-      "Status akan diperbarui menjadi selesai oleh petugas setelah penggunaan alat berakhir.",
-  });
-
-  const handleUseAction = async (rejectionNote?: string) => {
-    if (!confirmType) return;
-
-    const type = confirmType;
-    const result = await updateUseStatus(
-      useItem.id,
-      type,
-      type === "reject" ? { rejectionNote } : undefined,
-    );
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-
-    const now = new Date().toISOString();
-    setUseItem((current) =>
-      current
-        ? {
-            ...current,
-            status:
-              type === "approve"
-                ? "Approved"
-                : type === "reject"
-                  ? "Rejected"
-                  : "Completed",
-            updatedAt: now,
-            rejectionNote:
-              type === "reject"
-                ? String(rejectionNote ?? current.rejectionNote ?? "")
-                : current.rejectionNote,
-            approvedById:
-              type === "approve"
-                ? String(profile?.id ?? current.approvedById)
-                : current.approvedById,
-            approvedByName:
-              type === "approve"
-                ? profile?.name || current.approvedByName
-                : current.approvedByName,
-            approvedAt: type === "approve" ? now : current.approvedAt,
-            rejectedAt: type === "reject" ? now : current.rejectedAt,
-            completedAt: type === "complete" ? now : current.completedAt,
-          }
-        : current,
-    );
-    setConfirmType(null);
-
-    toast.success(
-      type === "approve"
-        ? "Pengajuan penggunaan alat berhasil disetujui."
-        : type === "reject"
-          ? "Pengajuan penggunaan alat berhasil ditolak."
-          : "Pengajuan penggunaan alat berhasil ditandai selesai.",
-    );
-    onActionComplete?.();
-  };
-
-  return (
-    <>
-      <RequestReviewCard
-        status={useItem.status}
-        code={useItem.code}
-        meta={[
-          { label: "Alat", value: useItem.equipmentName || "-" },
-          { label: "Ruangan", value: useItem.roomName || "-" },
-          { label: "Pemohon", value: useItem.requesterName },
-          { label: "Ditujukan ke PIC", value: useItem.roomPicName || "-" },
-
-          { label: "Jumlah", value: useItem.quantity || "-" },
-          { label: "Tujuan", value: useItem.purpose || "-" },
-
-          ...(!isGuestRequester
-            ? [
-                {
-                  label: "Prodi Pemohon",
-                  value: useItem.requesterDepartment || "-",
-                },
-                {
-                  label: "Dosen/Pembimbing",
-                  value: useItem.requesterMentor || "-",
-                },
-              ]
-            : []),
-          ...(isGuestRequester
-            ? [
-                { label: "Institusi", value: useItem.institution || "-" },
-                {
-                  label: "Alamat Institusi",
-                  value: useItem.institutionAddress || "-",
-                },
-              ]
-            : []),
-          ...(useItem.status === "Rejected"
-            ? [
-                {
-                  label: "Waktu Ditolak",
-                  value: formatDateTimeWib(useItem.rejectedAt),
-                },
-                {
-                  label: "Alasan Penolakan",
-                  value: useItem.rejectionNote || "-",
-                },
-              ]
-            : []),
-          ...(useItem.status === "Expired"
-            ? [
-                {
-                  label: "Waktu Kedaluwarsa",
-                  value: formatDateTimeWib(useItem.expiredAt),
-                },
-              ]
-            : []),
-          ...(useItem.status === "Completed"
-            ? [
-                {
-                  label: "Waktu Selesai",
-                  value: formatDateTimeWib(useItem.completedAt),
-                },
-              ]
-            : []),
-        ]}
-        checklist={showUseReviewCheck ? reviewIssues : []}
-        checklistLoading={showUseReviewCheck ? issuesLoading : false}
-        showChecklistSection={showUseReviewCheck}
-        checklistEmptyMessage={
-          showUseReviewCheck
-            ? "Tidak ada catatan review. Pengajuan ini siap diproses."
-            : undefined
-        }
-        checklistPassedIndicators={
-          showUseReviewCheck ? passedIndicators : []
-        }
-        statusHintTitle={mentorHint?.title ?? useStatusHint?.title}
-        statusHintMessage={mentorHint?.message ?? useStatusHint?.message}
-        statusHintIndicators={mentorHint?.indicators ?? useStatusHint?.indicators}
-        statusHintClassName={mentorHint?.className ?? useStatusHint?.className}
-        statusHintTitleClassName={mentorHint?.titleClassName ?? useStatusHint?.titleClassName}
-        statusHintTextClassName={mentorHint?.textClassName ?? useStatusHint?.textClassName}
-      >
-        {canReviewUse ? (
-          <>
-            <Button
-              type="button"
-              className="h-10 rounded-md border border-emerald-600 bg-emerald-600 px-4 text-white shadow-sm hover:bg-emerald-700"
-              onClick={() => setConfirmType("approve")}
-              disabled={pendingAction.useId === useItem.id}
-            >
-              <Check className="h-4 w-4" />
-              Setujui
-            </Button>
-            <Button
-              type="button"
-              className="h-10 rounded-md border border-rose-600 bg-rose-600 px-4 text-white shadow-sm hover:bg-rose-700"
-              onClick={() => setConfirmType("reject")}
-              disabled={pendingAction.useId === useItem.id}
-            >
-              <X className="h-4 w-4" />
-              Tolak
-            </Button>
-          </>
-        ) : null}
-        {canCompleteUse ? (
-          <Button
-            type="button"
-            className="h-10 rounded-md border border-sky-600 bg-sky-600 px-4 text-white shadow-sm hover:bg-sky-700"
-            onClick={() => setConfirmType("complete")}
-            disabled={pendingAction.useId === useItem.id}
-          >
-            <Check className="h-4 w-4" />
-            Tandai Selesai
-          </Button>
-        ) : null}
-      </RequestReviewCard>
-
-      <StatusConfirmDialog
-        open={Boolean(confirmType)}
-        actionType={
-          confirmType === "reject" ? "reject" : confirmType ? "approve" : null
-        }
-        onOpenChange={(open) => {
-          if (!open) setConfirmType(null);
-        }}
-        onConfirm={handleUseAction}
-        isSubmitting={pendingAction.useId === useItem.id}
-        subjectLabel={
-          confirmType === "complete"
-            ? "pengajuan penggunaan alat ini sebagai selesai"
-            : "pengajuan penggunaan alat ini"
-        }
-        requireReasonOnReject={confirmType === "reject"}
-      />
-    </>
-  );
-}
 
 function BorrowReviewPanel({
   id,
@@ -1518,7 +1192,7 @@ function PengujianReviewPanel({
     initialSampleTesting,
   });
   const { updateSampleTestingStatus, pendingAction } = useUpdateSampleTestingStatus();
-  const [confirmType, setConfirmType] = useState<"approve" | "reject" | null>(
+  const [confirmType, setConfirmType] = useState<"approve" | "reject" | "complete" | null>(
     null,
   );
 
@@ -1533,6 +1207,9 @@ function PengujianReviewPanel({
 
   const canReviewSampleTesting =
     isSampleTestingApproverRole(profile?.role) && isPendingStatus(sampleTesting.status);
+  const canCompleteSampleTesting =
+    isSampleTestingApproverRole(profile?.role) &&
+    ["approved", "diproses"].includes(normalizeStatus(sampleTesting.status));
   const isGuestRequester = isGuestRole(sampleTesting.requesterRole);
   const sampleTestingStatusHint = getPengujianStatusHint(
     sampleTesting.status,
@@ -1554,7 +1231,12 @@ function PengujianReviewPanel({
       current
         ? {
             ...current,
-            status: type === "approve" ? "Approved" : "Rejected",
+            status:
+              type === "approve"
+                ? "Approved"
+                : type === "complete"
+                  ? "Completed"
+                  : "Rejected",
             updatedAt: now,
             approvedById:
               type === "approve"
@@ -1566,7 +1248,7 @@ function PengujianReviewPanel({
                 : current.approvedByName,
             approvedAt: type === "approve" ? now : current.approvedAt,
             rejectedAt: type === "reject" ? now : current.rejectedAt,
-            completedAt: current.completedAt,
+            completedAt: type === "complete" ? now : current.completedAt,
           }
         : current,
     );
@@ -1575,7 +1257,9 @@ function PengujianReviewPanel({
     toast.success(
       type === "approve"
         ? "Pengajuan pengujian sampel berhasil disetujui."
-        : "Pengajuan pengujian sampel berhasil ditolak.",
+        : type === "complete"
+          ? "Pengajuan pengujian sampel berhasil ditandai selesai."
+          : "Pengajuan pengujian sampel berhasil ditolak.",
     );
     onActionComplete?.();
   };
@@ -1585,6 +1269,7 @@ function PengujianReviewPanel({
       <RequestReviewCard
         status={sampleTesting.status}
         code={sampleTesting.code}
+        itemGridClassName="md:grid-cols-[124px_minmax(0,1fr)]"
         meta={[
           { label: "Sampel", value: sampleTesting.sampleName || "-" },
           { label: "Jenis Sampel", value: sampleTesting.sampleType || "-" },
@@ -1659,20 +1344,31 @@ function PengujianReviewPanel({
             </Button>
           </>
         ) : null}
+        {canCompleteSampleTesting ? (
+          <Button
+            type="button"
+            className="h-10 rounded-md border border-sky-600 bg-sky-600 px-4 text-white shadow-sm hover:bg-sky-700"
+            onClick={() => setConfirmType("complete")}
+            disabled={pendingAction.sampleTestingId === sampleTesting.id}
+          >
+            <Check className="h-4 w-4" />
+            Tandai Selesai
+          </Button>
+        ) : null}
       </RequestReviewCard>
 
       <StatusConfirmDialog
         open={Boolean(confirmType)}
-        actionType={
-          confirmType === "reject" ? "reject" : confirmType ? "approve" : null
-        }
+        actionType={confirmType}
         onOpenChange={(open) => {
           if (!open) setConfirmType(null);
         }}
         onConfirm={handlePengujianAction}
         isSubmitting={pendingAction.sampleTestingId === sampleTesting.id}
         subjectLabel={
-          "pengajuan pengujian sampel ini"
+          confirmType === "complete"
+            ? "pengajuan pengujian sampel ini sebagai selesai"
+            : "pengajuan pengujian sampel ini"
         }
       />
     </>
@@ -1684,9 +1380,6 @@ export function parseReviewContext(pathname: string): ReviewContext {
 
   if (parts[0] === "booking-rooms" && parts[1] === "approval" && parts[2]) {
     return { kind: "booking", id: parts[2] };
-  }
-  if (parts[0] === "use-equipment" && parts[1] === "approval" && parts[2]) {
-    return { kind: "use", id: parts[2] };
   }
   if (parts[0] === "borrow-equipment" && parts[1] === "approval" && parts[2]) {
     return { kind: "borrow", id: parts[2] };
@@ -1702,14 +1395,12 @@ export function DashboardDetailReviewPanel({
   context,
   onActionComplete,
   initialBooking,
-  initialUseItem,
   initialBorrow,
   initialSampleTesting,
 }: {
   context: Exclude<ReviewContext, null>;
   onActionComplete?: () => void;
   initialBooking?: BookingRow | null;
-  initialUseItem?: UseRow | null;
   initialBorrow?: BorrowRow | null;
   initialSampleTesting?: SampleTestingRow | null;
 }) {
@@ -1719,16 +1410,6 @@ export function DashboardDetailReviewPanel({
         id={context.id}
         onActionComplete={onActionComplete}
         initialBooking={initialBooking}
-      />
-    );
-  }
-
-  if (context.kind === "use") {
-    return (
-      <UseReviewPanel
-        id={context.id}
-        onActionComplete={onActionComplete}
-        initialUseItem={initialUseItem}
       />
     );
   }

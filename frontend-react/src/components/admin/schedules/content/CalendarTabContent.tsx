@@ -68,7 +68,6 @@ export default function CalendarTabContent({
           { value: "", label: "Semua Sumber" },
           { value: "schedule", label: "Jadwal Praktikum" },
           { value: "booking", label: "Booking" },
-          { value: "use", label: "Penggunaan Alat" },
         ]}
         dateRange={dateRange}
         rooms={rooms}

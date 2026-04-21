@@ -1,13 +1,12 @@
 "use client";
 
-
 import { useEffect, useState } from "react";
 
-import { ClipboardPlus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { DataPagination, TableActionIconButton } from "@/components/shared";
+import { DataPagination } from "@/components/shared";
 
 import { useSoftwares } from "@/hooks/shared/resources/softwares";
 
@@ -47,18 +46,14 @@ export default function SoftwareListPage() {
             <tr className="text-left text-sm">
               <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Nama</th>
               <th className="w-[100px] px-3 py-3 font-medium text-slate-50">Versi</th>
-              {/* <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Lisensi</th> */}
               <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Peralatan</th>
               <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
-              <th className="sticky right-0 z-20 w-[120px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
-                Aksi
-              </th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {isLoading || !hasLoadedOnce ? (
               <tr>
-                <td colSpan={5} className="px-3 py-5 text-center text-slate-500">
+                <td colSpan={4} className="px-3 py-5 text-center text-slate-500">
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Memuat data...
@@ -70,7 +65,6 @@ export default function SoftwareListPage() {
                 <tr key={String(item.id)} className="border-b last:border-b-0">
                   <td className="truncate px-3 py-2.5 font-medium text-slate-800">{item.name}</td>
                   <td className="truncate px-3 py-2.5">{item.version || "-"}</td>
-                  {/* <td className="truncate px-3 py-2.5">{item.licenseInfo || "-"}</td> */}
                   <td className="truncate px-3 py-2.5">{item.equipmentName}</td>
                   <td className="truncate px-3 py-2.5">
                     {item.roomName}
@@ -78,20 +72,11 @@ export default function SoftwareListPage() {
                       <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
                     )}
                   </td>
-                  <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                    <TableActionIconButton
-                      type="button"
-                      label="Ajukan penggunaan"
-                      icon={<ClipboardPlus className="h-3.5 w-3.5" />}
-                      className="w-8 rounded-md border border-slate-200 bg-sky-50 p-0 text-sky-700 shadow-none hover:bg-sky-100"
-                      onClick={() => router.push(`/use-equipment/form?equipment=${item.equipmentId}`)}
-                    />
-                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-3 py-5 text-center text-slate-500">
+                <td colSpan={4} className="px-3 py-5 text-center text-slate-500">
                   Belum ada software yang tersedia.
                 </td>
               </tr>

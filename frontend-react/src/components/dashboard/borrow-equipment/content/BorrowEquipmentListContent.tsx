@@ -18,6 +18,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -33,7 +34,11 @@ import {
 
 import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
-import { useBorrows, useCreateBorrow } from "@/hooks/borrow-equipment";
+import {
+  useBorrows,
+  useCreateBorrow,
+  useUpdateBorrowStatus,
+} from "@/hooks/borrow-equipment";
 
 import { useLoadProfile } from "@/hooks/shared/profile";
 
@@ -44,6 +49,7 @@ import { formatDateTimeWib } from "@/lib/date";
 import {
   canCurrentUserReviewPendingRequest,
   isWaitingForMentorApproval,
+  requiresMentorApproval,
 } from "@/lib/request";
 
 import { getBorrowProgressFlow } from "@/lib/request";
@@ -57,6 +63,7 @@ import {
 } from "@/lib/request";
 
 const PAGE_SIZE = 10;
+const MENTOR_PAGE_SIZE = 10;
 const TABLE_COLUMN_WIDTHS = [
   "10rem",
   "14rem",
@@ -183,9 +190,14 @@ export default function BorrowEquipmentListContent({
   const { profile } = useLoadProfile();
   const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
+  const [mentorPage, setMentorPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
   const [reviewBorrowId, setReviewBorrowId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    code: string;
+  } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
     id: string;
     code: string;
   } | null>(null);
@@ -208,6 +220,10 @@ export default function BorrowEquipmentListContent({
 
   useEffect(() => {
     setPage(1);
+  }, [status, search, equipment, requestedBy, createdAfter, createdBefore]);
+
+  useEffect(() => {
+    setMentorPage(1);
   }, [status, search, equipment, requestedBy, createdAfter, createdBefore]);
 
   const { borrows, totalCount, aggregates, isLoading, hasLoadedOnce, error } =
@@ -241,7 +257,38 @@ export default function BorrowEquipmentListContent({
   );
 
   const normalizedRole = normalizeRoleValue(profile?.role);
+  const showMentorApprovalSection =
+    scope === "all" && normalizedRole === ROLE_VALUES.LECTURER;
+  const {
+    borrows: mentorBorrowRows,
+    totalCount: mentorTotalCount,
+    isLoading: isMentorLoading,
+    hasLoadedOnce: hasLoadedMentorOnce,
+  } = useBorrows(
+    mentorPage,
+    MENTOR_PAGE_SIZE,
+    {
+      q: search,
+      status,
+      requestedBy:
+        scope === "my"
+          ? String(profile.id ?? "")
+          : scope === "all"
+            ? requestedBy
+            : "",
+      reviewerScope: "mentor",
+      equipment,
+      createdAfter: createdAfter ? toStartOfDay(createdAfter) : "",
+      createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
+    },
+    reloadKey,
+    "all",
+    {
+      enabled: showMentorApprovalSection,
+    },
+  );
   const { deleteBorrow, isSubmitting: isDeletingBorrow } = useCreateBorrow();
+  const { updateBorrowStatus, pendingAction } = useUpdateBorrowStatus();
   const canReviewBorrows =
     scope === "all" &&
     (normalizedRole === ROLE_VALUES.ADMIN ||
@@ -250,19 +297,37 @@ export default function BorrowEquipmentListContent({
   const currentProfileId = String(profile?.id ?? "");
   const mentorBorrows = useMemo(
     () =>
-      filteredBorrows.filter(
+      mentorBorrowRows.filter(
         (item) =>
-          isWaitingForMentorApproval(item) &&
+          requiresMentorApproval(item) &&
           item.requesterMentorProfileId === currentProfileId,
       ),
+    [currentProfileId, mentorBorrowRows],
+  );
+  const generalBorrows = useMemo(
+    () =>
+      filteredBorrows.filter((item) => {
+        const isMentor =
+          currentProfileId !== "" &&
+          item.requesterMentorProfileId === currentProfileId &&
+          requiresMentorApproval(item);
+        const isPic = item.roomPicIds.includes(currentProfileId);
+
+        if (isMentor && !isPic) {
+          return false;
+        }
+
+        return true;
+      }),
     [currentProfileId, filteredBorrows],
   );
-  const showMentorApprovalSection =
-    scope === "all" && normalizedRole === ROLE_VALUES.LECTURER;
-
   const totalPages = Math.max(
     1,
     Math.ceil((totalCount || filteredBorrows.length) / PAGE_SIZE),
+  );
+  const mentorTotalPages = Math.max(
+    1,
+    Math.ceil((mentorTotalCount || mentorBorrows.length) / MENTOR_PAGE_SIZE),
   );
 
   const canShowReviewButton = (item: (typeof filteredBorrows)[number]) => {
@@ -285,6 +350,9 @@ export default function BorrowEquipmentListContent({
   const canManageBorrow = (item: (typeof filteredBorrows)[number]) =>
     scope !== "all" && normalizeStatus(item.status) === "pending";
 
+  const canCancelBorrow = (item: (typeof filteredBorrows)[number]) =>
+    scope !== "all" && normalizeStatus(item.status) === "approved";
+
   const handleDeleteBorrow = async () => {
     if (!deleteTarget) return;
 
@@ -292,6 +360,20 @@ export default function BorrowEquipmentListContent({
     if (!result.ok) return;
 
     setDeleteTarget(null);
+    setReloadKey((prev) => prev + 1);
+  };
+
+  const handleCancelBorrow = async () => {
+    if (!cancelTarget) return;
+
+    const result = await updateBorrowStatus(cancelTarget.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Pengajuan peminjaman alat berhasil dibatalkan.");
+    setCancelTarget(null);
     setReloadKey((prev) => prev + 1);
   };
 
@@ -373,10 +455,10 @@ export default function BorrowEquipmentListContent({
               Approval Dosen Pembimbing
             </h2>
             <p className="text-xs text-slate-600">
-              Pengajuan Skripsi/TA peminjaman alat yang menunggu persetujuan Anda.
+              Pengajuan Skripsi/TA peminjaman alat yang ditujukan kepada Anda sebagai dosen pembimbing.
             </p>
           </div>
-          <div className="w-full max-w-full overflow-x-auto rounded-xl border border-amber-200 bg-white">
+          <div className="max-h-[28rem] w-full max-w-full overflow-auto rounded-xl border border-amber-200 bg-white">
             <table className="w-full min-w-[1120px]">
               <colgroup>
                 {TABLE_COLUMN_WIDTHS.map((width) => (
@@ -399,7 +481,7 @@ export default function BorrowEquipmentListContent({
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {isLoading || !hasLoadedOnce ? (
+                {isMentorLoading || !hasLoadedMentorOnce ? (
                   <tr>
                     <td colSpan={9} className="px-3 py-5 text-center text-slate-500">
                       <div className="flex items-center justify-center gap-2">
@@ -425,15 +507,23 @@ export default function BorrowEquipmentListContent({
                         {formatDateTimeWib(item.endTime)}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setProgressState({
+                              code: item.code,
+                              steps: getBorrowProgressFlow(item),
+                            })
+                          }
+                          className={`inline-flex cursor-pointer rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
                         >
                           {getBorrowStatusDisplayLabel(item.status)}
-                        </span>
+                        </button>
                       </td>
                       <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(254,243,199,1)]">
                         <div className="flex items-center justify-center gap-2">
-                          {canCurrentUserReviewPendingRequest(
+                          {isWaitingForMentorApproval(item) &&
+                          canCurrentUserReviewPendingRequest(
                             item,
                             profile?.id,
                             profile?.role,
@@ -460,13 +550,26 @@ export default function BorrowEquipmentListContent({
                 ) : (
                   <tr>
                     <td colSpan={9} className="px-3 py-5 text-center text-slate-500">
-                      Belum ada pengajuan yang menunggu persetujuan dosen pembimbing Anda.
+                      Belum ada pengajuan Skripsi/TA pada tabel dosen pembimbing Anda.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+          {mentorTotalPages > 1 ? (
+            <div className="w-full">
+              <DataPagination
+                page={mentorPage}
+                totalPages={mentorTotalPages}
+                totalCount={mentorTotalCount || mentorBorrows.length}
+                pageSize={MENTOR_PAGE_SIZE}
+                itemLabel="approval dosen pembimbing"
+                isLoading={isMentorLoading}
+                onPageChange={setMentorPage}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -523,8 +626,8 @@ export default function BorrowEquipmentListContent({
                   </div>
                 </td>
               </tr>
-            ) : filteredBorrows.length ? (
-              filteredBorrows.map((item) => (
+            ) : generalBorrows.length ? (
+              generalBorrows.map((item) => (
                 <tr key={String(item.id)} className="border-b last:border-b-0">
                   <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
                     {item.code}
@@ -595,6 +698,20 @@ export default function BorrowEquipmentListContent({
                           />
                         </>
                       ) : null}
+                      {canCancelBorrow(item) ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Batalkan"
+                          icon={<X className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                          onClick={() =>
+                            setCancelTarget({
+                              id: String(item.id),
+                              code: item.code,
+                            })
+                          }
+                        />
+                      ) : null}
                       <TableActionIconButton
                         type="button"
                         label="Lihat detail"
@@ -629,7 +746,7 @@ export default function BorrowEquipmentListContent({
       <DataPagination
         page={page}
         totalPages={totalPages}
-        totalCount={totalCount || filteredBorrows.length}
+        totalCount={totalCount || generalBorrows.length}
         pageSize={PAGE_SIZE}
         itemLabel="peminjaman alat"
         isLoading={isLoading}
@@ -659,6 +776,17 @@ export default function BorrowEquipmentListContent({
             ? `Pengajuan ${deleteTarget.code} akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`
             : "Pengajuan ini akan dihapus permanen."
         }
+      />
+      <DeleteRequestConfirmDialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        onConfirm={() => void handleCancelBorrow()}
+        isSubmitting={pendingAction.borrowId === cancelTarget?.id}
+        title="Batalkan pengajuan peminjaman alat ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan proses peminjaman dihentikan."
+        confirmLabel="Ya, Batalkan"
       />
       <RequestProgressDialog
         open={Boolean(progressState)}

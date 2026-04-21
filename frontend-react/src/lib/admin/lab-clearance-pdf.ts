@@ -5,7 +5,6 @@ import type { LabClearanceResult } from "@/services/admin";
 const SERVICE_TYPE_LABEL: Record<string, string> = {
   borrow: "Peminjaman Alat",
   booking: "Peminjaman Lab",
-  use: "Penggunaan Alat",
   pengujian: "Pengujian Sampel",
 };
 
@@ -128,7 +127,7 @@ export async function generateLabClearancePdf(data: LabClearanceResult): Promise
 
   if (data.isClear) {
     const conclusionText = pdf.splitTextToSize(
-      "dinyatakan BEBAS TANGGUNGAN terhadap semua layanan laboratorium, meliputi peminjaman alat, peminjaman ruangan, penggunaan alat, dan pengujian sampel. Surat keterangan ini diberikan untuk dipergunakan sebagaimana mestinya.",
+      "dinyatakan BEBAS TANGGUNGAN terhadap semua layanan laboratorium, meliputi peminjaman alat, peminjaman ruangan, dan pengujian sampel. Surat keterangan ini diberikan untuk dipergunakan sebagaimana mestinya.",
       contentW,
     ) as string[];
     pdf.text(conclusionText, margin, curY);

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ClipboardPlus, Loader2, Package2, Settings2 } from "lucide-react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { Button, Skeleton } from "@/components/ui";
 import { useEquipmentDetail } from "@/hooks/shared/resources/equipments";
@@ -48,15 +48,8 @@ function DetailCard({
   );
 }
 
-function DetailMetaItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailMetaItem({ label, value }: { label: string; value: string }) {
   if (!hasDisplayValue(value)) return null;
-
   return (
     <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
       <p className="text-xs text-slate-500">{label}</p>
@@ -80,7 +73,6 @@ function EquipmentDetailSkeleton() {
           </div>
         </div>
       </div>
-
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
           <div className="flex items-start gap-3">
@@ -94,10 +86,8 @@ function EquipmentDetailSkeleton() {
             <Skeleton className="h-14 w-full rounded-md" />
             <Skeleton className="h-14 w-full rounded-md" />
             <Skeleton className="h-14 w-full rounded-md" />
-            <Skeleton className="h-20 w-full rounded-md" />
           </div>
         </div>
-
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -110,37 +100,7 @@ function EquipmentDetailSkeleton() {
             <div className="mt-4 space-y-2">
               <Skeleton className="h-14 w-full rounded-md" />
               <Skeleton className="h-14 w-full rounded-md" />
-              <Skeleton className="h-14 w-full rounded-md" />
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
-        <div className="flex items-start gap-3">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-44" />
-            <Skeleton className="h-3 w-60" />
-          </div>
-        </div>
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
-          <div className="border-b border-slate-800 bg-slate-900 px-4 py-3">
-            <Skeleton className="h-4 w-52 bg-slate-700" />
-          </div>
-          <div className="space-y-0">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={`equipment-software-skeleton-${index}`}
-                className="grid grid-cols-[1.4fr_0.8fr_1fr_1.2fr_1.6fr] gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
-              >
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -148,22 +108,10 @@ function EquipmentDetailSkeleton() {
   );
 }
 
-export default function EquipmentDetailPageContent() {
+export default function EquipmentDetailPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useParams<EquipmentDetailParams>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
-  const isBorrowCatalogDetail = pathname.startsWith("/borrow-equipment/equipment/");
-  const backHref = isBorrowCatalogDetail ? "/borrow-equipment/equipment" : "/use-equipment/equipment";
-  const backLabel = isBorrowCatalogDetail
-    ? "Kembali ke Daftar Alat Pinjam"
-    : "Kembali ke Daftar Peralatan";
-  const submitHref = isBorrowCatalogDetail
-    ? `/borrow-equipment/form?equipment=${id}`
-    : `/use-equipment/form?equipment=${id}`;
-  const submitLabel = isBorrowCatalogDetail
-    ? "Ajukan Peminjaman Alat"
-    : "Ajukan Penggunaan Alat";
 
   const { equipment, isLoading, error } = useEquipmentDetail(id);
   const isComputerCategory = String(equipment?.category ?? "").trim().toLowerCase() === "computer";
@@ -176,9 +124,7 @@ export default function EquipmentDetailPageContent() {
     equipment: id ? String(id) : "",
   });
 
-  if (isLoading) {
-    return <EquipmentDetailSkeleton />;
-  }
+  if (isLoading) return <EquipmentDetailSkeleton />;
 
   if (error) {
     return (
@@ -186,9 +132,9 @@ export default function EquipmentDetailPageContent() {
         <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
-        <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+        <Button type="button" variant="outline" onClick={() => router.push("/booking-rooms/equipment")}>
           <ArrowLeft className="h-4 w-4" />
-          {backLabel}
+          Kembali ke Daftar Peralatan
         </Button>
       </section>
     );
@@ -198,9 +144,9 @@ export default function EquipmentDetailPageContent() {
     return (
       <section className="space-y-3">
         <p className="text-sm text-slate-600">Data alat tidak ditemukan.</p>
-        <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+        <Button type="button" variant="outline" onClick={() => router.push("/booking-rooms/equipment")}>
           <ArrowLeft className="h-4 w-4" />
-          {backLabel}
+          Kembali ke Daftar Peralatan
         </Button>
       </section>
     );
@@ -216,11 +162,13 @@ export default function EquipmentDetailPageContent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => router.push(submitHref)}>
-            <ClipboardPlus className="h-4 w-4" />
-            {submitLabel}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => router.push(backHref)}>
+          {equipment.isBorrowable && (
+            <Button type="button" onClick={() => router.push(`/borrow-equipment/form?equipment=${id}`)}>
+              <ClipboardPlus className="h-4 w-4" />
+              Ajukan Peminjaman Alat
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={() => router.push("/booking-rooms/equipment")}>
             <ArrowLeft className="h-4 w-4" />
             Kembali
           </Button>
@@ -231,7 +179,7 @@ export default function EquipmentDetailPageContent() {
         <div className="space-y-4">
           <DetailCard
             title="Informasi Peralatan"
-            subtitle="Ringkasan detail peralatan yang tersedia untuk diajukan penggunaannya."
+            subtitle="Ringkasan detail peralatan yang tersedia."
             icon={<Package2 className="h-4 w-4" />}
           >
             <DetailMetaItem label="Nama Alat" value={equipment.name} />
@@ -241,23 +189,22 @@ export default function EquipmentDetailPageContent() {
             <DetailMetaItem label="Ruangan" value={equipment.roomName} />
             <DetailMetaItem label="Deskripsi" value={equipment.description || "-"} />
           </DetailCard>
-
         </div>
 
         <div className="space-y-4">
           <DetailCard
-            title="Catatan Penggunaan"
-            subtitle="Informasi singkat sebelum Anda melanjutkan ke formulir pengajuan."
+            title="Informasi Peminjaman"
+            subtitle="Informasi singkat sebelum mengajukan peminjaman."
             icon={<Settings2 className="h-4 w-4" />}
           >
             <DetailMetaItem label="Status Saat Ini" value={formatStatus(equipment.status)} />
             <DetailMetaItem label="Lokasi" value={`Peralatan ini terdaftar di ${equipment.roomName}.`} />
             <DetailMetaItem
-              label="Pengajuan"
+              label="Peminjaman"
               value={
-                isBorrowCatalogDetail
+                equipment.isBorrowable
                   ? "Gunakan tombol Ajukan Peminjaman Alat untuk melanjutkan pengajuan dari peralatan ini."
-                  : "Gunakan tombol Ajukan Penggunaan Alat untuk melanjutkan pengajuan dari peralatan ini."
+                  : "Peralatan ini tidak tersedia untuk dipinjam."
               }
             />
           </DetailCard>

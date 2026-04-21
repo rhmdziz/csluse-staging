@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -31,6 +32,7 @@ import {
 import {
   useCreateBookingRoom,
   useBookings,
+  useUpdateBookingStatus,
   type BookingListScope,
 } from "@/hooks/booking-rooms";
 
@@ -48,6 +50,7 @@ import { formatDateTimeWib } from "@/lib/date";
 import {
   canCurrentUserReviewPendingRequest,
   isWaitingForMentorApproval,
+  requiresMentorApproval,
 } from "@/lib/request";
 
 import { getBookingProgressFlow } from "@/lib/request";
@@ -61,6 +64,7 @@ import {
 } from "@/lib/request";
 
 const PAGE_SIZE = 10;
+const MENTOR_PAGE_SIZE = 10;
 const TABLE_COLUMN_WIDTHS = [
   "10rem",
   "16rem",
@@ -152,9 +156,14 @@ export default function BookingRoomsListContent({
   const searchParams = useSearchParams();
   const { profile } = useLoadProfile();
   const [page, setPage] = useState(1);
+  const [mentorPage, setMentorPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
   const [reviewBookingId, setReviewBookingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    code: string;
+  } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
     id: string;
     code: string;
   } | null>(null);
@@ -179,6 +188,10 @@ export default function BookingRoomsListContent({
     setPage(1);
   }, [status, search, room, requestedBy, createdAfter, createdBefore]);
 
+  useEffect(() => {
+    setMentorPage(1);
+  }, [status, search, room, requestedBy, createdAfter, createdBefore]);
+
   const { bookings, totalCount, aggregates, isLoading, hasLoadedOnce, error } = useBookings(
     page,
     PAGE_SIZE,
@@ -195,8 +208,34 @@ export default function BookingRoomsListContent({
   );
 
   const normalizedRole = normalizeRoleValue(profile?.role);
+  const showMentorApprovalSection =
+    scope === "all" && normalizedRole === ROLE_VALUES.LECTURER;
+  const {
+    bookings: mentorBookingRows,
+    totalCount: mentorTotalCount,
+    isLoading: isMentorLoading,
+    hasLoadedOnce: hasLoadedMentorOnce,
+  } = useBookings(
+    mentorPage,
+    MENTOR_PAGE_SIZE,
+    {
+      q: search,
+      status,
+      room,
+      requestedBy: scope === "all" ? requestedBy : "",
+      reviewerScope: "mentor",
+      createdAfter: createdAfter ? toStartOfDay(createdAfter) : "",
+      createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
+    },
+    reloadKey,
+    "all",
+    {
+      enabled: showMentorApprovalSection,
+    },
+  );
   const { deleteBookingRoom, isSubmitting: isDeletingBooking } =
     useCreateBookingRoom();
+  const { updateBookingStatus, pendingAction } = useUpdateBookingStatus();
   const canReviewBookings =
     scope === "all" &&
     (normalizedRole === ROLE_VALUES.ADMIN ||
@@ -213,18 +252,37 @@ export default function BookingRoomsListContent({
   );
   const mentorBookings = useMemo(
     () =>
-      filteredBookings.filter(
+      mentorBookingRows.filter(
         (booking) =>
-          isWaitingForMentorApproval(booking) &&
+          requiresMentorApproval(booking) &&
           booking.requesterMentorProfileId === currentProfileId,
       ),
+    [currentProfileId, mentorBookingRows],
+  );
+  const generalBookings = useMemo(
+    () =>
+      filteredBookings.filter((booking) => {
+        const isMentor =
+          currentProfileId !== "" &&
+          booking.requesterMentorProfileId === currentProfileId &&
+          requiresMentorApproval(booking);
+        const isPic = booking.roomPicIds.includes(currentProfileId);
+
+        if (isMentor && !isPic) {
+          return false;
+        }
+
+        return true;
+      }),
     [currentProfileId, filteredBookings],
   );
-  const showMentorApprovalSection =
-    scope === "all" && normalizedRole === ROLE_VALUES.LECTURER;
   const totalPages = Math.max(
     1,
     Math.ceil((totalCount || filteredBookings.length) / PAGE_SIZE),
+  );
+  const mentorTotalPages = Math.max(
+    1,
+    Math.ceil((mentorTotalCount || mentorBookings.length) / MENTOR_PAGE_SIZE),
   );
   const pendingCount = aggregates.pending;
   const approvedCount = aggregates.approved;
@@ -252,6 +310,9 @@ export default function BookingRoomsListContent({
   const canManageBooking = (booking: (typeof filteredBookings)[number]) =>
     scope !== "all" && normalizeStatus(booking.status) === "pending";
 
+  const canCancelBooking = (booking: (typeof filteredBookings)[number]) =>
+    scope !== "all" && normalizeStatus(booking.status) === "approved";
+
   const handleDeleteBooking = async () => {
     if (!deleteTarget) return;
 
@@ -259,6 +320,20 @@ export default function BookingRoomsListContent({
     if (!result.ok) return;
 
     setDeleteTarget(null);
+    setReloadKey((prev) => prev + 1);
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancelTarget) return;
+
+    const result = await updateBookingStatus(cancelTarget.id, "cancel");
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Pengajuan peminjaman lab berhasil dibatalkan.");
+    setCancelTarget(null);
     setReloadKey((prev) => prev + 1);
   };
 
@@ -316,10 +391,10 @@ export default function BookingRoomsListContent({
               Approval Dosen Pembimbing
             </h2>
             <p className="text-xs text-slate-600">
-              Pengajuan Skripsi/TA yang menunggu persetujuan Anda sebagai dosen pembimbing.
+              Pengajuan Skripsi/TA yang ditujukan kepada Anda sebagai dosen pembimbing.
             </p>
           </div>
-          <div className="w-full max-w-full overflow-x-auto rounded-xl border border-amber-200 bg-white">
+          <div className="max-h-[28rem] w-full max-w-full overflow-auto rounded-xl border border-amber-200 bg-white">
             <table className="w-full min-w-[1120px]">
               <colgroup>
                 {TABLE_COLUMN_WIDTHS.map((width) => (
@@ -341,7 +416,7 @@ export default function BookingRoomsListContent({
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {isLoading || !hasLoadedOnce ? (
+                {isMentorLoading || !hasLoadedMentorOnce ? (
                   <tr>
                     <td colSpan={8} className="px-3 py-5 text-center text-slate-500">
                       <div className="flex items-center justify-center gap-2">
@@ -366,15 +441,23 @@ export default function BookingRoomsListContent({
                         {formatDateTimeWib(booking.endTime)}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(booking.status)}`}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setProgressState({
+                              code: booking.code,
+                              steps: getBookingProgressFlow(booking),
+                            })
+                          }
+                          className={`inline-flex cursor-pointer rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(booking.status)}`}
                         >
                           {getRequestStatusDisplayLabel(booking.status)}
-                        </span>
+                        </button>
                       </td>
                       <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(254,243,199,1)]">
                         <div className="flex items-center justify-center gap-2">
-                          {canCurrentUserReviewPendingRequest(
+                          {isWaitingForMentorApproval(booking) &&
+                          canCurrentUserReviewPendingRequest(
                             booking,
                             profile?.id,
                             profile?.role,
@@ -401,13 +484,26 @@ export default function BookingRoomsListContent({
                 ) : (
                   <tr>
                     <td colSpan={8} className="px-3 py-5 text-center text-slate-500">
-                      Belum ada pengajuan yang menunggu persetujuan dosen pembimbing Anda.
+                      Belum ada pengajuan Skripsi/TA pada tabel dosen pembimbing Anda.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+          {mentorTotalPages > 1 ? (
+            <div className="w-full">
+              <DataPagination
+                page={mentorPage}
+                totalPages={mentorTotalPages}
+                totalCount={mentorTotalCount || mentorBookings.length}
+                pageSize={MENTOR_PAGE_SIZE}
+                itemLabel="approval dosen pembimbing"
+                isLoading={isMentorLoading}
+                onPageChange={setMentorPage}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -462,8 +558,8 @@ export default function BookingRoomsListContent({
                   </div>
                 </td>
               </tr>
-            ) : filteredBookings.length ? (
-              filteredBookings.map((booking) => (
+            ) : generalBookings.length ? (
+              generalBookings.map((booking) => (
                 <tr
                   key={String(booking.id)}
                   className="border-b last:border-b-0"
@@ -535,6 +631,20 @@ export default function BookingRoomsListContent({
                           />
                         </>
                       ) : null}
+                      {canCancelBooking(booking) ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Batalkan"
+                          icon={<X className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                          onClick={() =>
+                            setCancelTarget({
+                              id: String(booking.id),
+                              code: booking.code,
+                            })
+                          }
+                        />
+                      ) : null}
                       <TableActionIconButton
                         type="button"
                         label="Lihat detail"
@@ -569,7 +679,7 @@ export default function BookingRoomsListContent({
       <DataPagination
         page={page}
         totalPages={totalPages}
-        totalCount={totalCount || filteredBookings.length}
+        totalCount={totalCount || generalBookings.length}
         pageSize={PAGE_SIZE}
         itemLabel="peminjaman lab"
         isLoading={isLoading}
@@ -603,6 +713,17 @@ export default function BookingRoomsListContent({
             ? `Pengajuan ${deleteTarget.code} akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`
             : "Pengajuan ini akan dihapus permanen."
         }
+      />
+      <DeleteRequestConfirmDialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        onConfirm={() => void handleCancelBooking()}
+        isSubmitting={pendingAction.bookingId === cancelTarget?.id}
+        title="Batalkan pengajuan peminjaman lab ini?"
+        description="Status pengajuan akan diubah menjadi dibatalkan dan tidak dapat diproses lanjut."
+        confirmLabel="Ya, Batalkan"
       />
       <RequestProgressDialog
         open={Boolean(progressState)}

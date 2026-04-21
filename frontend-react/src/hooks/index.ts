@@ -6,6 +6,5 @@ export * from "./dashboard";
 export * from "./information";
 export * from "./sample-testing";
 export * from "./shared";
-export * from "./use-equipment";
 export * from "./use-delete-record";
 export * from "./use-mobile";

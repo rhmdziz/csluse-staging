@@ -12,6 +12,7 @@ export default function AdminSampleTestingDocumentsPage() {
           "signed_testing_agreement",
           "invoice",
           "payment_proof",
+          "receipt",
           "test_result_letter",
         ],
         emptyMessage: "Belum ada dokumen pengujian sampel yang tersedia.",

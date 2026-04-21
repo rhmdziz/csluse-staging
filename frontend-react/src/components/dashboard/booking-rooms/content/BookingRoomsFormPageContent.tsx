@@ -1,8 +1,8 @@
 "use client";
 
-
 import { useEffect, useMemo, useState } from "react";
 
+import { addDays, addMonths } from "date-fns";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -26,10 +26,7 @@ import {
 import { Button, Input } from "@/components/ui";
 import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
-import {
-  useBookingDetail,
-  useCreateBookingRoom,
-} from "@/hooks/booking-rooms";
+import { useBookingDetail, useCreateBookingRoom } from "@/hooks/booking-rooms";
 
 import { useEquipmentOptions } from "@/hooks/shared/resources/equipments";
 
@@ -110,6 +107,7 @@ export default function BookingRoomsFormPage() {
   const bookingId = typeof id === "string" ? id : "";
   const isEditMode = bookingId.length > 0;
   const today = useMemo(() => startOfToday(), []);
+  const earliestStartDate = useMemo(() => addDays(today, 2), [today]);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const { profile } = useLoadProfile();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -162,17 +160,30 @@ export default function BookingRoomsFormPage() {
     [canSelectPracticumPurpose, canSelectThesisPurpose, isGuestUser],
   );
 
-  const minEndDate = startDate ? new Date(startDate) : new Date(today);
+  const maxEndDate = useMemo(
+    () => (startDate ? addMonths(startDate, 3) : undefined),
+    [startDate],
+  );
+  const minEndDate = startDate
+    ? new Date(startDate)
+    : new Date(earliestStartDate);
   if (minEndDate) {
     minEndDate.setHours(0, 0, 0, 0);
   }
   const minEndTime =
-    startDate &&
-    endDate &&
-    startDate.getTime() === endDate.getTime()
+    startDate && endDate && startDate.getTime() === endDate.getTime()
       ? startTime || undefined
       : undefined;
   const minStartTime = getMinSelectableTime(startDate, today);
+  const earliestStartDateLabel = useMemo(
+    () =>
+      earliestStartDate.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+    [earliestStartDate],
+  );
 
   const selectedRoomLabel = useMemo(
     () => rooms.find((room) => room.id === formData.roomId)?.label ?? "-",
@@ -237,7 +248,9 @@ export default function BookingRoomsFormPage() {
       note: sanitizeFormValue(booking.note),
       requesterPhone: sanitizeFormValue(booking.requesterPhone),
       requesterMentor: sanitizeFormValue(booking.requesterMentor),
-      requesterMentorProfileId: sanitizeFormValue(booking.requesterMentorProfileId),
+      requesterMentorProfileId: sanitizeFormValue(
+        booking.requesterMentorProfileId,
+      ),
       institution: sanitizeFormValue(booking.institution),
       institutionAddress: sanitizeFormValue(booking.institutionAddress),
       workshopInstitution: sanitizeFormValue(booking.workshopInstitution),
@@ -255,7 +268,12 @@ export default function BookingRoomsFormPage() {
   }, [booking, isEditMode]);
 
   useEffect(() => {
-    if (availablePurposeOptions.some((option) => option.value === formData.purpose)) return;
+    if (
+      availablePurposeOptions.some(
+        (option) => option.value === formData.purpose,
+      )
+    )
+      return;
     setFormData((prev) => ({
       ...prev,
       purpose: "Penelitian",
@@ -266,6 +284,18 @@ export default function BookingRoomsFormPage() {
       workshopTitle: "",
     }));
   }, [availablePurposeOptions, formData.purpose]);
+
+  useEffect(() => {
+    if (!startDate || !endDate || !maxEndDate) return;
+    if (endDate.getTime() <= maxEndDate.getTime()) return;
+
+    setEndDate(undefined);
+    setEndTime("");
+    setFormData((prev) => ({
+      ...prev,
+      endTime: "",
+    }));
+  }, [endDate, maxEndDate, startDate]);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -283,10 +313,21 @@ export default function BookingRoomsFormPage() {
   };
 
   const handleStartDateChange = (date: Date | undefined) => {
+    const nextMaxEndDate = date ? addMonths(date, 3) : undefined;
+    const shouldResetEndDate =
+      endDate !== undefined &&
+      nextMaxEndDate !== undefined &&
+      endDate.getTime() > nextMaxEndDate.getTime();
+
     setStartDate(date);
+    if (shouldResetEndDate) {
+      setEndDate(undefined);
+      setEndTime("");
+    }
     setFormData((prev) => ({
       ...prev,
       startTime: combineDateTime(date, startTime),
+      ...(shouldResetEndDate ? { endTime: "" } : {}),
     }));
     setValidationMessage("");
     setErrorMessage("");
@@ -398,12 +439,18 @@ export default function BookingRoomsFormPage() {
       setValidationMessage("Tujuan penggunaan ruangan wajib diisi.");
       return false;
     }
-    if (!availablePurposeOptions.some((option) => option.value === formData.purpose)) {
+    if (
+      !availablePurposeOptions.some(
+        (option) => option.value === formData.purpose,
+      )
+    ) {
       setValidationMessage("Pilihan tujuan tidak valid.");
       return false;
     }
     if (!isGuestUser && isThesisPurpose && !formData.requesterMentorProfileId) {
-      setValidationMessage("Dosen pembimbing wajib dipilih untuk tujuan Skripsi/TA.");
+      setValidationMessage(
+        "Dosen pembimbing wajib dipilih untuk tujuan Skripsi/TA.",
+      );
       return false;
     }
     if (!formData.startTime || !formData.endTime) {
@@ -478,6 +525,21 @@ export default function BookingRoomsFormPage() {
       );
       return false;
     }
+    const earliestStart = new Date(earliestStartDate);
+    earliestStart.setHours(0, 0, 0, 0);
+    if (start < earliestStart) {
+      setValidationMessage(
+        `Waktu mulai booking minimal H+2 dari tanggal pengajuan (ajukan H-2). Pilih tanggal mulai paling cepat ${earliestStartDateLabel}.`,
+      );
+      return false;
+    }
+    const maxAllowedEnd = addMonths(start, 3);
+    if (end > maxAllowedEnd) {
+      setValidationMessage(
+        "Rentang booking maksimal 3 bulan dari waktu mulai.",
+      );
+      return false;
+    }
     return true;
   };
 
@@ -498,7 +560,9 @@ export default function BookingRoomsFormPage() {
       note: formData.note,
       requesterPhone: formData.requesterPhone,
       requesterMentor: isGuestUser ? "" : formData.requesterMentor,
-      requesterMentorProfileId: isGuestUser ? "" : formData.requesterMentorProfileId,
+      requesterMentorProfileId: isGuestUser
+        ? ""
+        : formData.requesterMentorProfileId,
       institution: formData.institution,
       institutionAddress: formData.institutionAddress,
       workshopTitle: formData.workshopTitle,
@@ -563,6 +627,11 @@ export default function BookingRoomsFormPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900 md:col-span-2">
+            Pengajuan peminjaman lab harus diajukan minimal H-2, sehingga
+            tanggal mulai paling cepat {earliestStartDateLabel}.
+          </div>
+
           <DashboardComboboxField
             label="Ruangan"
             value={formData.roomId}
@@ -577,7 +646,7 @@ export default function BookingRoomsFormPage() {
           <DashboardComboboxField
             label="Tujuan"
             value={formData.purpose}
-              options={availablePurposeOptions}
+            options={availablePurposeOptions}
             placeholder="Pilih tujuan"
             emptyText="Tujuan tidak ditemukan."
             disabled={isSubmitting}
@@ -591,7 +660,7 @@ export default function BookingRoomsFormPage() {
               label="Waktu Mulai (WIB)"
               date={startDate}
               time={startTime}
-              minDate={today}
+              minDate={earliestStartDate}
               minTime={minStartTime}
               onDateChange={handleStartDateChange}
               onTimeChange={handleStartTimeChange}
@@ -604,6 +673,7 @@ export default function BookingRoomsFormPage() {
               date={endDate}
               time={endTime}
               minDate={minEndDate}
+              maxDate={maxEndDate}
               minTime={minEndTime}
               onDateChange={handleEndDateChange}
               onTimeChange={handleEndTimeChange}
@@ -654,7 +724,9 @@ export default function BookingRoomsFormPage() {
                 disabled={isSubmitting || isLoadingMentors}
                 required
                 onChange={(value) => {
-                  const selectedMentor = mentors.find((mentor) => mentor.id === value);
+                  const selectedMentor = mentors.find(
+                    (mentor) => mentor.id === value,
+                  );
                   setFormData((prev) => ({
                     ...prev,
                     requesterMentorProfileId: value,
@@ -904,8 +976,10 @@ export default function BookingRoomsFormPage() {
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Menyimpan...
               </>
+            ) : isEditMode ? (
+              "Simpan Perubahan"
             ) : (
-              (isEditMode ? "Simpan Perubahan" : "Ajukan Booking")
+              "Ajukan Booking"
             )}
           </Button>
         </div>
@@ -939,8 +1013,9 @@ export default function BookingRoomsFormPage() {
         <SubmissionSummaryItem
           label="Tujuan"
           value={
-            availablePurposeOptions.find((option) => option.value === formData.purpose)
-              ?.label ?? formData.purpose
+            availablePurposeOptions.find(
+              (option) => option.value === formData.purpose,
+            )?.label ?? formData.purpose
           }
         />
         <SubmissionSummaryItem
@@ -973,7 +1048,10 @@ export default function BookingRoomsFormPage() {
         ) : null}
         {isGuestUser ? (
           <>
-            <SubmissionSummaryItem label="Institusi" value={formData.institution} />
+            <SubmissionSummaryItem
+              label="Institusi"
+              value={formData.institution}
+            />
             <SubmissionSummaryItem
               label="Alamat Institusi"
               value={formData.institutionAddress}
@@ -986,14 +1064,20 @@ export default function BookingRoomsFormPage() {
               label="Judul Workshop"
               value={formData.workshopTitle}
             />
-            <SubmissionSummaryItem label="PIC Workshop" value={formData.workshopPic} />
+            <SubmissionSummaryItem
+              label="PIC Workshop"
+              value={formData.workshopPic}
+            />
             <SubmissionSummaryItem
               label="Institusi Workshop"
               value={formData.workshopInstitution}
             />
           </>
         ) : null}
-        <SubmissionSummaryItem label="Peralatan" value={selectedEquipmentLabel} />
+        <SubmissionSummaryItem
+          label="Peralatan"
+          value={selectedEquipmentLabel}
+        />
         <SubmissionSummaryItem label="Catatan" value={formData.note} />
       </SubmissionConfirmDialog>
     </section>

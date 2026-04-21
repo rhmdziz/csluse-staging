@@ -13,14 +13,18 @@ function hasDisplayValue(value?: string | null) {
 function DetailMetaItem({
   label,
   value,
+  itemGridClassName,
 }: {
   label: string;
   value: string;
+  itemGridClassName?: string;
 }) {
   if (!hasDisplayValue(value)) return null;
 
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+    <div
+      className={`grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 ${itemGridClassName ?? "md:grid-cols-[180px_minmax(0,1fr)]"} md:items-start md:gap-4`}
+    >
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-xs leading-5 text-slate-800 break-words">{value}</p>
     </div>
@@ -36,6 +40,7 @@ export function RequestInformationCard({
   approvedByName,
   rejectionNote,
   children,
+  itemGridClassName,
 }: {
   icon: ReactNode;
   requesterName: string;
@@ -45,6 +50,7 @@ export function RequestInformationCard({
   approvedByName?: string;
   rejectionNote?: string;
   children?: ReactNode;
+  itemGridClassName?: string;
 }) {
   const approverLabel = status === "Rejected" ? "Ditolak Oleh" : "Disetujui Oleh";
 
@@ -63,9 +69,19 @@ export function RequestInformationCard({
       </div>
 
       <div className="mt-4 space-y-2">
-        <DetailMetaItem label="Pemohon" value={requesterName} />
-        <DetailMetaItem label="Prodi Pemohon" value={requesterDepartment || "-"} />
-        <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+        <DetailMetaItem
+          label="Pemohon"
+          value={requesterName}
+          itemGridClassName={itemGridClassName}
+        />
+        <DetailMetaItem
+          label="Prodi Pemohon"
+          value={requesterDepartment || "-"}
+          itemGridClassName={itemGridClassName}
+        />
+        <div
+          className={`grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 ${itemGridClassName ?? "md:grid-cols-[180px_minmax(0,1fr)]"} md:items-start md:gap-4`}
+        >
           <p className="text-xs text-slate-500">Status Saat Ini</p>
           <div className="flex items-center">
             {onStatusClick ? (
@@ -85,8 +101,16 @@ export function RequestInformationCard({
             )}
           </div>
         </div>
-        <DetailMetaItem label={approverLabel} value={approvedByName || "-"} />
-        <DetailMetaItem label="Alasan Penolakan" value={rejectionNote || "-"} />
+        <DetailMetaItem
+          label={approverLabel}
+          value={approvedByName || "-"}
+          itemGridClassName={itemGridClassName}
+        />
+        <DetailMetaItem
+          label="Alasan Penolakan"
+          value={rejectionNote || "-"}
+          itemGridClassName={itemGridClassName}
+        />
         {children}
       </div>
     </section>

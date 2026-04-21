@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.db.models import Prefetch, Q, Sum
 from rest_framework import viewsets, status
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -29,8 +29,8 @@ from .models import (
     Schedule,
     FAQ,
     Pengujian,
-    Use,
     Notification,
+    SuratBebasLab,
 )
 from .serializers import (
     ImageSerializer,
@@ -63,10 +63,11 @@ from .serializers import (
     ScheduleFeedItemSerializer,
     PengujianSerializer,
     PengujianListSerializer,
-    UseSerializer,
-    UseListSerializer,
     DashboardOverviewSerializer,
     NotificationSerializer,
+    SuratBebasLabSerializer,
+    SuratBebasLabListSerializer,
+    SuratBebasLabDocumentSerializer,
 )
 from csluse_auth.audit import log_admin_action
 from csluse_auth.models import Profile
@@ -79,20 +80,22 @@ from csluse_auth.permissions import (
     ADMINISTRATOR,
     SUPER_ADMINISTRATOR,
 )
-from .email_notifications import (
-    build_email_context,
-    notification_cta_label,
-    notification_cta_url,
-    send_notification_email,
+from .notification_service import (
+    notify_borrow_overdue,
+    notify_new_request_submission,
+    notify_post_mentor_approval,
+    notify_request_status,
 )
 
 STATUS_VALUE_MAP = {
     "pending": "Pending",
     "approved": "Approved",
+    "canceled": "Canceled",
+    "cancelled": "Canceled",
     "diproses": "Diproses",
-    "menunggu pembayaran": "Menunggu Pembayaran",
-    "waiting_payment": "Menunggu Pembayaran",
-    "waiting payment": "Menunggu Pembayaran",
+    "menunggu pembayaran": "Diproses",
+    "waiting_payment": "Diproses",
+    "waiting payment": "Diproses",
     "rejected": "Rejected",
     "expired": "Expired",
     "returned_pending_inspection": "Returned Pending Inspection",
@@ -105,18 +108,17 @@ STATUS_VALUE_MAP = {
     "lost/damaged": "Lost/Damaged",
 }
 
-PENGUJIAN_APPROVER_DOCUMENT_TYPES = {"testing_agreement", "invoice", "test_result_letter"}
+PENGUJIAN_APPROVER_DOCUMENT_TYPES = {
+    "testing_agreement",
+    "invoice",
+    "receipt",
+    "test_result_letter",
+}
 PENGUJIAN_REQUESTER_DOCUMENT_TYPES = {
     "signed_testing_agreement",
     "payment_proof",
 }
 PENGUJIAN_DOCUMENT_MAX_SIZE = 5 * 1024 * 1024
-PENGUJIAN_NEXT_DOCUMENT_TYPES = {
-    "testing_agreement": "signed_testing_agreement",
-    "signed_testing_agreement": "invoice",
-    "invoice": "payment_proof",
-    "payment_proof": "test_result_letter",
-}
 ANNOUNCEMENT_IMAGE_SRC_RE = re.compile(
     r"""<img[^>]+src=["'](?P<src>[^"']+)["']""",
     re.IGNORECASE,
@@ -221,7 +223,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     queryset = Image.objects.all().order_by('-created_at')
     serializer_class = ImageSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_permissions(self):
         if self.action == "create":
@@ -467,7 +469,7 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             return [IsAuthenticated(), IsStaffOrAbove()]
         if self.action in {
             "update", "partial_update", "destroy", "bulk_delete",
-            "bulk_set_shareable", "bulk_set_borrowable", "bulk_set_useable",
+            "bulk_set_shareable", "bulk_set_borrowable",
         }:
             return [IsAuthenticated(), IsAdministratorOrAbove()]
         return super().get_permissions()
@@ -481,7 +483,6 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
             OpenApiParameter("is_moveable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
             OpenApiParameter("is_borrowable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
-            OpenApiParameter("is_useable", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
             OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY),
         ]
     )
@@ -496,7 +497,6 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
         is_moveable = self.request.query_params.get('is_moveable')
         is_borrowable = self.request.query_params.get('is_borrowable')
-        is_useable = self.request.query_params.get('is_useable')
 
         # Filter params: status, category, room, pic, is_moveable, is_borrowable, created range
         if is_active_status_filter(status_param):
@@ -519,11 +519,6 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 qs = qs.filter(is_borrowable=True)
             elif str(is_borrowable).lower() in ['false', '0', 'no']:
                 qs = qs.filter(is_borrowable=False)
-        if is_useable is not None:
-            if str(is_useable).lower() in ['true', '1', 'yes']:
-                qs = qs.filter(is_useable=True)
-            elif str(is_useable).lower() in ['false', '0', 'no']:
-                qs = qs.filter(is_useable=False)
         query = (self.request.query_params.get('q') or self.request.query_params.get('search') or '').strip()
         if query:
             qs = qs.filter(
@@ -648,10 +643,6 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='bulk-set-borrowable')
     def bulk_set_borrowable(self, request):
         return self._bulk_set_flag(request, "is_borrowable")
-
-    @action(detail=False, methods=['post'], url_path='bulk-set-useable')
-    def bulk_set_useable(self, request):
-        return self._bulk_set_flag(request, "is_useable")
 
     @action(detail=False, methods=['get'], url_path='dropdown')
     def dropdown(self, request):
@@ -1111,6 +1102,21 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 }
             )
 
+    def _ensure_requester_cancel_permission(self, booking):
+        profile = self._current_profile()
+        if profile is None or booking.requested_by_id != profile.id:
+            raise PermissionDenied(
+                "Anda hanya dapat membatalkan pengajuan peminjaman lab milik sendiri."
+            )
+        if booking.status != "Approved":
+            raise ValidationError(
+                {
+                    "status": (
+                        "Hanya pengajuan peminjaman lab dengan status Approved yang dapat dibatalkan."
+                    )
+                }
+            )
+
     def _ensure_review_permission(self, booking):
         if not self._can_review_booking(booking):
             raise PermissionDenied(
@@ -1135,6 +1141,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             "mentor_approved_at",
             "updated_at",
         ])
+        notify_post_mentor_approval(booking, kind="booking", actor_profile=actor_profile)
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
@@ -1146,7 +1153,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(rejected_at=now)
-        _notify_request_status(
+        notify_request_status(
             booking,
             kind="booking",
             status_value="Rejected",
@@ -1209,6 +1216,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("room", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("equipment", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("requested_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("reviewer_scope", OpenApiTypes.STR, OpenApiParameter.QUERY, description="mentor or all"),
             OpenApiParameter("department", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("pic", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="PIC of the room"),
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
@@ -1227,6 +1235,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         room_id = self.request.query_params.get('room')
         equipment_id = self.request.query_params.get('equipment')
         requester_id = self.request.query_params.get('requested_by')
+        reviewer_scope = (self.request.query_params.get('reviewer_scope') or '').strip().lower()
         department = self.request.query_params.get('department')
         purpose_param = self.request.query_params.get('purpose')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
@@ -1264,6 +1273,11 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(equipment_items__equipment_id=equipment_id).distinct()
         if requester_id and allow_requester_filter:
             qs = qs.filter(requested_by_id=requester_id)
+        if reviewer_scope == 'mentor':
+            profile = self._current_profile()
+            if profile is None:
+                return qs.none()
+            qs = qs.filter(requester_mentor_profile_id=profile.id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
         if purpose_param:
@@ -1324,7 +1338,8 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return self._apply_list_filters(qs, allow_requester_filter=False)
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        notify_new_request_submission(instance, kind="booking")
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -1467,7 +1482,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="booking", status_value="Approved", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="booking", status_value="Approved", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -1494,7 +1509,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="booking", status_value="Rejected", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="booking", status_value="Rejected", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -1513,6 +1528,26 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(completed_at=now)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_requester_cancel_permission(instance)
+        self._ensure_transition(instance, ["Approved"], "Canceled")
+        serializer = self._transition_serializer(
+            instance,
+            data={"status": "Canceled", **request.data},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        notify_request_status(
+            instance,
+            kind="booking",
+            status_value="Canceled",
+            actor_profile=getattr(request.user, "profile", None),
+            request=request,
+        )
         return Response(serializer.data)
 
 
@@ -1609,6 +1644,21 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             "Hanya PIC ruangan terkait atau laboran/admin yang dapat memproses borrow ini."
         )
 
+    def _ensure_requester_cancel_permission(self, borrow):
+        profile = self._current_profile()
+        if profile is None or borrow.requested_by_id != profile.id:
+            raise PermissionDenied(
+                "Anda hanya dapat membatalkan pengajuan peminjaman alat milik sendiri."
+            )
+        if borrow.status != "Approved":
+            raise ValidationError(
+                {
+                    "status": (
+                        "Hanya pengajuan peminjaman alat dengan status Approved dan belum diserahterimakan yang dapat dibatalkan."
+                    )
+                }
+            )
+
     def _handle_mentor_approval(self, borrow, actor_profile):
         borrow.is_approved_by_mentor = True
         borrow.mentor_approved_at = timezone.now()
@@ -1617,6 +1667,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             "mentor_approved_at",
             "updated_at",
         ])
+        notify_post_mentor_approval(borrow, kind="borrow", actor_profile=actor_profile)
         serializer = self.get_serializer(borrow)
         return Response(serializer.data)
 
@@ -1628,7 +1679,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(rejected_at=now)
-        _notify_request_status(
+        notify_request_status(
             borrow,
             kind="borrow",
             status_value="Rejected",
@@ -1688,6 +1739,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         equipment_id = self.request.query_params.get('equipment')
         room_id = self.request.query_params.get('room')
         requester_id = self.request.query_params.get('requested_by')
+        reviewer_scope = (self.request.query_params.get('reviewer_scope') or '').strip().lower()
         department = self.request.query_params.get('department')
         purpose_param = self.request.query_params.get('purpose')
         pic_id = self.request.query_params.get('pic') or self.request.query_params.get('pic_id')
@@ -1714,6 +1766,11 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             qs = qs.filter(equipment__room_id=room_id)
         if requester_id and allow_requester_filter:
             qs = qs.filter(requested_by_id=requester_id)
+        if reviewer_scope == 'mentor':
+            profile = self._current_profile()
+            if profile is None:
+                return qs.none()
+            qs = qs.filter(requester_mentor_profile_id=profile.id)
         if department:
             qs = qs.filter(requested_by__department__iexact=department)
         if purpose_param:
@@ -1736,6 +1793,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("equipment", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("room", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("requested_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("reviewer_scope", OpenApiTypes.STR, OpenApiParameter.QUERY, description="mentor or all"),
             OpenApiParameter("department", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter("pic", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="PIC of the equipment's room"),
             OpenApiParameter("pic_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, description="Alias for pic"),
@@ -1817,7 +1875,8 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         ).distinct()
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        notify_new_request_submission(instance, kind="borrow")
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -1962,7 +2021,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="borrow", status_value="Approved", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="borrow", status_value="Approved", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -1990,7 +2049,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="borrow", status_value="Rejected", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="borrow", status_value="Rejected", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -2010,6 +2069,26 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(borrowed_at=now)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_requester_cancel_permission(instance)
+        self._ensure_transition(instance, ["Approved"], "Canceled")
+        serializer = self._transition_serializer(
+            instance,
+            data={"status": "Canceled", **request.data},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        notify_request_status(
+            instance,
+            kind="borrow",
+            status_value="Canceled",
+            actor_profile=getattr(request.user, "profile", None),
+            request=request,
+        )
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='receive-return')
@@ -2590,21 +2669,9 @@ class CalendarViewSet(viewsets.ViewSet):
             .select_related('room', 'requested_by')
         )
 
-        use_qs = (
-            Use.objects
-            .filter(
-                status__in=["Approved", "Completed"],
-                start_time__lt=end,
-                end_time__gt=start,
-                equipment__room__isnull=False,
-            )
-            .select_related("equipment__room", "requested_by")
-        )
-
         if room_id:
             schedule_qs = schedule_qs.filter(room_id=room_id)
             booking_qs = booking_qs.filter(room_id=room_id)
-            use_qs = use_qs.filter(equipment__room_id=room_id)
 
         items = []
 
@@ -2640,23 +2707,6 @@ class CalendarViewSet(viewsets.ViewSet):
                 'purpose': item.purpose,
             })
 
-        for item in use_qs:
-            room_obj = item.equipment.room if item.equipment else None
-            equip_name = item.equipment.name if item.equipment else "Alat"
-            items.append({
-                "id": str(item.id),
-                "source": "use",
-                "title": f"Penggunaan Alat ({equip_name})",
-                "start_time": item.start_time,
-                "end_time": item.end_time,
-                "room_id": room_obj.id if room_obj else None,
-                "room_name": room_obj.name if room_obj else None,
-                "room_number": room_obj.number if room_obj else None,
-                "requested_by_name": _profile_display_name(item.requested_by),
-                "attendee_count": 1,
-                "purpose": item.purpose,
-            })
-
         items.sort(key=lambda item: (item['start_time'], item['title']))
         serializer = CalendarEventSerializer(items, many=True)
         return Response(serializer.data)
@@ -2684,7 +2734,6 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
             )
 
         sync_booking_statuses()
-        sync_use_statuses()
         sync_borrow_statuses()
 
         now = timezone.now()
@@ -2695,13 +2744,6 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 Booking.objects
                 .filter(room__pics__id=profile.id)
                 .select_related("room", "requested_by")
-                .distinct()
-                .order_by("-created_at")
-            )
-            uses = list(
-                Use.objects
-                .filter(equipment__room__pics__id=profile.id)
-                .select_related("equipment", "equipment__room", "requested_by")
                 .distinct()
                 .order_by("-created_at")
             )
@@ -2725,12 +2767,6 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 Booking.objects
                 .filter(requested_by=profile)
                 .select_related("room")
-                .order_by("-created_at")
-            )
-            uses = list(
-                Use.objects
-                .filter(requested_by=profile)
-                .select_related("equipment", "equipment__room")
                 .order_by("-created_at")
             )
             borrows = list(
@@ -2763,18 +2799,6 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                     "href": f"/booking-rooms/approval/{item.id}" if is_pic_scope_role else f"/booking-rooms/{item.id}",
                 })
 
-        for item in uses:
-            if item.status == "Approved" and item.start_time and item.start_time >= now:
-                upcoming_items.append({
-                    "id": f"use-{item.id}",
-                    "title": _overview_title(getattr(getattr(item, "equipment", None), "name", None), item.code or "Penggunaan Alat"),
-                    "type": "Penggunaan Alat",
-                    "requester_name": _profile_display_name(getattr(item, "requested_by", None)) or "",
-                    "start_time": item.start_time,
-                    "end_time": item.end_time,
-                    "href": f"/use-equipment/approval/{item.id}" if is_pic_scope_role else f"/use-equipment/{item.id}",
-                })
-
         for item in borrows:
             if item.status == "Approved" and item.start_time and item.start_time >= now:
                 upcoming_items.append({
@@ -2801,17 +2825,6 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 "status": item.status,
                 "created_at": item.created_at,
                 "href": f"/booking-rooms/approval/{item.id}" if is_pic_scope_role else f"/booking-rooms/{item.id}",
-            })
-
-        for item in uses:
-            recent_activities.append({
-                "id": f"use-{item.id}",
-                "title": _overview_title(getattr(getattr(item, "equipment", None), "name", None), item.code or "Penggunaan Alat"),
-                "code": item.code or "",
-                "type": "Penggunaan Alat",
-                "status": item.status,
-                "created_at": item.created_at,
-                "href": f"/use-equipment/approval/{item.id}" if is_pic_scope_role else f"/use-equipment/{item.id}",
             })
 
         for item in borrows:
@@ -2844,39 +2857,33 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
 
         payload = {
             "totals": {
-                "total_requests": len(bookings) + len(uses) + len(borrows) + len(pengujians),
+                "total_requests": len(bookings) + len(borrows) + len(pengujians),
                 "pending": (
                     status_count(bookings, "Pending")
-                    + status_count(uses, "Pending")
                     + status_count(borrows, "Pending")
                     + status_count(pengujians, "Pending")
                 ),
                 "approved": (
                     status_count(bookings, "Approved")
-                    + status_count(uses, "Approved")
                     + status_count(borrows, "Approved")
                     + status_count(
                         pengujians,
                         "Approved",
                         "Diproses",
-                        "Menunggu Pembayaran",
                     )
                 ),
                 "completed": (
                     status_count(bookings, "Completed")
-                    + status_count(uses, "Completed")
                     + status_count(borrows, "Returned")
                     + status_count(pengujians, "Completed")
                 ),
                 "rejected": (
                     status_count(bookings, "Rejected")
-                    + status_count(uses, "Rejected")
                     + status_count(borrows, "Rejected")
                     + status_count(pengujians, "Rejected")
                 ),
                 "expired": (
                     status_count(bookings, "Expired")
-                    + status_count(uses, "Expired")
                 ),
             },
             "upcoming_approved": upcoming_approved,
@@ -3070,54 +3077,38 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         }
 
     def _validate_document_upload_sequence(self, pengujian, document_type, existing_documents):
-        if pengujian.status in {"Pending", "Rejected", "Completed"}:
+        if pengujian.status in {"Pending", "Canceled", "Rejected", "Completed"}:
             raise ValidationError(
                 {"status": "Dokumen hanya dapat diunggah setelah pengajuan disetujui dan sebelum selesai."}
             )
 
-        required_types = {
-            "signed_testing_agreement": ["testing_agreement"],
-            "invoice": ["signed_testing_agreement"],
-            "payment_proof": ["invoice"],
-            "test_result_letter": ["payment_proof"],
-        }.get(document_type, [])
-
-        missing_types = [
-            required_type
-            for required_type in required_types
-            if required_type not in existing_documents
-        ]
-        if missing_types:
-            raise ValidationError(
-                {
-                    "document_type": (
-                        "Dokumen sebelumnya belum tersedia untuk tahap ini."
-                    )
-                }
-            )
-
-        next_document_type = PENGUJIAN_NEXT_DOCUMENT_TYPES.get(document_type)
-        if (
-            document_type in existing_documents
-            and next_document_type
-            and next_document_type in existing_documents
-        ):
-            raise ValidationError(
-                {
-                    "document_type": (
-                        "Dokumen ini tidak dapat diganti karena tahap berikutnya sudah memiliki dokumen."
-                    )
-                }
-            )
-
     def _resolve_pengujian_status_after_document_upload(self, pengujian, document_type):
-        if document_type == "invoice":
-            return "Menunggu Pembayaran"
-        if document_type == "test_result_letter":
-            return "Completed"
-        if pengujian.status == "Approved":
+        if document_type == "testing_agreement" and pengujian.status == "Approved":
             return "Diproses"
+
+        existing_documents = self._get_existing_document_map(pengujian)
+        receipt_document = existing_documents.get("receipt")
+        test_result_document = existing_documents.get("test_result_letter")
+        if (
+            receipt_document
+            and receipt_document.document
+            and test_result_document
+            and test_result_document.document
+        ):
+            return "Completed"
+
+        if pengujian.status == "Approved":
+            return pengujian.status
         return pengujian.status
+
+    def _delete_document_file(self, document_instance):
+        if not document_instance.document:
+            return
+
+        document_name = document_instance.document.name or ""
+        document_storage = document_instance.document.storage
+        if document_name and document_storage is not None:
+            document_storage.delete(document_name)
 
     def _ensure_transition(self, pengujian, allowed_sources, target_status):
         if pengujian.status not in allowed_sources:
@@ -3126,6 +3117,21 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 {
                     "status": (
                         f"Transisi ke {target_status} hanya boleh dari status: {allowed}."
+                    )
+                }
+            )
+
+    def _ensure_requester_cancel_permission(self, pengujian):
+        profile = getattr(self.request.user, "profile", None)
+        if profile is None or pengujian.requested_by_id != profile.id:
+            raise PermissionDenied(
+                "Anda hanya dapat membatalkan pengajuan pengujian sampel milik sendiri."
+            )
+        if pengujian.status != "Approved":
+            raise ValidationError(
+                {
+                    "status": (
+                        "Hanya pengajuan pengujian sampel dengan status Approved yang dapat dibatalkan."
                     )
                 }
             )
@@ -3271,7 +3277,8 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        notify_new_request_submission(instance, kind="pengujian")
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -3334,7 +3341,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="pengujian", status_value="Approved", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="pengujian", status_value="Approved", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='all/export')
@@ -3414,7 +3421,27 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="pengujian", status_value="Rejected", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="pengujian", status_value="Rejected", actor_profile=actor_profile, request=request)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_requester_cancel_permission(instance)
+        self._ensure_transition(instance, ["Approved"], "Canceled")
+        serializer = self._transition_serializer(
+            instance,
+            data={"status": "Canceled", **request.data},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        notify_request_status(
+            instance,
+            kind="pengujian",
+            status_value="Canceled",
+            actor_profile=getattr(request.user, "profile", None),
+            request=request,
+        )
         return Response(serializer.data)
 
     @action(
@@ -3495,11 +3522,45 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("document_type", OpenApiTypes.STR, OpenApiParameter.PATH),
+        ]
+    )
+    @action(
+        detail=True,
+        methods=['delete'],
+        url_path=r'documents/delete/(?P<document_type>[^/.]+)',
+    )
+    def delete_document(self, request, pk=None, document_type=None):
+        instance = self.get_object()
+        document_type = str(document_type or "").strip()
+
+        existing_documents = self._get_existing_document_map(instance)
+        self._ensure_document_upload_permission(instance, document_type)
+        self._validate_document_upload_sequence(instance, document_type, existing_documents)
+
+        document_instance = existing_documents.get(document_type)
+        if document_instance is None:
+            raise ValidationError({"document_type": "Dokumen tidak ditemukan."})
+
+        self._delete_document_file(document_instance)
+        document_instance.delete()
+
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "deleted_document_type": document_type,
+                "pengujian": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
         instance = self.get_object()
         self._ensure_review_permission(instance)
-        self._ensure_transition(instance, ["Approved", "Diproses", "Menunggu Pembayaran"], "Completed")
+        self._ensure_transition(instance, ["Approved", "Diproses"], "Completed")
         serializer = self._transition_serializer(
             instance,
             data={'status': 'Completed', **request.data},
@@ -3511,440 +3572,6 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
 
 # endregion
-
-
-# region Use Equipment
-class UseViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
-    queryset = (
-        Use.objects
-        .select_related(
-            'equipment',
-            'equipment__room',
-            'requested_by',
-            'approved_by',
-            'requester_mentor_profile',
-        )
-        .prefetch_related('equipment__room__pics')
-        .order_by('-created_at')
-    )
-    serializer_class = UseSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = DefaultPagination
-
-    def get_serializer_class(self):
-        if self.action == "list":
-            return UseListSerializer
-        return UseSerializer
-
-    def _auto_update_use_statuses(self):
-        sync_use_statuses()
-
-    def _append_aggregates(self, response, aggregates):
-        response.data["aggregates"] = aggregates
-        return response
-
-    def _delete_use_instance(self, instance):
-        log_admin_action(
-            self.request.user,
-            instance,
-            DELETION,
-            "Deleted equipment usage record via CSL Admin.",
-        )
-        instance.delete()
-
-    def _can_access_use_approval_scope(self):
-        return is_reviewer_or_above(self.request.user)
-
-    def _can_manage_all_uses(self):
-        return can_manage_all_approval_records(self.request.user)
-
-    def _current_profile(self):
-        return getattr(self.request.user, "profile", None)
-
-    def _is_room_pic_for_use(self, use_item):
-        profile = self._current_profile()
-        room = getattr(getattr(use_item, "equipment", None), "room", None)
-        if not profile or room is None:
-            return False
-        return room.pics.filter(id=profile.id).exists()
-
-    def _is_use_mentor(self, use_item):
-        return _is_assigned_mentor(self.request.user, use_item)
-
-    def _can_review_use(self, use_item):
-        return (
-            self._can_manage_all_uses()
-            or self._is_room_pic_for_use(use_item)
-            or self._is_use_mentor(use_item)
-        )
-
-    def _can_finalize_use_review(self, use_item):
-        return self._can_manage_all_uses() or self._is_room_pic_for_use(use_item)
-
-    def _ensure_use_access(self, use_item):
-        current_profile = self._current_profile()
-        if current_profile and use_item.requested_by_id == current_profile.id:
-            return
-        if self._can_review_use(use_item):
-            return
-        raise PermissionDenied("Anda tidak memiliki akses ke pengajuan penggunaan alat ini.")
-
-    def _ensure_requester_mutation_permission(self, use_item):
-        current_profile = self._current_profile()
-        if current_profile is None or use_item.requested_by_id != current_profile.id:
-            raise PermissionDenied(
-                "Anda hanya dapat mengubah atau menghapus pengajuan penggunaan alat milik sendiri."
-            )
-        if use_item.status != "Pending":
-            raise ValidationError(
-                {
-                    "status": (
-                        "Hanya pengajuan penggunaan alat dengan status Pending yang dapat diubah atau dihapus."
-                    )
-                }
-            )
-
-    def _ensure_review_permission(self, use_item):
-        if not self._can_review_use(use_item):
-            raise PermissionDenied(
-                "Hanya PIC ruangan alat terkait atau Admin yang dapat memproses penggunaan alat."
-            )
-
-        current_profile = self._current_profile()
-        if (
-            current_profile
-            and use_item.requested_by_id == current_profile.id
-            and not is_administrator_or_above(self.request.user)
-        ):
-            raise PermissionDenied(
-                "Anda tidak dapat memproses pengajuan milik sendiri kecuali sebagai Admin atau SuperAdministrator."
-            )
-
-    def _handle_mentor_approval(self, use_item, actor_profile):
-        use_item.is_approved_by_mentor = True
-        use_item.mentor_approved_at = timezone.now()
-        use_item.save(update_fields=[
-            "is_approved_by_mentor",
-            "mentor_approved_at",
-            "updated_at",
-        ])
-        serializer = self.get_serializer(use_item)
-        return Response(serializer.data)
-
-    def _handle_mentor_rejection(self, use_item, actor_profile, request):
-        serializer = self._transition_serializer(
-            use_item,
-            data={"status": "Rejected", **request.data},
-        )
-        serializer.is_valid(raise_exception=True)
-        now = timezone.now()
-        serializer.save(rejected_at=now)
-        _notify_request_status(
-            use_item,
-            kind="use",
-            status_value="Rejected",
-            actor_profile=actor_profile,
-            request=request,
-        )
-        return Response(serializer.data)
-
-    def _ensure_transition(self, use_item, allowed_sources, target_status):
-        if use_item.status not in allowed_sources:
-            allowed = ", ".join(allowed_sources)
-            raise ValidationError(
-                {
-                    "status": (
-                        f"Transisi ke {target_status} hanya boleh dari status: {allowed}."
-                    )
-                }
-            )
-
-    def _transition_serializer(self, instance, data):
-        return self.get_serializer(
-            instance,
-            data=data,
-            partial=True,
-            context={
-                **self.get_serializer_context(),
-                "allow_status_transition": True,
-                "allowed_next_status": data.get("status"),
-            },
-        )
-
-    def _apply_list_filters(self, qs, *, allow_requester_filter=False):
-        query = (self.request.query_params.get('q') or '').strip()
-        status_param = self.request.query_params.get('status')
-        equipment_id = self.request.query_params.get('equipment')
-        room_id = self.request.query_params.get('room')
-        requester_id = self.request.query_params.get('requested_by')
-        department = self.request.query_params.get('department')
-        purpose_param = self.request.query_params.get('purpose')
-        approved_by = self.request.query_params.get('approved_by')
-        start_after = self.request.query_params.get('start_after')
-        end_before = self.request.query_params.get('end_before')
-        created_after = self.request.query_params.get('created_after')
-        created_before = self.request.query_params.get('created_before')
-
-        if query:
-            qs = qs.filter(
-                Q(code__icontains=query)
-                | Q(equipment__name__icontains=query)
-                | Q(equipment__room__name__icontains=query)
-                | Q(requested_by__full_name__icontains=query)
-                | Q(requested_by__user__email__icontains=query)
-                | Q(purpose__icontains=query)
-            ).distinct()
-        if status_param:
-            qs = qs.filter(status=normalize_status_value(status_param))
-        if equipment_id:
-            qs = qs.filter(equipment_id=equipment_id)
-        if room_id:
-            qs = qs.filter(equipment__room_id=room_id)
-        if requester_id and allow_requester_filter:
-            qs = qs.filter(requested_by_id=requester_id)
-        if department:
-            qs = qs.filter(requested_by__department__iexact=department)
-        if purpose_param:
-            qs = qs.filter(purpose__iexact=purpose_param)
-        if approved_by:
-            qs = qs.filter(approved_by_id=approved_by)
-        if start_after:
-            qs = qs.filter(start_time__gte=start_after)
-        if end_before:
-            qs = qs.filter(end_time__lte=end_before)
-        if created_after:
-            qs = qs.filter(created_at__gte=created_after)
-        if created_before:
-            qs = qs.filter(created_at__lte=created_before)
-        return qs
-
-    @extend_schema(
-        parameters=[
-            OpenApiParameter("status", OpenApiTypes.STR, OpenApiParameter.QUERY),
-            OpenApiParameter("equipment", OpenApiTypes.UUID, OpenApiParameter.QUERY),
-            OpenApiParameter("room", OpenApiTypes.UUID, OpenApiParameter.QUERY),
-            OpenApiParameter("requested_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
-            OpenApiParameter("department", OpenApiTypes.STR, OpenApiParameter.QUERY),
-            OpenApiParameter("approved_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
-            OpenApiParameter("start_after", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
-            OpenApiParameter("end_before", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
-            OpenApiParameter("created_after", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
-            OpenApiParameter("created_before", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
-        ]
-    )
-    def list(self, request, *args, **kwargs):
-        self._auto_update_use_statuses()
-        aggregate_qs = self.get_queryset()
-        aggregates = build_status_aggregates(aggregate_qs)
-
-        queryset = self.filter_queryset(aggregate_qs)
-        page = self.paginate_queryset(queryset)
-        serializer = self.get_serializer(page if page is not None else queryset, many=True)
-        if page is not None:
-            return self._append_aggregates(self.get_paginated_response(serializer.data), aggregates)
-        return Response({"results": serializer.data, "aggregates": aggregates})
-
-    def get_queryset(self):
-        self._auto_update_use_statuses()
-        qs = super().get_queryset()
-        profile = self._current_profile()
-        if self.action == "my":
-            qs = qs.filter(requested_by=profile)
-            return self._apply_list_filters(qs, allow_requester_filter=False)
-
-        if not self._can_access_use_approval_scope():
-            qs = qs.filter(requested_by=profile)
-            return self._apply_list_filters(qs, allow_requester_filter=False)
-
-        if profile is None:
-            return qs.none()
-
-        # Admin: bypass filter PIC untuk action detail/aksi (retrieve, approve, dll)
-        # atau jika halaman admin mengirim ?unscoped=1.
-        _USE_LIST_ACTIONS = {'list', 'all', 'export', 'requester_options'}
-        if self._can_manage_all_uses() and (
-            self.request.query_params.get('unscoped') == '1'
-            or self.action not in _USE_LIST_ACTIONS
-        ):
-            return self._apply_list_filters(qs, allow_requester_filter=True)
-
-        # Semua reviewer (termasuk admin di dashboard): hanya PIC/mentor.
-        qs = qs.filter(
-            Q(equipment__room__pics__id=profile.id)
-            | Q(requester_mentor_profile_id=profile.id)
-        ).distinct()
-        return self._apply_list_filters(qs, allow_requester_filter=False)
-
-    def _apply_export_search(self, qs):
-        query = (self.request.query_params.get('q') or '').strip()
-        if not query:
-            return qs
-        return qs.filter(
-            Q(code__icontains=query)
-            | Q(equipment__name__icontains=query)
-            | Q(equipment__room__name__icontains=query)
-            | Q(requested_by__full_name__icontains=query)
-            | Q(requested_by__user__email__icontains=query)
-            | Q(purpose__icontains=query)
-        ).distinct()
-
-    def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
-
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self._ensure_use_access(instance)
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self._ensure_requester_mutation_permission(instance)
-        return super().update(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self._ensure_requester_mutation_permission(instance)
-        return super().partial_update(request, *args, **kwargs)
-
-    def perform_destroy(self, instance):
-        self._ensure_requester_mutation_permission(instance)
-        self._delete_use_instance(instance)
-
-    bulk_delete_success_message = "Semua record penggunaan alat terpilih berhasil dihapus."
-    bulk_delete_failure_message = "Sebagian record penggunaan alat tidak ditemukan."
-
-    def check_bulk_delete_permission(self, request):
-        if not self._can_access_use_approval_scope():
-            raise PermissionDenied("Anda tidak memiliki akses untuk menghapus data penggunaan alat.")
-
-    @action(detail=False, methods=['get'], url_path='my')
-    def my(self, request):
-        self._auto_update_use_statuses()
-        base_qs = super().get_queryset().filter(
-            requested_by=getattr(request.user, "profile", None)
-        )
-        aggregates = build_status_aggregates(base_qs)
-        qs = self._apply_list_filters(base_qs, allow_requester_filter=False)
-        page = self.paginate_queryset(qs)
-        serializer = UseListSerializer(page if page is not None else qs, many=True)
-        if page is not None:
-            return self._append_aggregates(self.get_paginated_response(serializer.data), aggregates)
-        return Response({"results": serializer.data, "aggregates": aggregates})
-
-    @action(detail=False, methods=['get'], url_path='all')
-    def all(self, request):
-        if not self._can_access_use_approval_scope():
-            raise PermissionDenied("Anda tidak memiliki akses untuk melihat seluruh data penggunaan alat.")
-
-        self._auto_update_use_statuses()
-        base_qs = self.get_queryset()
-        aggregates = build_status_aggregates(base_qs)
-        qs = base_qs
-        page = self.paginate_queryset(qs)
-        serializer = UseListSerializer(page if page is not None else qs, many=True)
-        if page is not None:
-            return self._append_aggregates(self.get_paginated_response(serializer.data), aggregates)
-        return Response({"results": serializer.data, "aggregates": aggregates})
-
-    @action(detail=False, methods=['get'], url_path='all/export')
-    def export(self, request):
-        if not self._can_access_use_approval_scope():
-            raise PermissionDenied("Anda tidak memiliki akses untuk export data penggunaan alat.")
-
-        self._auto_update_use_statuses()
-        qs = self._apply_export_search(self.get_queryset())
-        serializer = UseListSerializer(qs, many=True)
-        return Response({
-            "count": qs.count(),
-            "generated_at": timezone.now(),
-            "results": serializer.data,
-        })
-
-    @action(detail=False, methods=['get'], url_path='all/requesters')
-    def requester_options(self, request):
-        if not self._can_access_use_approval_scope():
-            raise PermissionDenied("Anda tidak memiliki akses untuk melihat daftar pemohon penggunaan alat.")
-        self._auto_update_use_statuses()
-        return build_requester_dropdown_response(self.get_queryset())
-
-    @action(detail=True, methods=['get'], url_path='review-check')
-    def review_check(self, request, pk=None):
-        instance = self.get_object()
-        self._ensure_use_access(instance)
-        return Response(_use_review_result(instance))
-
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
-        instance = self.get_object()
-        self._ensure_review_permission(instance)
-        actor_profile = getattr(request.user, 'profile', None)
-        if _mentor_review_pending(instance):
-            if not self._is_use_mentor(instance):
-                raise ValidationError(
-                    {"detail": "Pengajuan ini masih menunggu persetujuan dosen pembimbing."}
-                )
-            return self._handle_mentor_approval(instance, actor_profile)
-
-        if not _can_run_final_pic_review(instance):
-            raise ValidationError(
-                {"detail": "Pengajuan ini masih menunggu persetujuan dosen pembimbing."}
-            )
-        if not self._can_finalize_use_review(instance):
-            raise PermissionDenied(
-                "Hanya PIC ruangan alat terkait atau Admin yang dapat memberikan persetujuan akhir."
-            )
-        self._ensure_transition(instance, ["Pending"], "Approved")
-        serializer = self._transition_serializer(
-            instance,
-            data={'status': 'Approved', **request.data},
-        )
-        serializer.is_valid(raise_exception=True)
-        now = timezone.now()
-        serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="use", status_value="Approved", actor_profile=actor_profile, request=request)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'])
-    def reject(self, request, pk=None):
-        instance = self.get_object()
-        self._ensure_review_permission(instance)
-        actor_profile = getattr(request.user, 'profile', None)
-        if _mentor_review_pending(instance):
-            if not self._is_use_mentor(instance):
-                raise ValidationError(
-                    {"detail": "Pengajuan ini masih menunggu persetujuan dosen pembimbing."}
-                )
-            return self._handle_mentor_rejection(instance, actor_profile, request)
-
-        if not self._can_finalize_use_review(instance):
-            raise PermissionDenied(
-                "Hanya PIC ruangan alat terkait atau Admin yang dapat memberikan keputusan akhir."
-            )
-        self._ensure_transition(instance, ["Pending"], "Rejected")
-        serializer = self._transition_serializer(
-            instance,
-            data={'status': 'Rejected', **request.data},
-        )
-        serializer.is_valid(raise_exception=True)
-        now = timezone.now()
-        serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="use", status_value="Rejected", actor_profile=actor_profile, request=request)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'])
-    def complete(self, request, pk=None):
-        instance = self.get_object()
-        self._ensure_review_permission(instance)
-        self._ensure_transition(instance, ["Approved"], "Completed")
-        serializer = self._transition_serializer(
-            instance,
-            data={'status': 'Completed', **request.data},
-        )
-        serializer.is_valid(raise_exception=True)
-        now = timezone.now()
-        serializer.save(completed_at=now)
-        return Response(serializer.data)
 
 
 # endregion
@@ -4145,19 +3772,11 @@ def _booking_review_result(booking):
                     )
                 )
             else:
-                # Cek kapasitas: total attendee_count semua booking Penelitian/Skripsi yang overlap + Use + ini
                 room_capacity = getattr(booking.room, "capacity", None)
                 shared_bookings = overlapping_bookings.filter(purpose__in=list(_SHARED_PURPOSES))
                 existing_total = shared_bookings.aggregate(
                     total=Sum("attendee_count")
                 )["total"] or 0
-                use_in_room = Use.objects.filter(
-                    equipment__room_id=booking.room_id,
-                    status="Approved",
-                    start_time__lt=booking.end_time,
-                    end_time__gt=booking.start_time,
-                ).count()
-                existing_total += use_in_room
                 current_attendees = booking.attendee_count or 0
                 total_attendees = existing_total + current_attendees
                 shared_count = shared_bookings.count()
@@ -4165,7 +3784,6 @@ def _booking_review_result(booking):
                 if room_capacity is not None:
                     overlap_info = {
                         "shared_booking_count": shared_count,
-                        "use_count_in_room": use_in_room,
                         "existing_attendees": existing_total,
                         "current_attendees": current_attendees,
                         "total_attendees": total_attendees,
@@ -4237,7 +3855,6 @@ def _equipment_review_overlap_issues(
     start_time,
     end_time,
     exclude_borrow_id=None,
-    exclude_use_id=None,
     exclude_booking_id=None,
 ):
     issues = []
@@ -4265,25 +3882,13 @@ def _equipment_review_overlap_issues(
         borrow_qs = borrow_qs.exclude(pk=exclude_borrow_id)
     borrow_allocated_qty = borrow_qs.aggregate(total=Sum("quantity")).get("total") or 0
 
-    use_qs = Use.objects.filter(
-        equipment_id=equipment_id,
-        status__in=["Approved"],
-        start_time__lt=end_time,
-        end_time__gt=start_time,
-    )
-    if exclude_use_id is not None:
-        use_qs = use_qs.exclude(pk=exclude_use_id)
-    use_allocated_qty = use_qs.aggregate(total=Sum("quantity")).get("total") or 0
-
-    allocated_qty = booking_allocated_qty + borrow_allocated_qty + use_allocated_qty
+    allocated_qty = booking_allocated_qty + borrow_allocated_qty
     remaining_qty = max((stock_quantity or 0) - allocated_qty, 0)
 
     if requested_quantity > remaining_qty:
         segments = []
         if booking_allocated_qty:
             segments.append(f"{booking_allocated_qty} unit untuk booking")
-        if use_allocated_qty:
-            segments.append(f"{use_allocated_qty} unit untuk penggunaan alat")
         if borrow_allocated_qty:
             segments.append(f"{borrow_allocated_qty} unit untuk peminjaman alat")
         issues.append(
@@ -4299,137 +3904,6 @@ def _equipment_review_overlap_issues(
         )
     else:
         passed_indicators.append("Sisa stok alat pada rentang waktu yang sama masih mencukupi")
-
-    return _review_result(issues=issues, passed_indicators=passed_indicators)
-
-
-def _use_review_result(use_item):
-    issues = []
-    passed_indicators = []
-    required_fields_complete = True
-
-    if not _has_review_value(use_item.requester_phone):
-        required_fields_complete = False
-        issues.append(
-            _review_issue(
-                "Nomor telepon belum diisi",
-                "Pemohon belum mengisi nomor telepon yang bisa dihubungi.",
-            )
-        )
-    if str(use_item.purpose or "").strip() == "Skripsi/TA" and not _has_review_value(use_item.requester_mentor):
-        required_fields_complete = False
-        issues.append(
-            _review_issue(
-                "Dosen pembimbing belum diisi",
-                "Field dosen pembimbing belum dilengkapi pada pengajuan Skripsi/TA ini.",
-            )
-        )
-
-    equipment = getattr(use_item, "equipment", None)
-    equipment_available = False
-    stock_within_limit = False
-    if equipment is not None:
-        if str(equipment.status or "") != "Available":
-            issues.append(
-                _review_issue(
-                    "Status alat tidak available",
-                    f"Status alat saat ini {equipment.status}. Pastikan alat memang dapat digunakan sebelum approve.",
-                )
-            )
-        else:
-            equipment_available = True
-        if (use_item.quantity or 0) > (equipment.quantity or 0):
-            issues.append(
-                _review_issue(
-                    "Jumlah melebihi stok",
-                    f"Pengajuan meminta {use_item.quantity} unit, sementara stok alat hanya {equipment.quantity}.",
-                )
-            )
-        else:
-            stock_within_limit = True
-
-    if equipment is not None and not getattr(equipment, "is_shareable", False):
-        overlap_result = _equipment_review_overlap_issues(
-            equipment_id=getattr(use_item, "equipment_id", None),
-            requested_quantity=use_item.quantity or 0,
-            stock_quantity=getattr(equipment, "quantity", 0),
-            start_time=use_item.start_time,
-            end_time=use_item.end_time,
-            exclude_use_id=use_item.pk,
-        )
-        issues.extend(overlap_result["issues"])
-        passed_indicators.extend(overlap_result["passed_indicators"])
-    elif equipment is not None and getattr(equipment, "is_shareable", False):
-        passed_indicators.append("Alat bersifat shareable, tidak ada pembatasan stok berdasarkan waktu")
-
-    room = getattr(equipment, "room", None) if equipment else None
-    if room and use_item.start_time and use_item.end_time:
-        practicum_count = Schedule.objects.filter(
-            room=room,
-            start_time__lt=use_item.end_time,
-            end_time__gt=use_item.start_time,
-        ).count()
-        if practicum_count:
-            issues.append(
-                _review_issue(
-                    "Bentrok jadwal praktikum",
-                    f"Ruangan {room.name} sudah dipakai untuk {practicum_count} jadwal praktikum pada rentang waktu ini.",
-                )
-            )
-        else:
-            passed_indicators.append("Tidak bentrok dengan jadwal praktikum pada ruangan yang sama")
-
-        EXCLUSIVE = {"Praktikum", "Workshop"}
-        blocking = Booking.objects.filter(
-            room=room,
-            status="Approved",
-            purpose__in=EXCLUSIVE,
-            start_time__lt=use_item.end_time,
-            end_time__gt=use_item.start_time,
-        ).count()
-        if blocking:
-            issues.append(
-                _review_issue(
-                    "Bentrok booking Praktikum/Workshop",
-                    f"Ruangan {room.name} sudah dipakai untuk {blocking} booking Praktikum/Workshop "
-                    f"yang disetujui pada rentang waktu ini.",
-                )
-            )
-        else:
-            total_booking = (
-                Booking.objects.filter(
-                    room=room,
-                    status="Approved",
-                    start_time__lt=use_item.end_time,
-                    end_time__gt=use_item.start_time,
-                ).aggregate(total=Sum("attendee_count"))["total"] or 0
-            )
-            total_use = Use.objects.filter(
-                equipment__room=room,
-                status="Approved",
-                start_time__lt=use_item.end_time,
-                end_time__gt=use_item.start_time,
-            ).exclude(pk=use_item.pk).count()
-            total_occupancy = total_booking + total_use + 1
-            if total_occupancy > room.capacity:
-                issues.append(
-                    _review_issue(
-                        "Melebihi kapasitas ruangan",
-                        f"Total pengguna ({total_occupancy} orang) melebihi kapasitas ruangan "
-                        f"{room.name} ({room.capacity} orang) jika digabung dengan booking dan penggunaan alat lain.",
-                    )
-                )
-            else:
-                passed_indicators.append(
-                    f"Kapasitas ruangan {room.name} mencukupi ({total_occupancy}/{room.capacity} orang)"
-                )
-
-    if equipment_available:
-        passed_indicators.insert(0, "Status alat masih available")
-    if stock_within_limit:
-        passed_indicators.append("Jumlah pengajuan tidak melebihi stok alat")
-    if required_fields_complete:
-        passed_indicators.append("Field penting untuk approval sudah terisi semua")
 
     return _review_result(issues=issues, passed_indicators=passed_indicators)
 
@@ -4611,7 +4085,6 @@ def _request_label(kind):
     labels = {
         "booking": "peminjaman lab",
         "borrow": "peminjaman alat",
-        "use": "penggunaan alat",
         "pengujian": "pengujian sampel",
     }
     return labels.get(kind, "request")
@@ -4626,186 +4099,6 @@ def _request_identifier(instance, fallback):
     )
 
 
-def _notification_recipient_email(recipient):
-    if recipient is None:
-        return None
-    user = getattr(recipient, "user", None)
-    email = getattr(user, "email", None)
-    return (email or "").strip() or None
-
-
-def _notification_recipient_name(instance, recipient):
-    return (
-        _profile_display_name(recipient)
-        or getattr(instance, "name", None)
-        or _notification_recipient_email(recipient)
-        or "Pengguna"
-    )
-
-
-def _notification_email_extra_context(
-    instance,
-    *,
-    recipient,
-    kind,
-    title,
-    message,
-    cta_url,
-    cta_label,
-):
-    return {
-        "user_display": _notification_recipient_name(instance, recipient),
-        "notification_title": title,
-        "notification_message": message,
-        "request_label": _request_label(kind).title(),
-        "request_label_lower": _request_label(kind),
-        "request_identifier": _request_identifier(instance, _request_label(kind).title()),
-        "cta_url": cta_url,
-        "cta_label": cta_label,
-    }
-
-
-def _send_request_status_email(
-    instance,
-    *,
-    recipient,
-    kind,
-    title,
-    message,
-    status_value,
-    request=None,
-):
-    recipient_email = _notification_recipient_email(recipient)
-    if not recipient_email:
-        return
-
-    cta_url = notification_cta_url(kind, instance)
-    cta_label = notification_cta_label(kind)
-    context = build_email_context(
-        request=request,
-        extra_context={
-            **_notification_email_extra_context(
-                instance,
-                recipient=recipient,
-                kind=kind,
-                title=title,
-                message=message,
-                cta_url=cta_url,
-                cta_label=cta_label,
-            ),
-            "status_label": "disetujui" if status_value == "Approved" else "ditolak",
-        },
-    )
-    send_notification_email(
-        recipient_email,
-        template_base="csluse/email/request_status",
-        context=context,
-    )
-
-
-def _send_borrow_overdue_email(
-    instance,
-    *,
-    recipient,
-    title,
-    message,
-    due_text,
-    equipment_name,
-    request=None,
-):
-    recipient_email = _notification_recipient_email(recipient)
-    if not recipient_email:
-        return
-
-    cta_url = notification_cta_url("borrow", instance)
-    context = build_email_context(
-        request=request,
-        extra_context={
-            **_notification_email_extra_context(
-                instance,
-                recipient=recipient,
-                kind="borrow",
-                title=title,
-                message=message,
-                cta_url=cta_url,
-                cta_label="Lihat Detail Peminjaman",
-            ),
-            "equipment_name": equipment_name,
-            "due_text": due_text,
-        },
-    )
-    send_notification_email(
-        recipient_email,
-        template_base="csluse/email/borrow_overdue",
-        context=context,
-    )
-
-
-def _notify_request_status(instance, *, kind, status_value, actor_profile=None, request=None):
-    recipient = getattr(instance, "requested_by", None)
-    if recipient is None:
-        return
-
-    request_label = _request_label(kind)
-    request_identifier = _request_identifier(instance, request_label.title())
-    actor_name = _profile_display_name(actor_profile) or "tim laboratorium"
-    category = "Approved" if status_value == "Approved" else "Rejected"
-    action_label = "disetujui" if status_value == "Approved" else "ditolak"
-    title = f"{request_label.title()} {request_identifier} {action_label}"
-    message = (
-        f"Pengajuan {request_label} Anda ({request_identifier}) telah "
-        f"{action_label} oleh {actor_name}."
-    )
-
-    _create_notification(
-        recipient,
-        title=title,
-        category=category,
-        message=message,
-    )
-    _send_request_status_email(
-        instance,
-        recipient=recipient,
-        kind=kind,
-        title=title,
-        message=message,
-        status_value=status_value,
-        request=request,
-    )
-
-
-def _notify_borrow_overdue(instance, request=None):
-    recipient = getattr(instance, "requested_by", None)
-    if recipient is None:
-        return
-
-    borrow_identifier = _request_identifier(instance, "Borrow")
-    equipment_name = getattr(getattr(instance, "equipment", None), "name", "alat")
-    due_at = getattr(instance, "end_time", None)
-    due_text = timezone.localtime(due_at).strftime("%d %b %Y %H:%M WIB") if due_at else "jadwal pengembalian"
-    title = f"Peminjaman {borrow_identifier} melewati batas waktu"
-    message = (
-        f"Peminjaman alat Anda ({borrow_identifier}) untuk {equipment_name} "
-        f"sudah overdue sejak {due_text}. Segera lakukan pengembalian."
-    )
-
-    _create_notification(
-        recipient,
-        title=title,
-        category="Reminder",
-        message=message,
-    )
-    _send_borrow_overdue_email(
-        instance,
-        recipient=recipient,
-        title=title,
-        message=message,
-        due_text=due_text,
-        equipment_name=equipment_name,
-        request=request,
-    )
-
-
 def build_status_aggregates(queryset, completed_statuses=None):
     completed_statuses = completed_statuses or ["Completed"]
     return {
@@ -4813,7 +4106,6 @@ def build_status_aggregates(queryset, completed_statuses=None):
         "pending": queryset.filter(status="Pending").count(),
         "approved": queryset.filter(status="Approved").count(),
         "diproses": queryset.filter(status="Diproses").count(),
-        "menunggu_pembayaran": queryset.filter(status="Menunggu Pembayaran").count(),
         "completed": queryset.filter(status__in=completed_statuses).count(),
         "rejected": queryset.filter(status="Rejected").count(),
         "expired": queryset.filter(status="Expired").count(),
@@ -4855,24 +4147,6 @@ def sync_booking_statuses():
     }
 
 
-def sync_use_statuses():
-    now = timezone.now()
-    expired_finished = (
-        Use.objects
-        .filter(status="Pending", end_time__lt=now, expired_at__isnull=True)
-        .update(status="Expired", expired_at=now, updated_at=now)
-    )
-    expired_started_without_end = (
-        Use.objects
-        .filter(status="Pending", end_time__isnull=True, start_time__lt=now, expired_at__isnull=True)
-        .update(status="Expired", expired_at=now, updated_at=now)
-    )
-    return {
-        "expired_finished": expired_finished,
-        "expired_started_without_end": expired_started_without_end,
-    }
-
-
 def sync_borrow_statuses():
     now = timezone.now()
     expired_pending = (
@@ -4893,11 +4167,288 @@ def sync_borrow_statuses():
         )
         for item in overdue_borrows:
             item.status = "Overdue"
-            _notify_borrow_overdue(item)
+            notify_borrow_overdue(item)
     return {
         "expired_pending": expired_pending,
         "marked_overdue": len(overdue_borrows),
     }
+
+
+BEBAS_LAB_DOCUMENT_TYPES = {"form_alat_kecil", "form_alat_besar", "form_permintaan_bahan"}
+
+
+class SuratBebasLabViewSet(viewsets.ModelViewSet):
+    queryset = (
+        SuratBebasLab.objects
+        .select_related("requested_by__user", "reviewed_by__user")
+        .prefetch_related("documents__uploaded_by__user")
+        .order_by("-created_at")
+    )
+    serializer_class = SuratBebasLabSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = DefaultPagination
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def get_serializer_class(self):
+        if self.action in {"list", "my", "all"}:
+            return SuratBebasLabListSerializer
+        return SuratBebasLabSerializer
+
+    def _current_profile(self):
+        return getattr(self.request.user, "profile", None)
+
+    def _is_admin(self):
+        return is_administrator_or_above(self.request.user)
+
+    def _is_owner(self, instance):
+        profile = self._current_profile()
+        return profile and instance.requested_by_id == profile.id
+
+    def _apply_filters(self, qs):
+        search = (
+            self.request.query_params.get("search")
+            or self.request.query_params.get("q")
+            or ""
+        ).strip()
+        status_param = self.request.query_params.get("status")
+        requested_by = self.request.query_params.get("requested_by")
+        batch = (self.request.query_params.get("batch") or "").strip()
+        created_after = self.request.query_params.get("created_after")
+        created_before = self.request.query_params.get("created_before")
+        ordering = (self.request.query_params.get("ordering") or "").strip().lower()
+        if search:
+            qs = qs.filter(
+                Q(requested_by__full_name__icontains=search)
+                | Q(requested_by__user__email__icontains=search)
+                | Q(requested_by__id_number__icontains=search)
+                | Q(code__icontains=search)
+            ).distinct()
+        if status_param:
+            qs = qs.filter(status=status_param)
+        if requested_by:
+            qs = qs.filter(requested_by_id=requested_by)
+        if batch:
+            qs = qs.filter(requested_by__batch__icontains=batch)
+        if created_after:
+            qs = qs.filter(created_at__gte=created_after)
+        if created_before:
+            qs = qs.filter(created_at__lte=created_before)
+        if ordering == "oldest":
+            qs = qs.order_by("created_at", "id")
+        else:
+            qs = qs.order_by("-created_at", "-id")
+        return qs
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "my":
+            return self._apply_filters(qs.filter(requested_by=self._current_profile()))
+        if self.action == "all":
+            if not self._is_admin():
+                raise PermissionDenied("Akses ditolak.")
+            return self._apply_filters(qs)
+        if not self._is_admin():
+            return self._apply_filters(qs.filter(requested_by=self._current_profile()))
+        return self._apply_filters(qs)
+
+    def perform_create(self, serializer):
+        instance = serializer.save(requested_by=self._current_profile())
+        self._save_documents(instance)
+
+    def _save_documents(self, instance):
+        request = self.request
+        saved = 0
+        for doc_type in BEBAS_LAB_DOCUMENT_TYPES:
+            file_obj = request.FILES.get(doc_type)
+            if not file_obj:
+                continue
+            self._replace_document(instance, doc_type, file_obj)
+            saved += 1
+        if saved == 0:
+            instance.delete()
+            raise ValidationError({"documents": "Minimal satu dokumen harus dilampirkan."})
+
+    def _replace_document(self, instance, document_type, file_obj):
+        document_instance = instance.documents.filter(document_type=document_type).first()
+        if document_instance is None:
+            Document.objects.create(
+                surat_bebas_lab=instance,
+                document_type=document_type,
+                document=file_obj,
+                original_name=file_obj.name,
+                mime_type=file_obj.content_type,
+                size=file_obj.size,
+                uploaded_by=self._current_profile(),
+                pengujian=None,
+            )
+            return
+
+        old_document_name = document_instance.document.name if document_instance.document else ""
+        document_instance.document = file_obj
+        document_instance.original_name = file_obj.name
+        document_instance.mime_type = file_obj.content_type
+        document_instance.size = file_obj.size
+        document_instance.uploaded_by = self._current_profile()
+        document_instance.pengujian = None
+        document_instance.save()
+
+        if old_document_name and old_document_name != document_instance.document.name:
+            document_storage = document_instance.document.storage
+            if document_storage is not None:
+                document_storage.delete(old_document_name)
+
+    def _delete_document_file(self, document_instance):
+        if not document_instance.document:
+            return
+
+        document_name = document_instance.document.name or ""
+        document_storage = document_instance.document.storage
+        if document_name and document_storage is not None:
+            document_storage.delete(document_name)
+
+    def _build_mutation_response(self, instance, **extra):
+        instance.refresh_from_db()
+        serializer = SuratBebasLabSerializer(instance, context=self.get_serializer_context())
+        return Response(
+            {
+                "surat_bebas_lab": serializer.data,
+                **extra,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._is_owner(instance):
+            raise PermissionDenied("Anda hanya dapat mengubah permohonan milik sendiri.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat diubah."})
+
+        updated_document_types = []
+        for document_type in BEBAS_LAB_DOCUMENT_TYPES:
+            file_obj = request.FILES.get(document_type)
+            if not file_obj:
+                continue
+            self._replace_document(instance, document_type, file_obj)
+            updated_document_types.append(document_type)
+
+        if not updated_document_types:
+            raise ValidationError({"documents": "Minimal satu dokumen harus dikirim untuk diperbarui."})
+
+        return self._build_mutation_response(
+            instance,
+            action="documents_updated",
+            updated_document_types=updated_document_types,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._is_owner(instance) and not self._is_admin():
+            raise PermissionDenied("Akses ditolak.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat dihapus."})
+        return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("document_type", OpenApiTypes.STR, OpenApiParameter.PATH),
+        ]
+    )
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path=r"documents/delete/(?P<document_type>[^/.]+)",
+    )
+    def delete_document(self, request, pk=None, document_type=None):  # noqa: ARG002
+        instance = self.get_object()
+        if not self._is_owner(instance) and not self._is_admin():
+            raise PermissionDenied("Akses ditolak.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya dokumen dari permohonan Pending yang dapat dihapus."})
+
+        document_type = str(document_type or "").strip()
+        if document_type not in BEBAS_LAB_DOCUMENT_TYPES:
+            raise ValidationError({"document_type": "Jenis dokumen tidak dikenali."})
+
+        document_instance = instance.documents.filter(document_type=document_type).first()
+        if document_instance is None:
+            raise ValidationError({"document_type": "Dokumen tidak ditemukan."})
+        if instance.documents.count() <= 1:
+            raise ValidationError(
+                {"documents": "Minimal satu dokumen harus tersisa pada permohonan."}
+            )
+
+        self._delete_document_file(document_instance)
+        document_instance.delete()
+
+        return self._build_mutation_response(
+            instance,
+            action="document_deleted",
+            deleted_document_type=document_type,
+        )
+
+    @action(detail=False, methods=["get"], url_path="my")
+    def my(self, _request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        serializer = SuratBebasLabListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=False, methods=["get"], url_path="all")
+    def all(self, _request):
+        if not self._is_admin():
+            raise PermissionDenied("Akses ditolak.")
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        serializer = SuratBebasLabListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=True, methods=["post"])
+    def approve(self, _request, pk=None):  # noqa: ARG002
+        if not self._is_admin():
+            raise PermissionDenied("Hanya Admin yang dapat menyetujui permohonan.")
+        instance = self.get_object()
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat disetujui."})
+        now = timezone.now()
+        serializer = SuratBebasLabSerializer(
+            instance,
+            data={"status": "Approved"},
+            partial=True,
+            context={**self.get_serializer_context(), "allow_status_transition": True},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(reviewed_by=self._current_profile(), reviewed_at=now)
+        return self._build_mutation_response(
+            instance,
+            action="approved",
+        )
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):  # noqa: ARG002
+        if not self._is_admin():
+            raise PermissionDenied("Hanya Admin yang dapat menolak permohonan.")
+        instance = self.get_object()
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat ditolak."})
+        note = (request.data.get("note") or "").strip()
+        now = timezone.now()
+        serializer = SuratBebasLabSerializer(
+            instance,
+            data={"status": "Rejected", "note": note},
+            partial=True,
+            context={**self.get_serializer_context(), "allow_status_transition": True},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(reviewed_by=self._current_profile(), reviewed_at=now)
+        return self._build_mutation_response(
+            instance,
+            action="rejected",
+        )
 
 
 # endregion

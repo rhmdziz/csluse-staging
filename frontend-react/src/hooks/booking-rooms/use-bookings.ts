@@ -9,6 +9,7 @@ export type BookingFilters = {
   status?: string;
   purpose?: string;
   requestedBy?: string;
+  reviewerScope?: "mentor" | "all";
   department?: string;
   room?: string;
   createdAfter?: string;
@@ -330,7 +331,11 @@ export function useBookings(
   filters: BookingFilters = {},
   reloadKey = 0,
   scope: BookingListScope = "default",
+  options?: {
+    enabled?: boolean;
+  },
 ) {
+  const enabled = options?.enabled ?? true;
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -346,6 +351,23 @@ export function useBookings(
   });
 
   useEffect(() => {
+    if (!enabled) {
+      setBookings([]);
+      setTotalCount(0);
+      setAggregates({
+        total: 0,
+        pending: 0,
+        approved: 0,
+        completed: 0,
+        rejected: 0,
+        expired: 0,
+      });
+      setError("");
+      setIsLoading(false);
+      setHasLoadedOnce(true);
+      return;
+    }
+
     const controller = new AbortController();
     let isAborted = false;
 
@@ -400,12 +422,14 @@ export function useBookings(
     filters.status,
     filters.purpose,
     filters.requestedBy,
+    filters.reviewerScope,
     filters.department,
     filters.room,
     filters.createdAfter,
     filters.createdBefore,
     reloadKey,
     scope,
+    enabled,
   ]);
 
   return {

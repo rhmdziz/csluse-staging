@@ -1,4 +1,5 @@
 import {
+  API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN,
   API_AUTH_ADMIN_PROFILE_DETAIL,
   API_AUTH_MENTOR_USERS_DROPDOWN,
   API_AUTH_PIC_USERS,
@@ -344,6 +345,18 @@ export const usersService = {
     });
     if (!response.ok) {
       throw new Error(`Gagal memuat data PIC (${response.status})`);
+    }
+    const list = (await response.json()) as ApiPicUser[];
+    return list.map(mapPicUser).filter((item): item is PicUser => item !== null);
+  },
+
+  async getAssignedPicUsers(signal?: AbortSignal) {
+    const response = await authFetch(API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN, {
+      method: "GET",
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Gagal memuat data PIC terpasang (${response.status})`);
     }
     const list = (await response.json()) as ApiPicUser[];
     return list.map(mapPicUser).filter((item): item is PicUser => item !== null);

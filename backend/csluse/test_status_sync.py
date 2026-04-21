@@ -7,12 +7,11 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from csluse.models import Booking, Borrow, Equipment, Room, Use
+from csluse.models import Booking, Borrow, Equipment, Room
 from csluse.viewsets import (
     normalize_status_value,
     sync_booking_statuses,
     sync_borrow_statuses,
-    sync_use_statuses,
 )
 
 User = get_user_model()
@@ -112,55 +111,6 @@ class CSLUseStatusTestCase(TestCase):
         self.assertEqual(completed_booking.status, "Completed")
         self.assertEqual(active_booking.status, "Pending")
 
-    def test_sync_use_statuses_expires_finished_or_stale_pending_requests(self):
-        now = timezone.now()
-        future_start = self.future_datetime(day_offset=1, hour=9)
-        ended_use = Use.objects.create(
-            requested_by=self.requester,
-            equipment=self.equipment,
-            quantity=1,
-            start_time=future_start,
-            end_time=self.future_datetime(day_offset=1, hour=10),
-            status="Pending",
-        )
-        open_started_use = Use.objects.create(
-            requested_by=self.requester,
-            equipment=self.equipment,
-            quantity=1,
-            start_time=future_start,
-            end_time=self.future_datetime(day_offset=1, hour=10),
-            status="Pending",
-        )
-        future_use = Use.objects.create(
-            requested_by=self.requester,
-            equipment=self.equipment,
-            quantity=1,
-            start_time=self.future_datetime(day_offset=2, hour=9),
-            end_time=None,
-            status="Pending",
-        )
-
-        Use.objects.filter(pk=ended_use.pk).update(
-            start_time=now - timedelta(hours=5),
-            end_time=now - timedelta(hours=1),
-            status="Pending",
-        )
-        Use.objects.filter(pk=open_started_use.pk).update(
-            start_time=now - timedelta(hours=2),
-            end_time=None,
-            status="Pending",
-        )
-
-        sync_use_statuses()
-
-        ended_use.refresh_from_db()
-        open_started_use.refresh_from_db()
-        future_use.refresh_from_db()
-
-        self.assertEqual(ended_use.status, "Expired")
-        self.assertEqual(open_started_use.status, "Expired")
-        self.assertEqual(future_use.status, "Pending")
-
     def test_sync_borrow_statuses_expires_pending_and_marks_overdue(self):
         now = timezone.now()
         future_start = self.future_datetime(day_offset=1, hour=9)
@@ -259,17 +209,10 @@ class CSLUseStatusTestCase(TestCase):
         self.assertEqual(first.code, "PR2603-001")
         self.assertEqual(second.code, "PR2603-002")
 
-    def test_use_and_borrow_save_generate_expected_prefixes(self):
+    def test_borrow_save_generates_expected_prefix(self):
         frozen_now = timezone.make_aware(datetime(2026, 3, 15, 9, 30, 0))
 
         with patch("csluse.models.timezone.now", return_value=frozen_now):
-            use_request = Use.objects.create(
-                requested_by=self.requester,
-                equipment=self.equipment,
-                quantity=1,
-                start_time=self.future_datetime(day_offset=1, hour=9),
-                end_time=self.future_datetime(day_offset=1, hour=10),
-            )
             borrow_request = Borrow.objects.create(
                 requested_by=self.requester,
                 equipment=self.equipment,
@@ -278,5 +221,4 @@ class CSLUseStatusTestCase(TestCase):
                 end_time=self.future_datetime(day_offset=2, hour=9),
             )
 
-        self.assertEqual(use_request.code, "US2603-001")
         self.assertEqual(borrow_request.code, "PA2603-001")

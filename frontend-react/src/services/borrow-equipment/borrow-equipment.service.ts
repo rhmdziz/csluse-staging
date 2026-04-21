@@ -1,5 +1,6 @@
 import {
   API_BORROW_APPROVE,
+  API_BORROW_CANCEL,
   API_BORROW_DETAIL,
   API_BORROW_FINALIZE_RETURN,
   API_BORROW_HANDOVER,
@@ -18,6 +19,7 @@ export type BorrowServiceFilters = {
   status?: string;
   purpose?: string;
   requestedBy?: string;
+  reviewerScope?: "mentor" | "all";
   department?: string;
   equipment?: string;
   createdAfter?: string;
@@ -43,6 +45,7 @@ export type CreateBorrowPayload = {
 export type BorrowStatusActionType =
   | "approve"
   | "reject"
+  | "cancel"
   | "handover"
   | "receive_return"
   | "finalize_return"
@@ -93,6 +96,9 @@ export const borrowEquipmentService = {
     if (filters.purpose) url.searchParams.set("purpose", filters.purpose);
     if (filters.requestedBy && scope !== "my") {
       url.searchParams.set("requested_by", filters.requestedBy);
+    }
+    if (filters.reviewerScope) {
+      url.searchParams.set("reviewer_scope", filters.reviewerScope);
     }
     if (filters.department) url.searchParams.set("department", filters.department);
     if (filters.equipment) url.searchParams.set("equipment", filters.equipment);
@@ -165,6 +171,8 @@ export const borrowEquipmentService = {
         ? API_BORROW_APPROVE(borrowId)
         : type === "reject"
           ? API_BORROW_REJECT(borrowId)
+          : type === "cancel"
+            ? API_BORROW_CANCEL(borrowId)
           : type === "handover"
             ? API_BORROW_HANDOVER(borrowId)
             : type === "receive_return"

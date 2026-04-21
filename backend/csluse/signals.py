@@ -12,7 +12,7 @@ from csluse_auth.permissions import (
     has_role,
 )
 
-from .models import Image, Booking, BookingEquipmentItem, Borrow, Room, Pengujian, Use
+from .models import Image, Booking, BookingEquipmentItem, Borrow, Room, Pengujian
 
 
 def validate_start_not_in_past(start_time, label="start time"):
@@ -115,7 +115,6 @@ def validate_booking(sender, instance, **kwargs):
         validate_start_not_in_past(instance.start_time, "booking start time")
 
     validate_booking_working_hours(instance.start_time, instance.end_time)
-    validate_no_weekend_range(instance.start_time, instance.end_time, "booking time range")
 
     # approved_by must be room PIC or Admin (when set)
     if instance.approved_by_id:
@@ -142,33 +141,6 @@ def validate_booking_equipment_item(sender, instance, **kwargs):
         )
 
 
-@receiver(pre_save, sender=Use)
-def validate_use(sender, instance, **kwargs):
-    """
-    Use rules:
-    - Quantity > 0.
-    - Start time cannot be in the past.
-    """
-    if instance.quantity <= 0:
-        raise ValidationError("Use quantity must be at least 1.")
-
-    previous_instance = None
-    if instance.pk:
-        previous_instance = Use.objects.filter(pk=instance.pk).only(
-            "start_time",
-            "status",
-        ).first()
-
-    start_time_changed = (
-        previous_instance is None
-        or previous_instance.start_time != instance.start_time
-    )
-
-    if start_time_changed:
-        validate_start_not_in_past(instance.start_time, "use start time")
-
-    validate_no_weekend_range(instance.start_time, instance.end_time, "use time range")
-
 @receiver(pre_save, sender=Borrow)
 def validate_borrow(sender, instance, **kwargs):
     """
@@ -192,8 +164,6 @@ def validate_borrow(sender, instance, **kwargs):
     )
     if start_time_changed:
         validate_start_not_in_past(instance.start_time, "borrow start time")
-
-    validate_no_weekend_range(instance.start_time, instance.end_time, "borrow time range")
 
     if instance.equipment_id:
         equipment_qty = instance.equipment.quantity

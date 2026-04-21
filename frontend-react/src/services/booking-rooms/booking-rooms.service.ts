@@ -3,6 +3,7 @@ import {
   API_BOOKINGS_ALL,
   API_BOOKINGS_MY,
   API_BOOKING_APPROVE,
+  API_BOOKING_CANCEL,
   API_BOOKING_COMPLETE,
   API_BOOKING_DETAIL,
   API_BOOKING_REJECT,
@@ -14,6 +15,7 @@ export type BookingServiceFilters = {
   status?: string;
   purpose?: string;
   requestedBy?: string;
+  reviewerScope?: "mentor" | "all";
   department?: string;
   room?: string;
   createdAfter?: string;
@@ -44,7 +46,7 @@ export type CreateBookingRoomPayload = {
   }>;
 };
 
-export type BookingStatusActionType = "approve" | "reject" | "complete";
+export type BookingStatusActionType = "approve" | "reject" | "complete" | "cancel";
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -89,6 +91,9 @@ export const bookingRoomsService = {
     if (filters.purpose) url.searchParams.set("purpose", filters.purpose);
     if (filters.requestedBy && scope !== "my") {
       url.searchParams.set("requested_by", filters.requestedBy);
+    }
+    if (filters.reviewerScope) {
+      url.searchParams.set("reviewer_scope", filters.reviewerScope);
     }
     if (filters.department) url.searchParams.set("department", filters.department);
     if (filters.room) url.searchParams.set("room", filters.room);
@@ -161,7 +166,9 @@ export const bookingRoomsService = {
         ? API_BOOKING_APPROVE(bookingId)
         : type === "reject"
           ? API_BOOKING_REJECT(bookingId)
-          : API_BOOKING_COMPLETE(bookingId),
+          : type === "complete"
+            ? API_BOOKING_COMPLETE(bookingId)
+            : API_BOOKING_CANCEL(bookingId),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

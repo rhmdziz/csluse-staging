@@ -2,7 +2,7 @@
 
 ## Ringkasan Project
 
-Project ini adalah aplikasi internal CSL/CSL Use dengan arsitektur full-stack:
+Project ini adalah aplikasi internal CSL dengan arsitektur full-stack:
 
 - `backend/`: Django 4.2 + Django REST Framework + env Python 3.12
 - `frontend-react/`: React 19 + Vite + TypeScript
@@ -14,7 +14,6 @@ Fungsi bisnis utama yang terlihat dari struktur route dan folder:
 - autentikasi dan otorisasi pengguna
 - dashboard pengguna
 - booking ruangan
-- penggunaan alat
 - peminjaman alat
 - pengujian sampel
 - approval/review workflow
@@ -99,7 +98,6 @@ Dari router frontend, domain besar aplikasi meliputi:
 - `dashboard`
 - `schedule`
 - `booking-rooms`
-- `use-equipment`
 - `borrow-equipment`
 - `sample-testing`
 - `approval`
@@ -198,7 +196,7 @@ Saat menambah fitur, usahakan mengikuti pembagian domain yang sudah ada:
 ## Checklist Context Dasar Sebelum Mulai Kerja
 
 - pahami apakah perubahan ada di `backend`, `frontend-react`, atau keduanya
-- identifikasi domain fitur: booking room, use equipment, borrow equipment, sample testing, admin, atau auth
+- identifikasi domain fitur: booking room, booking catalog, borrow equipment, sample testing, admin, atau auth
 - cek apakah perubahan menyentuh route, hook data fetching, dan API contract
 - cek file `.env` atau compose bila masalah terkait auth, cookie, origin, atau deployment
 

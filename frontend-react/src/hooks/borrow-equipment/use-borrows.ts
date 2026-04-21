@@ -9,6 +9,7 @@ export type BorrowFilters = {
   status?: string;
   purpose?: string;
   requestedBy?: string;
+  reviewerScope?: "mentor" | "all";
   department?: string;
   equipment?: string;
   createdAfter?: string;
@@ -305,7 +306,11 @@ export function useBorrows(
   filters: BorrowFilters = {},
   reloadKey = 0,
   scope: BorrowListScope = "default",
+  options?: {
+    enabled?: boolean;
+  },
 ) {
+  const enabled = options?.enabled ?? true;
   const [borrows, setBorrows] = useState<BorrowRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -325,6 +330,27 @@ export function useBorrows(
   });
 
   useEffect(() => {
+    if (!enabled) {
+      setBorrows([]);
+      setTotalCount(0);
+      setAggregates({
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        expired: 0,
+        borrowed: 0,
+        returned_pending_inspection: 0,
+        returned: 0,
+        overdue: 0,
+        lost_damaged: 0,
+      });
+      setError("");
+      setIsLoading(false);
+      setHasLoadedOnce(true);
+      return;
+    }
+
     if (scope === "my" && !filters.requestedBy) {
       setBorrows([]);
       setTotalCount(0);
@@ -406,12 +432,14 @@ export function useBorrows(
     filters.status,
     filters.purpose,
     filters.requestedBy,
+    filters.reviewerScope,
     filters.department,
     filters.equipment,
     filters.createdAfter,
     filters.createdBefore,
     reloadKey,
     scope,
+    enabled,
   ]);
 
   return {
