@@ -450,6 +450,21 @@ class SuratBebasLab(BaseModel):
         return f"{self.code} - {self.requested_by}"
 
 
+class SuratBebasLabBookingHistory(BaseModel):
+    surat_bebas_lab = models.ForeignKey(
+        SuratBebasLab,
+        on_delete=models.CASCADE,
+        related_name="booking_histories",
+    )
+    lab_room_name = models.CharField(max_length=255)
+    purpose = models.CharField(max_length=255)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"{self.surat_bebas_lab.code} - {self.lab_room_name} ({self.start_date})"
+
+
 class Document(BaseModel):
     DOCUMENT_TYPE_CHOICES = [
         ("testing_agreement", "Surat perjanjian pengujian"),

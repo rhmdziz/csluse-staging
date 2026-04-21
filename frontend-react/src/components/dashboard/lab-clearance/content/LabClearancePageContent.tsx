@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  Check,
   Download,
   Eye,
   FileText,
   Info,
   Loader2,
+  Pencil,
   Plus,
+  PlusCircle,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -43,11 +47,13 @@ import {
 } from "@/hooks/lab-clearance";
 import {
   labClearanceService,
+  type LabClearanceBookingHistory,
   type LabClearanceDetail,
   type LabClearanceDocument,
   type LabClearanceDocumentType,
   type LabClearanceListItem,
 } from "@/services/lab-clearance";
+import { roomsService, type RoomOption } from "@/services/shared/resources";
 
 const PAGE_SIZE = 10;
 
@@ -192,6 +198,20 @@ export function LabClearancePageContent() {
   const [files, setFiles] = useState<
     Partial<Record<LabClearanceDocumentType, File>>
   >({});
+  const [bookingHistories, setBookingHistories] = useState<
+    Omit<LabClearanceBookingHistory, "id">[]
+  >([]);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [roomOptions, setRoomOptions] = useState<RoomOption[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<Omit<LabClearanceBookingHistory, "id"> | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newEntry, setNewEntry] = useState<Omit<LabClearanceBookingHistory, "id">>({
+    lab_room_name: "",
+    purpose: "",
+    start_date: "",
+    end_date: "",
+  });
   const [detailTarget, setDetailTarget] = useState<LabClearanceListItem | null>(
     null,
   );
@@ -261,7 +281,28 @@ export function LabClearancePageContent() {
   const handleOpenDialog = () => {
     setFiles({});
     setErrorMessage("");
+    setBookingHistories([]);
+    setEditingIndex(null);
+    setEditingEntry(null);
+    setIsAddingNew(false);
+    setNewEntry({ lab_room_name: "", purpose: "", start_date: "", end_date: "" });
     setIsDialogOpen(true);
+    setIsSuggestionsLoading(true);
+    void roomsService.getOptions().then(setRoomOptions).catch(() => {});
+    labClearanceService
+      .getBookingSuggestions()
+      .then((suggestions) => {
+        setBookingHistories(
+          suggestions.map(({ lab_room_name, purpose, start_date, end_date }) => ({
+            lab_room_name,
+            purpose,
+            start_date,
+            end_date,
+          })),
+        );
+      })
+      .catch(() => {/* pre-fill silently fails, user can add manually */})
+      .finally(() => setIsSuggestionsLoading(false));
   };
 
   const handleSubmit = async () => {
@@ -269,7 +310,7 @@ export function LabClearancePageContent() {
       setErrorMessage("Minimal satu formulir harus dilampirkan.");
       return;
     }
-    const result = await submit(files);
+    const result = await submit(files, bookingHistories);
     if (result.ok) {
       toast.success("Permohonan berhasil dikirim.");
       setIsDialogOpen(false);
@@ -552,6 +593,10 @@ export function LabClearancePageContent() {
                         }
                       />
                       <DetailInfoItem
+                        label="Direview Oleh"
+                        value={detailData.reviewed_by_detail?.full_name || "-"}
+                      />
+                      <DetailInfoItem
                         label="Direview Pada"
                         value={
                           detailData.reviewed_at
@@ -707,15 +752,279 @@ export function LabClearancePageContent() {
               <div className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700">
                 <Upload className="h-4 w-4" />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <DialogTitle className="text-sm font-semibold text-slate-900">
                   Ajukan Permohonan Surat Bebas Laboratorium
                 </DialogTitle>
+                <DialogDescription className="mt-1 text-sm text-slate-500">
+                  Unggah formulir surat bebas laboratorium yang sudah diisi dan
+                  ditandatangani untuk diajukan ke admin.
+                </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           <div className="space-y-3 px-6 py-5">
+            {/* Riwayat Penggunaan Ruang Lab */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Riwayat Penggunaan Ruang Lab
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 border-slate-300 text-xs"
+                  onClick={() => setIsAddingNew(true)}
+                  disabled={isAddingNew}
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Tambah
+                </Button>
+              </div>
+              {isSuggestionsLoading ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Memuat riwayat booking...
+                </div>
+              ) : null}
+              <div className="overflow-x-auto rounded-md border border-slate-200">
+                <table className="min-w-full table-auto text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">Ruang Lab</th>
+                      <th className="px-3 py-2 font-semibold">Tujuan</th>
+                      <th className="px-3 py-2 font-semibold">Mulai</th>
+                      <th className="px-3 py-2 font-semibold">Selesai</th>
+                      <th className="px-3 py-2 text-center font-semibold">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookingHistories.map((entry, index) =>
+                      editingIndex === index ? (
+                        <tr key={index} className="border-t bg-blue-50/30">
+                          <td className="p-0">
+                            <select
+                              className="w-full bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                              value={editingEntry?.lab_room_name ?? ""}
+                              onChange={(e) =>
+                                setEditingEntry((prev) =>
+                                  prev ? { ...prev, lab_room_name: e.target.value } : prev,
+                                )
+                              }
+                            >
+                              <option value="">— Pilih ruang —</option>
+                              {roomOptions.map((r) => (
+                                <option key={r.id} value={r.name}>{r.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-0">
+                            <input
+                              className="w-full bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                              value={editingEntry?.purpose ?? ""}
+                              onChange={(e) =>
+                                setEditingEntry((prev) =>
+                                  prev ? { ...prev, purpose: e.target.value } : prev,
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="p-0">
+                            <input
+                              type="date"
+                              className="bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                              value={editingEntry?.start_date ?? ""}
+                              onChange={(e) =>
+                                setEditingEntry((prev) =>
+                                  prev ? { ...prev, start_date: e.target.value } : prev,
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="p-0">
+                            <input
+                              type="date"
+                              className="bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                              value={editingEntry?.end_date ?? ""}
+                              onChange={(e) =>
+                                setEditingEntry((prev) =>
+                                  prev ? { ...prev, end_date: e.target.value } : prev,
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex justify-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-6 w-6 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                onClick={() => {
+                                  if (!editingEntry) return;
+                                  setBookingHistories((prev) =>
+                                    prev.map((e, i) => (i === index ? editingEntry : e)),
+                                  );
+                                  setEditingIndex(null);
+                                  setEditingEntry(null);
+                                }}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-6 w-6 border-slate-200 text-slate-500"
+                                onClick={() => {
+                                  setEditingIndex(null);
+                                  setEditingEntry(null);
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={index} className="border-t last:border-b-0">
+                          <td className="px-3 py-2 text-sm text-slate-700">{entry.lab_room_name || "-"}</td>
+                          <td className="px-3 py-2 text-sm text-slate-700">{entry.purpose || "-"}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-sm text-slate-700">
+                            {entry.start_date || "-"}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-sm text-slate-700">
+                            {entry.end_date || "-"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex justify-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-6 w-6 border-slate-200 text-slate-600 hover:bg-slate-50"
+                                onClick={() => {
+                                  setEditingIndex(index);
+                                  setEditingEntry({ ...entry });
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-6 w-6 border-rose-200 text-rose-600 hover:bg-rose-50"
+                                onClick={() =>
+                                  setBookingHistories((prev) => prev.filter((_, i) => i !== index))
+                                }
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                    {isAddingNew && (
+                      <tr className="border-t bg-emerald-50/30">
+                        <td className="p-0">
+                          <select
+                            className="w-full bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                            value={newEntry.lab_room_name}
+                            onChange={(e) =>
+                              setNewEntry((p) => ({ ...p, lab_room_name: e.target.value }))
+                            }
+                          >
+                            <option value="">— Pilih ruang —</option>
+                            {roomOptions.map((r) => (
+                              <option key={r.id} value={r.name}>{r.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-0">
+                          <input
+                            className="w-full bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                            placeholder="Tujuan"
+                            value={newEntry.purpose}
+                            onChange={(e) =>
+                              setNewEntry((p) => ({ ...p, purpose: e.target.value }))
+                            }
+                          />
+                        </td>
+                        <td className="p-0">
+                          <input
+                            type="date"
+                            className="bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                            value={newEntry.start_date}
+                            onChange={(e) =>
+                              setNewEntry((p) => ({ ...p, start_date: e.target.value }))
+                            }
+                          />
+                        </td>
+                        <td className="p-0">
+                          <input
+                            type="date"
+                            className="bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
+                            value={newEntry.end_date}
+                            onChange={(e) =>
+                              setNewEntry((p) => ({ ...p, end_date: e.target.value }))
+                            }
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-6 w-6 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => {
+                                if (!newEntry.lab_room_name) return;
+                                setBookingHistories((prev) => [...prev, { ...newEntry }]);
+                                setIsAddingNew(false);
+                                setNewEntry({
+                                  lab_room_name: "",
+                                  purpose: "",
+                                  start_date: "",
+                                  end_date: "",
+                                });
+                              }}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-6 w-6 border-slate-200 text-slate-500"
+                              onClick={() => {
+                                setIsAddingNew(false);
+                                setNewEntry({
+                                  lab_room_name: "",
+                                  purpose: "",
+                                  start_date: "",
+                                  end_date: "",
+                                });
+                              }}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {bookingHistories.length === 0 && !isAddingNew && (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-3 py-4 text-center text-xs text-slate-400"
+                        >
+                          Belum ada riwayat. Klik &ldquo;Tambah&rdquo; untuk menambahkan secara manual.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {TEMPLATES.map((t) => (
               <FileUploadField
                 key={t.type}

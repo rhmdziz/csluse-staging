@@ -26,6 +26,7 @@ from .models import (
     Schedule,
     Software,
     SuratBebasLab,
+    SuratBebasLabBookingHistory,
 )
 
 
@@ -1694,6 +1695,28 @@ def _apply_requester_mentor_rules(serializer_instance, attrs):
 # region Surat Bebas Lab Serializers
 
 
+class SuratBebasLabBookingHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SuratBebasLabBookingHistory
+        fields = ["id", "lab_room_name", "purpose", "start_date", "end_date"]
+
+
+class BookingSuggestionSerializer(serializers.ModelSerializer):
+    lab_room_name = serializers.CharField(source="room.name", read_only=True)
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
+
+    def get_start_date(self, obj):
+        return obj.start_time.date().isoformat() if obj.start_time else None
+
+    def get_end_date(self, obj):
+        return obj.end_time.date().isoformat() if obj.end_time else None
+
+    class Meta:
+        model = Booking
+        fields = ["id", "code", "lab_room_name", "purpose", "start_date", "end_date", "status"]
+
+
 class SuratBebasLabDocumentSerializer(serializers.ModelSerializer):
     document_url = serializers.SerializerMethodField()
 
@@ -1720,6 +1743,7 @@ class SuratBebasLabSerializer(serializers.ModelSerializer):
     requested_by_detail = ProfileSerializer(source="requested_by", read_only=True)
     reviewed_by_detail = ProfileSerializer(source="reviewed_by", read_only=True)
     documents = SuratBebasLabDocumentSerializer(many=True, read_only=True)
+    booking_histories = SuratBebasLabBookingHistorySerializer(many=True, read_only=True)
 
     def validate(self, attrs):
         instance = getattr(self, "instance", None)
@@ -1742,8 +1766,10 @@ class SuratBebasLabSerializer(serializers.ModelSerializer):
 
 class SuratBebasLabListSerializer(serializers.ModelSerializer):
     requested_by_detail = serializers.SerializerMethodField()
+    reviewed_by_detail = serializers.SerializerMethodField()
     document_count = serializers.SerializerMethodField()
     documents = SuratBebasLabDocumentSerializer(many=True, read_only=True)
+    booking_histories = SuratBebasLabBookingHistorySerializer(many=True, read_only=True)
 
     def get_requested_by_detail(self, obj):
         p = obj.requested_by
@@ -1758,6 +1784,16 @@ class SuratBebasLabListSerializer(serializers.ModelSerializer):
             "batch": p.batch or "",
         }
 
+    def get_reviewed_by_detail(self, obj):
+        p = obj.reviewed_by
+        if not p:
+            return None
+        return {
+            "id": str(p.id),
+            "full_name": p.full_name or "",
+            "email": p.user.email if p.user else "",
+        }
+
     def get_document_count(self, obj):
         return obj.documents.count()
 
@@ -1769,8 +1805,10 @@ class SuratBebasLabListSerializer(serializers.ModelSerializer):
             "status",
             "note",
             "requested_by_detail",
+            "reviewed_by_detail",
             "document_count",
             "documents",
+            "booking_histories",
             "reviewed_at",
             "created_at",
             "updated_at",
