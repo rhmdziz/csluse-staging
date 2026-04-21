@@ -17,6 +17,34 @@ export type ScheduleTableRow = {
   scheduleItem?: ScheduleItem;
 };
 
+function formatDateRange(startTime: string, endTime?: string | null) {
+  const start = new Date(startTime);
+  if (Number.isNaN(start.getTime())) return "-";
+
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(d);
+
+  if (!endTime) return fmt(start);
+  const end = new Date(endTime);
+  if (Number.isNaN(end.getTime())) return fmt(start);
+
+  const toKey = (d: Date) =>
+    new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+
+  if (toKey(start) === toKey(end)) return fmt(start);
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
 function formatTimeWib(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
@@ -79,7 +107,7 @@ export function SchedulesTable({
             <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Judul</th>
             <th className="w-[140px] px-3 py-3 font-medium text-slate-50">Sumber</th>
             <th className="w-[180px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
-            <th className="w-[160px] px-3 py-3 font-medium text-slate-50">Tanggal</th>
+            <th className="w-[200px] px-3 py-3 font-medium text-slate-50">Tanggal</th>
             <th className="w-[180px] px-3 py-3 font-medium text-slate-50">Waktu Mulai</th>
             <th className="w-[180px] px-3 py-3 font-medium text-slate-50">Waktu Selesai</th>
             <th className="sticky right-0 z-10 relative w-[140px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
@@ -135,12 +163,8 @@ export function SchedulesTable({
                       : item.roomName
                     : "-"}
                 </td>
-                <td className="px-3 py-2 align-middle">
-                  {new Date(item.startTime).toLocaleDateString("id-ID", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                <td className="px-3 py-2 align-middle whitespace-nowrap">
+                  {formatDateRange(item.startTime, item.endTime)}
                 </td>
                 <td className="px-3 py-2 align-middle">{formatTimeWib(item.startTime)}</td>
                 <td className="px-3 py-2 align-middle">{formatTimeWib(item.endTime)}</td>

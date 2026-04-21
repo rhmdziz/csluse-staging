@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { HourlyScheduleTable, InlineErrorAlert } from "@/components/shared";
 import { useCalendarEvents } from "@/hooks/shared/calendar";
+import type { CalendarEvent } from "@/hooks/shared/calendar";
 import { parseDateKey } from "@/lib/date";
 import { normalizeText } from "@/lib/text";
 
@@ -14,6 +15,43 @@ function isSameDay(left: Date, right: Date) {
     left.getMonth() === right.getMonth() &&
     left.getDate() === right.getDate()
   );
+}
+
+function isWeekend(date: Date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function eventCoversDay(event: { start_time: string; end_time?: string | null }, date: Date) {
+  const start = new Date(event.start_time);
+  const end = event.end_time ? new Date(event.end_time) : new Date(event.start_time);
+  const sel = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  return sel >= startDay && sel <= endDay;
+}
+
+const wibDateFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Jakarta",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function adjustEventForDay(event: CalendarEvent, date: Date): CalendarEvent {
+  const startDate = new Date(event.start_time);
+  const endDate = event.end_time ? new Date(event.end_time) : startDate;
+  if (isSameDay(startDate, endDate)) return event;
+
+  const dayPrefix = wibDateFormatter.format(date);
+  const isStartDay = isSameDay(startDate, date);
+  const isEndDay = isSameDay(endDate, date);
+
+  return {
+    ...event,
+    start_time: isStartDay ? event.start_time : `${dayPrefix}T08:00:00+07:00`,
+    end_time: isEndDay ? event.end_time : `${dayPrefix}T17:00:00+07:00`,
+  };
 }
 
 export default function SchedulePage() {
@@ -36,8 +74,10 @@ export default function SchedulePage() {
   }, [categoryFilter, events, query, roomFilter]);
 
   const selectedDayEvents = useMemo(() => {
+    if (isWeekend(selectedDate)) return [];
     return filteredEvents
-      .filter((item) => isSameDay(new Date(item.start_time), selectedDate))
+      .filter((item) => eventCoversDay(item, selectedDate))
+      .map((item) => adjustEventForDay(item, selectedDate))
       .sort(
         (left, right) =>
           new Date(left.start_time).getTime() -
