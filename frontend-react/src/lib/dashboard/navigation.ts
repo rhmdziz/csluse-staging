@@ -288,7 +288,7 @@ export const SIDEBAR_SHORTCUTS: SidebarShortcut[] = [
     id: "bebas-laboratorium",
     label: "Surat Bebas Laboratorium",
     description: "Ajukan permohonan surat bebas laboratorium untuk mahasiswa tugas akhir.",
-    href: "/bebas-laboratorium",
+    href: "/lab-clearance",
     icon: Stamp,
     actions: [],
   },
@@ -467,7 +467,7 @@ export function parseDashboardPath(pathname: string) {
     }
     return { menu: "borrow-equipment", action: "request-list" };
   }
-  if (parts[0] === "bebas-laboratorium") {
+  if (parts[0] === "lab-clearance") {
     return { menu: "bebas-laboratorium", action: null };
   }
   if (parts[0] === "notifications") {

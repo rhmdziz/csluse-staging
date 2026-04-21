@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+from django.conf import settings
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -31,6 +32,7 @@ from .models import (
     Pengujian,
     Notification,
     SuratBebasLab,
+    SuratBebasLabBookingHistory,
 )
 from .serializers import (
     ImageSerializer,
@@ -68,6 +70,8 @@ from .serializers import (
     SuratBebasLabSerializer,
     SuratBebasLabListSerializer,
     SuratBebasLabDocumentSerializer,
+    SuratBebasLabBookingHistorySerializer,
+    BookingSuggestionSerializer,
 )
 from csluse_auth.audit import log_admin_action
 from csluse_auth.models import Profile
@@ -86,6 +90,7 @@ from .notification_service import (
     notify_post_mentor_approval,
     notify_request_status,
 )
+from .email_notifications import build_email_context, send_notification_email
 
 STATUS_VALUE_MAP = {
     "pending": "Pending",
@@ -4181,7 +4186,7 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
     queryset = (
         SuratBebasLab.objects
         .select_related("requested_by__user", "reviewed_by__user")
-        .prefetch_related("documents__uploaded_by__user")
+        .prefetch_related("documents__uploaded_by__user", "booking_histories")
         .order_by("-created_at")
     )
     serializer_class = SuratBebasLabSerializer
@@ -4254,6 +4259,29 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save(requested_by=self._current_profile())
         self._save_documents(instance)
+        self._save_booking_histories(instance)
+
+    def _save_booking_histories(self, instance):
+        import json
+        raw = self.request.data.get("booking_histories", "")
+        if not raw:
+            return
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            raise ValidationError({"booking_histories": "Format tidak valid (harus JSON array)."})
+        if not isinstance(items, list):
+            return
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            SuratBebasLabBookingHistory.objects.create(
+                surat_bebas_lab=instance,
+                lab_room_name=str(item.get("lab_room_name", ""))[:255],
+                purpose=str(item.get("purpose", ""))[:255],
+                start_date=item.get("start_date"),
+                end_date=item.get("end_date"),
+            )
 
     def _save_documents(self, instance):
         request = self.request
@@ -4406,6 +4434,99 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=False, methods=["get"], url_path="booking-suggestions")
+    def booking_suggestions(self, _request):
+        profile = self._current_profile()
+        if not profile:
+            raise PermissionDenied("Profil pengguna tidak ditemukan.")
+        qs = (
+            Booking.objects
+            .filter(requested_by=profile, status__in=["Approved", "Completed"])
+            .select_related("room")
+            .order_by("-start_time")
+        )
+        serializer = BookingSuggestionSerializer(qs, many=True)
+        return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=True, methods=["patch"], url_path="update-booking-histories")
+    def update_booking_histories(self, request, pk=None):  # noqa: ARG002
+        instance = self.get_object()
+        if not self._is_owner(instance) and not self._is_admin():
+            raise PermissionDenied("Anda hanya dapat mengubah permohonan milik sendiri.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat diubah."})
+        import json
+        raw = request.data.get("booking_histories", "")
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            raise ValidationError({"booking_histories": "Format tidak valid (harus JSON array)."})
+        if not isinstance(items, list):
+            raise ValidationError({"booking_histories": "booking_histories harus berupa array."})
+        instance.booking_histories.all().delete()
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            SuratBebasLabBookingHistory.objects.create(
+                surat_bebas_lab=instance,
+                lab_room_name=str(item.get("lab_room_name", ""))[:255],
+                purpose=str(item.get("purpose", ""))[:255],
+                start_date=item.get("start_date"),
+                end_date=item.get("end_date"),
+            )
+        return self._build_mutation_response(instance, action="booking_histories_updated")
+
+    @action(detail=True, methods=["post"], url_path="send-letter")
+    def send_letter(self, request, pk=None):  # noqa: ARG002
+        if not self._is_admin():
+            raise PermissionDenied("Hanya Admin yang dapat mengirim surat.")
+        instance = self.get_object()
+        if instance.status != "Approved":
+            raise ValidationError({"status": "Surat hanya dapat dikirim untuk permohonan yang sudah disetujui."})
+
+        pdf_file = request.FILES.get("letter_pdf")
+        if not pdf_file:
+            raise ValidationError({"letter_pdf": "File PDF surat harus dilampirkan."})
+
+        requester = instance.requested_by
+        requester_email = (
+            requester.user.email if requester and getattr(requester, "user", None) else None
+        )
+        if not requester_email:
+            raise ValidationError({"email": "Email pemohon tidak ditemukan."})
+
+        requester_name = getattr(requester, "full_name", None) or requester_email
+        attachment_name = f"surat-bebas-lab-{instance.code}.pdf"
+        pdf_bytes = pdf_file.read()
+
+        frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
+        cta_url = f"{frontend_url}/lab-clearance" if frontend_url else ""
+        context = build_email_context(
+            request=request,
+            extra_context={
+                "notification_title": "Surat Bebas Penggunaan Laboratorium",
+                "notification_message": (
+                    "Surat bebas penggunaan laboratorium Anda telah diterbitkan dan "
+                    f"terlampir pada email ini untuk pengajuan {instance.code}."
+                ),
+                "user_display": requester_name,
+                "request_identifier": instance.code,
+                "cta_url": cta_url,
+                "cta_label": "Buka Halaman Surat Bebas Lab",
+            },
+        )
+
+        sent = send_notification_email(
+            requester_email,
+            template_base="csluse/email/lab_clearance_letter",
+            context=context,
+            attachments=[(attachment_name, pdf_bytes, "application/pdf")],
+        )
+        if not sent:
+            raise ValidationError({"email": "Gagal mengirim email surat ke pemohon."})
+
+        return Response({"message": f"Surat berhasil dikirim ke {requester_email}."})
 
     @action(detail=True, methods=["post"])
     def approve(self, _request, pk=None):  # noqa: ARG002

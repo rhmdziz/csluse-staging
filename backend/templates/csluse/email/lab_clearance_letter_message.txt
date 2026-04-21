@@ -1,0 +1,14 @@
+Halo {{ user_display }},
+
+{{ notification_message }}
+
+Nomor pengajuan: {{ request_identifier }}
+
+Silakan buka tautan berikut untuk melihat halaman surat bebas lab:
+{{ cta_url }}
+
+Terima kasih,
+
+CSL USE
+School of Science, Technology, Engineering, Mathematic
+Universitas Prasetiya Mulya

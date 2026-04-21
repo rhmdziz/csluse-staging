@@ -529,9 +529,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
         profile = get_object_or_404(Profile, id=profile_id)
 
         ACTIVE_BORROW_STATUSES = ["Pending", "Approved", "Borrowed", "Returned Pending Inspection", "Overdue"]
-        ACTIVE_BOOKING_STATUSES = ["Pending", "Approved"]
-        ACTIVE_PENGUJIAN_STATUSES = ["Pending", "Approved", "Diproses", "Menunggu Pembayaran"]
-
         active_services = []
 
         for b in Borrow.objects.select_related("equipment").filter(
@@ -547,35 +544,7 @@ class LabClearanceViewSet(viewsets.ViewSet):
                 "end_time": b.end_time,
             })
 
-        for bk in Booking.objects.select_related("room").filter(
-            requested_by=profile, status__in=ACTIVE_BOOKING_STATUSES
-        ):
-            active_services.append({
-                "id": bk.id,
-                "code": bk.code,
-                "type": "booking",
-                "label": bk.room.name if bk.room else "-",
-                "status": bk.status,
-                "start_time": bk.start_time,
-                "end_time": bk.end_time,
-            })
-
-        for p in Pengujian.objects.filter(
-            requested_by=profile, status__in=ACTIVE_PENGUJIAN_STATUSES
-        ):
-            active_services.append({
-                "id": p.id,
-                "code": p.code,
-                "type": "pengujian",
-                "label": p.name or "-",
-                "status": p.status,
-                "start_time": p.created_at,
-                "end_time": None,
-            })
-
         borrow_count = sum(1 for s in active_services if s["type"] == "borrow")
-        booking_count = sum(1 for s in active_services if s["type"] == "booking")
-        pengujian_count = sum(1 for s in active_services if s["type"] == "pengujian")
 
         data = {
             "profile_id": profile.id,
@@ -590,8 +559,8 @@ class LabClearanceViewSet(viewsets.ViewSet):
             "summary": {
                 "total_active": len(active_services),
                 "borrow_count": borrow_count,
-                "booking_count": booking_count,
-                "pengujian_count": pengujian_count,
+                "booking_count": 0,
+                "pengujian_count": 0,
             },
         }
         serializer = LabClearanceSerializer(data)

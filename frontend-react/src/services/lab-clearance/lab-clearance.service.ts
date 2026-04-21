@@ -2,10 +2,13 @@ import {
   API_SURAT_BEBAS_LAB,
   API_SURAT_BEBAS_LAB_ALL,
   API_SURAT_BEBAS_LAB_APPROVE,
+  API_SURAT_BEBAS_LAB_BOOKING_SUGGESTIONS,
   API_SURAT_BEBAS_LAB_DELETE_DOCUMENT,
   API_SURAT_BEBAS_LAB_DETAIL,
   API_SURAT_BEBAS_LAB_MY,
   API_SURAT_BEBAS_LAB_REJECT,
+  API_SURAT_BEBAS_LAB_SEND_LETTER,
+  API_SURAT_BEBAS_LAB_UPDATE_BOOKING_HISTORIES,
 } from "@/constants/api";
 import { authFetch } from "@/lib/auth";
 
@@ -24,6 +27,24 @@ export type LabClearanceDocument = {
   created_at: string;
 };
 
+export type LabClearanceBookingHistory = {
+  id: string;
+  lab_room_name: string;
+  purpose: string;
+  start_date: string;
+  end_date: string;
+};
+
+export type LabClearanceBookingSuggestion = {
+  id: string;
+  code: string;
+  lab_room_name: string;
+  purpose: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+};
+
 export type LabClearanceRequesterDetail = {
   id: string;
   full_name: string;
@@ -33,14 +54,22 @@ export type LabClearanceRequesterDetail = {
   batch: string;
 };
 
+export type LabClearanceReviewerDetail = {
+  id: string;
+  full_name: string;
+  email: string;
+};
+
 export type LabClearanceListItem = {
   id: string;
   code: string;
   status: "Pending" | "Approved" | "Rejected";
   note: string;
   requested_by_detail: LabClearanceRequesterDetail | null;
+  reviewed_by_detail: LabClearanceReviewerDetail | null;
   document_count: number;
   documents: LabClearanceDocument[];
+  booking_histories: LabClearanceBookingHistory[];
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -103,13 +132,37 @@ export const labClearanceService = {
     return { ok: true as const, results: data.results, count: data.count };
   },
 
-  async submit(files: Partial<Record<LabClearanceDocumentType, File>>): Promise<MutationResult> {
+  async submit(
+    files: Partial<Record<LabClearanceDocumentType, File>>,
+    bookingHistories: Omit<LabClearanceBookingHistory, "id">[] = [],
+  ): Promise<MutationResult> {
     const formData = new FormData();
     for (const [key, file] of Object.entries(files)) {
       if (file) formData.append(key, file);
     }
+    formData.append("booking_histories", JSON.stringify(bookingHistories));
     const response = await authFetch(API_SURAT_BEBAS_LAB, {
       method: "POST",
+      body: formData,
+    });
+    return parseMutationResponse(response);
+  },
+
+  async getBookingSuggestions(signal?: AbortSignal): Promise<LabClearanceBookingSuggestion[]> {
+    const response = await authFetch(API_SURAT_BEBAS_LAB_BOOKING_SUGGESTIONS, { signal });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { results: LabClearanceBookingSuggestion[] };
+    return data.results ?? [];
+  },
+
+  async updateBookingHistories(
+    id: string,
+    histories: Omit<LabClearanceBookingHistory, "id">[],
+  ): Promise<MutationResult> {
+    const formData = new FormData();
+    formData.append("booking_histories", JSON.stringify(histories));
+    const response = await authFetch(API_SURAT_BEBAS_LAB_UPDATE_BOOKING_HISTORIES(id), {
+      method: "PATCH",
       body: formData,
     });
     return parseMutationResponse(response);
@@ -146,6 +199,16 @@ export const labClearanceService = {
 
   async approve(id: string): Promise<MutationResult> {
     const response = await authFetch(API_SURAT_BEBAS_LAB_APPROVE(id), { method: "POST" });
+    return parseMutationResponse(response);
+  },
+
+  async sendLetter(id: string, pdfBlob: Blob): Promise<MutationResult> {
+    const formData = new FormData();
+    formData.append("letter_pdf", pdfBlob, `surat-bebas-lab-${id}.pdf`);
+    const response = await authFetch(API_SURAT_BEBAS_LAB_SEND_LETTER(id), {
+      method: "POST",
+      body: formData,
+    });
     return parseMutationResponse(response);
   },
 

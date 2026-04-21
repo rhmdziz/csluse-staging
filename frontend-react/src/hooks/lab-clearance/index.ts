@@ -3,5 +3,6 @@ export {
   useDeleteLabClearanceDocument,
   useLabClearanceReview,
   useSubmitLabClearance,
+  useUpdateLabClearanceBookingHistories,
   useUpdateLabClearanceDocuments,
 } from "./use-lab-clearance-actions";

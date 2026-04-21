@@ -5,12 +5,14 @@ import type { DateRange } from "react-day-picker";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ClipboardCheck,
+  Download,
   ExternalLink,
   Eye,
   FileText,
   Loader2,
+  Mail,
+  ScrollText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,7 +35,12 @@ import {
   AlertDialogTitle,
   Button,
   DateRangePicker,
+  Dialog,
+  DialogContent,
+  DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
 } from "@/components/ui";
 
@@ -41,6 +48,7 @@ import { useLabClearanceList, useLabClearanceReview } from "@/hooks/lab-clearanc
 import { labClearanceService as adminLabClearanceService, type LabClearanceResult } from "@/services/admin";
 import { formatDateKey, formatDateTimeWib, toEndOfDay, toStartOfDay } from "@/lib/date";
 import { getRequestStatusDisplayLabel, getStatusBadgeClass } from "@/lib/request";
+import { buildSuratBebasPdf } from "@/lib/admin/surat-bebas-penggunaan-lab-pdf";
 import {
   labClearanceService,
   type LabClearanceDetail,
@@ -102,11 +110,11 @@ export default function AdminLabClearanceContent() {
   const [ordering, setOrdering] = useState("newest");
   const [createdRange, setCreatedRange] = useState<DateRange | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [detailsById, setDetailsById] = useState<Record<string, LabClearanceDetail | null>>({});
   const [loadingDetailIds, setLoadingDetailIds] = useState<Record<string, boolean>>({});
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
   const [reviewTargetId, setReviewTargetId] = useState<string | null>(null);
+  const [generateSuratDetail, setGenerateSuratDetail] = useState<LabClearanceDetail | null>(null);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
@@ -162,24 +170,11 @@ export default function AdminLabClearanceContent() {
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => items.some((item) => String(item.id) === id)));
-    setExpandedRows((prev) => {
-      const next: Record<string, boolean> = {};
-      items.forEach((item) => {
-        const key = String(item.id);
-        next[key] = prev[key] ?? false;
-      });
-      return next;
-    });
   }, [items]);
 
   const reviewTarget = reviewTargetId ? detailsById[reviewTargetId] ?? null : null;
   const isReviewLoading = reviewTargetId ? Boolean(loadingDetailIds[reviewTargetId]) : false;
   const reviewLoadError = reviewTargetId ? detailErrors[reviewTargetId] ?? "" : "";
-
-  const totalDocumentsOnPage = useMemo(
-    () => items.reduce((total, item) => total + item.documents.length, 0),
-    [items],
-  );
 
   const fetchClearanceCheck = async (itemId: string, profileId: string) => {
     if (clearanceChecks[itemId] !== undefined || loadingClearanceIds[itemId]) return;
@@ -198,8 +193,9 @@ export default function AdminLabClearanceContent() {
     }
   };
 
-  const ensureDetailLoaded = async (id: string) => {
-    if (detailsById[id] || loadingDetailIds[id]) return;
+  const ensureDetailLoaded = async (id: string): Promise<LabClearanceDetail | null> => {
+    if (detailsById[id]) return detailsById[id];
+    if (loadingDetailIds[id]) return null;
 
     setLoadingDetailIds((prev) => ({ ...prev, [id]: true }));
     setDetailErrors((prev) => ({ ...prev, [id]: "" }));
@@ -208,22 +204,20 @@ export default function AdminLabClearanceContent() {
       const detail = await labClearanceService.getDetail(id);
       if (!detail) {
         setDetailErrors((prev) => ({ ...prev, [id]: "Gagal memuat detail permohonan." }));
-        return;
+        return null;
       }
 
       setDetailsById((prev) => ({ ...prev, [id]: detail }));
+      return detail;
     } catch (loadError) {
       setDetailErrors((prev) => ({
         ...prev,
         [id]: loadError instanceof Error ? loadError.message : "Terjadi kesalahan saat memuat dokumen.",
       }));
+      return null;
     } finally {
       setLoadingDetailIds((prev) => ({ ...prev, [id]: false }));
     }
-  };
-
-  const toggleRow = (id: string) => {
-    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleOpenReview = (id: string) => {
@@ -235,7 +229,17 @@ export default function AdminLabClearanceContent() {
     void ensureDetailLoaded(id);
     const item = items.find((i) => String(i.id) === id);
     const profileId = item?.requested_by_detail?.id;
-    if (profileId) void fetchClearanceCheck(id, profileId);
+    if (item?.status === "Pending" && profileId) void fetchClearanceCheck(id, profileId);
+  };
+
+  const handleGenerateSurat = async (id: string) => {
+    const detail = await ensureDetailLoaded(id);
+    if (!detail) {
+      toast.error("Gagal memuat detail permohonan untuk generate PDF.");
+      return;
+    }
+
+    setGenerateSuratDetail(detail);
   };
 
   const handleApprove = async () => {
@@ -442,7 +446,6 @@ export default function AdminLabClearanceContent() {
       >
         {items.map((item) => {
           const rowId = String(item.id);
-          const isExpanded = expandedRows[rowId] ?? false;
 
           return (
             <Fragment key={rowId}>
@@ -481,97 +484,31 @@ export default function AdminLabClearanceContent() {
                     <Button
                       variant="outline"
                       size="icon-sm"
-                      className="border-slate-200 text-slate-700 hover:bg-slate-100"
-                      onClick={() => toggleRow(rowId)}
-                      aria-label={`${isExpanded ? "Sembunyikan" : "Lihat"} dokumen ${item.code}`}
-                    >
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                      />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
                       className="border-sky-200 text-sky-700 hover:bg-sky-50"
                       onClick={() => handleOpenReview(rowId)}
                       aria-label={`Review permohonan ${item.code}`}
                     >
                       <ClipboardCheck className="h-4 w-4" />
                     </Button>
+                    {item.status === "Approved" ? (
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        disabled={Boolean(loadingDetailIds[rowId])}
+                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => void handleGenerateSurat(rowId)}
+                        aria-label={`Generate PDF surat ${item.code}`}
+                      >
+                        {loadingDetailIds[rowId] ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ScrollText className="h-4 w-4" />
+                        )}
+                      </Button>
+                    ) : null}
                   </div>
                 </td>
               </tr>
-
-              {isExpanded ? (
-                <tr className="border-b bg-white">
-                  <td colSpan={7} className="px-3 py-3">
-                    {item.documents.length ? (
-                      <div className="overflow-x-auto rounded-md border border-slate-200">
-                        <table className="min-w-full table-auto">
-                          <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
-                            <tr>
-                              <th className="whitespace-nowrap px-3 py-2 font-semibold">Jenis Dokumen</th>
-                              <th className="whitespace-nowrap px-3 py-2 font-semibold">Nama File</th>
-                              <th className="whitespace-nowrap px-3 py-2 font-semibold">Diunggah</th>
-                              <th className="whitespace-nowrap px-3 py-2 text-center font-semibold">Aksi</th>
-                            </tr>
-                          </thead>
-                          <tbody className="text-sm">
-                            {item.documents.map((document) => (
-                              <tr key={document.id} className="border-t last:border-b-0">
-                                <td className="whitespace-nowrap px-3 py-2">
-                                  {DOCUMENT_TYPE_LABEL[document.document_type] ?? document.document_type}
-                                </td>
-                                <td className="max-w-96 px-3 py-2">
-                                  <p className="truncate" title={document.original_name}>
-                                    {document.original_name}
-                                  </p>
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2">
-                                  {formatDateTimeWib(document.created_at)}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <div className="flex justify-center gap-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon-sm"
-                                      className="border-sky-200 text-sky-600 hover:bg-sky-50 hover:text-sky-700"
-                                      onClick={() => setPreviewDocument(document)}
-                                      aria-label={`Preview dokumen ${document.original_name}`}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      asChild
-                                      variant="outline"
-                                      size="icon-sm"
-                                      className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                                    >
-                                      <a
-                                        href={document.document_url ?? "#"}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        aria-label={`Buka dokumen ${document.original_name}`}
-                                      >
-                                        <ExternalLink className="h-4 w-4" />
-                                      </a>
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="rounded-md border border-slate-200 px-4 py-4 text-sm text-slate-500">
-                        Dokumen belum tersedia.
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ) : null}
             </Fragment>
           );
         })}
@@ -622,6 +559,12 @@ export default function AdminLabClearanceContent() {
         onApprove={handleApprove}
         onReject={handleReject}
         onPreview={setPreviewDocument}
+        onGenerateSurat={setGenerateSuratDetail}
+      />
+
+      <DialogGenerateSurat
+        detail={generateSuratDetail}
+        onOpenChange={(open) => { if (!open) setGenerateSuratDetail(null); }}
       />
     </section>
   );
@@ -646,6 +589,7 @@ function DialogReview({
   onApprove,
   onReject,
   onPreview,
+  onGenerateSurat,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -665,6 +609,7 @@ function DialogReview({
   onApprove: () => void;
   onReject: () => void;
   onPreview: (document: LabClearanceDocument) => void;
+  onGenerateSurat: (detail: LabClearanceDetail) => void;
 }) {
   const isSubmitting = Boolean(detail?.id && pendingId === detail.id);
 
@@ -721,6 +666,10 @@ function DialogReview({
                     <AdminRecordDetailItem
                       label="Diajukan Pada"
                       value={formatDateTimeWib(detail.created_at)}
+                    />
+                    <AdminRecordDetailItem
+                      label="Direview Oleh"
+                      value={detail.reviewed_by_detail?.full_name || "-"}
                     />
                     <AdminRecordDetailItem
                       label="Direview Pada"
@@ -788,6 +737,41 @@ function DialogReview({
                   </tbody>
                 </table>
               </div>
+              {/* Riwayat Penggunaan Ruang Lab */}
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Riwayat Penggunaan Ruang Lab
+                </p>
+                {detail.booking_histories && detail.booking_histories.length > 0 ? (
+                  <div className="overflow-x-auto rounded-md border border-slate-200">
+                    <table className="min-w-full table-auto">
+                      <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+                        <tr>
+                          <th className="whitespace-nowrap px-3 py-2 font-semibold">Ruang Lab</th>
+                          <th className="whitespace-nowrap px-3 py-2 font-semibold">Tujuan</th>
+                          <th className="whitespace-nowrap px-3 py-2 font-semibold">Tanggal Mulai</th>
+                          <th className="whitespace-nowrap px-3 py-2 font-semibold">Tanggal Selesai</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        {detail.booking_histories.map((h) => (
+                          <tr key={h.id} className="border-t last:border-b-0">
+                            <td className="px-3 py-2 text-slate-700">{h.lab_room_name || "-"}</td>
+                            <td className="px-3 py-2 text-slate-700">{h.purpose || "-"}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-600">{h.start_date || "-"}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-600">{h.end_date || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-400">
+                    Tidak ada riwayat penggunaan ruang lab yang dilampirkan.
+                  </div>
+                )}
+              </div>
+
               {detail.note ? (
                 <div className="rounded-lg border border-rose-100 bg-rose-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-rose-400">
@@ -797,6 +781,7 @@ function DialogReview({
                 </div>
               ) : null}
 
+              {detail.status === "Pending" ? (
               <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Status Bebas Tanggungan
@@ -808,12 +793,13 @@ function DialogReview({
                   </div>
                 ) : clearanceCheckError ? (
                   <p className="text-sm text-rose-600">{clearanceCheckError}</p>
-                ) : clearanceCheck ? (
-                  clearanceCheck.isClear ? (
+                ) : clearanceCheck ? (() => {
+                  const borrowServices = clearanceCheck.activeServices.filter((s) => s.type === "borrow");
+                  return borrowServices.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                       <p className="text-sm font-medium text-emerald-700">
-                        Tidak ada tanggungan aktif — bebas laboratorium
+                        Tidak ada tanggungan peminjaman aktif — bebas laboratorium
                       </p>
                     </div>
                   ) : (
@@ -821,7 +807,7 @@ function DialogReview({
                       <div className="flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2">
                         <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
                         <p className="text-sm font-medium text-rose-700">
-                          Ada {clearanceCheck.summary.totalActive} tanggungan aktif
+                          Ada {borrowServices.length} tanggungan peminjaman aktif
                         </p>
                       </div>
                       <div className="overflow-x-auto rounded-md border border-rose-100">
@@ -829,18 +815,14 @@ function DialogReview({
                           <thead className="bg-rose-50 text-left text-xs uppercase tracking-wide text-rose-400">
                             <tr>
                               <th className="whitespace-nowrap px-3 py-2 font-semibold">Kode</th>
-                              <th className="whitespace-nowrap px-3 py-2 font-semibold">Jenis</th>
                               <th className="whitespace-nowrap px-3 py-2 font-semibold">Status</th>
                             </tr>
                           </thead>
                           <tbody className="text-sm">
-                            {clearanceCheck.activeServices.map((service) => (
+                            {borrowServices.map((service) => (
                               <tr key={service.id} className="border-t last:border-b-0">
                                 <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-800">
                                   {service.code}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2 text-slate-600">
-                                  {SERVICE_TYPE_LABEL[service.type] ?? service.type}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-2 text-slate-600">
                                   {service.status}
@@ -851,9 +833,10 @@ function DialogReview({
                         </table>
                       </div>
                     </div>
-                  )
-                ) : null}
+                  );
+                })() : null}
               </div>
+              ) : null}
             </>
             ) : null}
         </div>
@@ -889,6 +872,16 @@ function DialogReview({
                   Setujui
                 </Button>
               </>
+            ) : null}
+            {detail?.status === "Approved" ? (
+              <Button
+                type="button"
+                className="rounded-md bg-emerald-600 text-sm text-white hover:bg-emerald-700"
+                onClick={() => onGenerateSurat(detail)}
+              >
+                <ScrollText className="mr-2 h-4 w-4" />
+                Generate Surat Bebas Lab
+              </Button>
             ) : null}
           </DialogFooter>
         </div>
@@ -976,5 +969,176 @@ function DialogReview({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function DialogGenerateSurat({
+  detail,
+  onOpenChange,
+}: {
+  detail: LabClearanceDetail | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [pdfFilename, setPdfFilename] = useState<string>("");
+  const [isSending, setIsSending] = useState(false);
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const recipientEmail = detail?.requested_by_detail?.email?.trim() || "-";
+
+  useEffect(() => {
+    if (!detail) {
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlob(null);
+      setPdfBlobUrl(null);
+      setPdfFilename("");
+      setSendConfirmOpen(false);
+      return;
+    }
+    setIsPdfLoading(true);
+    void buildSuratBebasPdf(detail).then(({ blob, blobUrl, filename }) => {
+      setPdfBlob(blob);
+      setPdfBlobUrl(blobUrl);
+      setPdfFilename(filename);
+      setIsPdfLoading(false);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.id]);
+
+  function handleDownload() {
+    if (!pdfBlobUrl || !pdfFilename) return;
+    const a = document.createElement("a");
+    a.href = pdfBlobUrl;
+    a.download = pdfFilename;
+    a.click();
+  }
+
+  async function handleSendEmail() {
+    if (!detail || !pdfBlob) return;
+    setIsSending(true);
+    const result = await labClearanceService.sendLetter(detail.id, pdfBlob);
+    setIsSending(false);
+    if (result.ok) {
+      toast.success("Surat berhasil dikirim ke email pemohon.");
+    } else {
+      toast.error("Gagal mengirim surat. Silakan coba lagi.");
+    }
+  }
+
+  return (
+    <Dialog
+      open={Boolean(detail)}
+      onOpenChange={(open: boolean) => {
+        if (!open) onOpenChange(false);
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[96vh] w-[calc(100vw-1rem)] !max-w-[1200px] flex-col overflow-hidden border-slate-200 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:w-[96vw]"
+      >
+        <DialogHeader className="border-b border-slate-200 px-6 py-5">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+            <ScrollText className="h-5 w-5 text-emerald-600" />
+            Surat Bebas Penggunaan Laboratorium
+          </DialogTitle>
+          <DialogDescription className="text-sm text-slate-500">
+            Preview surat yang akan dikirim ke pemohon.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-100 px-6 py-5">
+          {isPdfLoading ? (
+            <div className="flex h-[65vh] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-500 sm:h-[70vh]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Membuat surat PDF...
+            </div>
+          ) : pdfBlobUrl ? (
+            <iframe
+              src={pdfBlobUrl}
+              title="Preview Surat Bebas Lab"
+              className="h-[65vh] w-full rounded-lg border border-slate-200 bg-white sm:h-[70vh]"
+            />
+          ) : (
+            <div className="flex h-[65vh] items-center justify-center rounded-lg border border-slate-200 bg-white text-sm text-slate-400 sm:h-[70vh]">
+              Gagal memuat preview.
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-slate-200 px-6 py-4">
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-md border-slate-300 text-sm"
+              onClick={() => onOpenChange(false)}
+            >
+              Tutup
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!pdfBlobUrl || isPdfLoading}
+              className="rounded-md border-blue-200 text-sm text-blue-700 hover:bg-blue-50"
+              onClick={handleDownload}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download
+            </Button>
+            <Button
+              type="button"
+              disabled={!pdfBlob || isPdfLoading || isSending}
+              className="rounded-md bg-emerald-600 text-sm text-white hover:bg-emerald-700"
+              onClick={() => setSendConfirmOpen(true)}
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Mengirim...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Kirim ke Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+
+      <AlertDialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kirim surat ke email pemohon?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Surat akan dikirim ke alamat email <span className="font-medium text-slate-900">{recipientEmail}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSending}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!pdfBlob || isPdfLoading || isSending}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleSendEmail().then(() => {
+                  setSendConfirmOpen(false);
+                });
+              }}
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Mengirim...
+                </>
+              ) : (
+                "Kirim"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Dialog>
   );
 }

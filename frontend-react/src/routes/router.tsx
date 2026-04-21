@@ -439,7 +439,7 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: "bebas-laboratorium",
+        path: "lab-clearance",
         element: (
           <RequireMenuAccess menuId="bebas-laboratorium">
             {renderPage(LabClearancePage)}

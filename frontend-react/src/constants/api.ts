@@ -187,6 +187,10 @@ const API_SURAT_BEBAS_LAB_DELETE_DOCUMENT = (id: string, documentType: string) =
   `${API_SURAT_BEBAS_LAB}${id}/documents/delete/${documentType}/`;
 const API_SURAT_BEBAS_LAB_APPROVE = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/approve/`;
 const API_SURAT_BEBAS_LAB_REJECT = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/reject/`;
+const API_SURAT_BEBAS_LAB_BOOKING_SUGGESTIONS = `${API_SURAT_BEBAS_LAB}booking-suggestions/`;
+const API_SURAT_BEBAS_LAB_SEND_LETTER = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/send-letter/`;
+const API_SURAT_BEBAS_LAB_UPDATE_BOOKING_HISTORIES = (id: string) =>
+  `${API_SURAT_BEBAS_LAB}${id}/update-booking-histories/`;
 
 export {
   API_BASE_URL,
@@ -318,4 +322,7 @@ export {
   API_SURAT_BEBAS_LAB_DELETE_DOCUMENT,
   API_SURAT_BEBAS_LAB_APPROVE,
   API_SURAT_BEBAS_LAB_REJECT,
+  API_SURAT_BEBAS_LAB_BOOKING_SUGGESTIONS,
+  API_SURAT_BEBAS_LAB_SEND_LETTER,
+  API_SURAT_BEBAS_LAB_UPDATE_BOOKING_HISTORIES,
 };

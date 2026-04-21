@@ -6,17 +6,24 @@ import {
   extractApiErrorMessage,
   extractApiErrorMessageFromText,
 } from "@/lib/core";
-import { labClearanceService, type LabClearanceDocumentType } from "@/services/lab-clearance";
+import {
+  labClearanceService,
+  type LabClearanceBookingHistory,
+  type LabClearanceDocumentType,
+} from "@/services/lab-clearance";
 
 export function useSubmitLabClearance() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const submit = async (files: Partial<Record<LabClearanceDocumentType, File>>) => {
+  const submit = async (
+    files: Partial<Record<LabClearanceDocumentType, File>>,
+    bookingHistories: Omit<LabClearanceBookingHistory, "id">[] = [],
+  ) => {
     setErrorMessage("");
     setIsSubmitting(true);
     try {
-      const result = await labClearanceService.submit(files);
+      const result = await labClearanceService.submit(files, bookingHistories);
       if (result.ok) return { ok: true as const };
       const message = extractApiErrorMessage(
         result.data,
@@ -139,4 +146,32 @@ export function useDeleteLabClearanceDocument() {
   };
 
   return { deleteDocument, pendingDocumentType };
+}
+
+export function useUpdateLabClearanceBookingHistories() {
+  const [isPending, setIsPending] = useState(false);
+
+  const updateHistories = async (
+    id: string,
+    histories: Omit<LabClearanceBookingHistory, "id">[],
+  ) => {
+    setIsPending(true);
+    try {
+      const result = await labClearanceService.updateBookingHistories(id, histories);
+      if (!result.ok) {
+        const message = extractApiErrorMessage(result.data, "Gagal memperbarui riwayat booking.");
+        return { ok: false as const, message };
+      }
+      return { ok: true as const, data: result.data };
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : "Terjadi kesalahan.",
+      };
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { updateHistories, isPending };
 }

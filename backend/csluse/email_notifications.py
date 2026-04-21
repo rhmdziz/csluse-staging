@@ -112,6 +112,7 @@ def send_notification_email(
     template_base,
     context,
     cc_emails=None,
+    attachments=None,
 ):
     to_emails = _normalize_email_list(recipient_email)
     cc_emails = _normalize_email_list(cc_emails)
@@ -135,6 +136,10 @@ def send_notification_email(
             cc=cc_emails,
         )
         message.attach_alternative(html_body, "text/html")
+        for attachment in attachments or []:
+            if not attachment:
+                continue
+            message.attach(*attachment)
         message.send()
         return True
     except Exception:
