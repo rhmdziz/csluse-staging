@@ -308,11 +308,7 @@ export async function buildSuratBebasPdf(detail: LabClearanceDetail): Promise<{
       " ruang .............................................",
     );
     y += BODY_ITEM_SPACING;
-    pdf.text(
-      "untuk keperluan ....................................................................................................................",
-      margin,
-      y,
-    );
+    pdf.text("untuk keperluan Skripsi/TA", margin, y);
     y += BODY_ITEM_SPACING;
     pdf.text(
       "yang dilakukan pada tanggal ............................................... s/d ............................................",
@@ -338,7 +334,7 @@ export async function buildSuratBebasPdf(detail: LabClearanceDetail): Promise<{
     drawInlineTextSegments(pdf, margin, y, singleHistorySegments);
     pdf.setFontSize(originalBodyFontSize);
     y += BODY_ITEM_SPACING;
-    pdf.text(`untuk keperluan ${h.purpose}`, margin, y);
+    pdf.text("untuk keperluan Skripsi/TA", margin, y);
     y += BODY_ITEM_SPACING;
     pdf.text(
       `yang dilakukan pada tanggal ${formatDateShort(h.start_date)} s/d ${formatDateShort(h.end_date)}`,
@@ -352,11 +348,10 @@ export async function buildSuratBebasPdf(detail: LabClearanceDetail): Promise<{
 
     autoTable(pdf, {
       startY: y,
-      head: [["No.", "Ruang Lab", "Keperluan", "Tanggal Mulai", "Tanggal Selesai"]],
+      head: [["No.", "Ruang Lab", "Tanggal Mulai", "Tanggal Selesai"]],
       body: histories.map((h, i) => [
         String(i + 1),
         h.lab_room_name,
-        h.purpose,
         formatDate(h.start_date),
         formatDate(h.end_date),
       ]),

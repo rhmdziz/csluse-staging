@@ -4278,7 +4278,6 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
             SuratBebasLabBookingHistory.objects.create(
                 surat_bebas_lab=instance,
                 lab_room_name=str(item.get("lab_room_name", ""))[:255],
-                purpose=str(item.get("purpose", ""))[:255],
                 start_date=item.get("start_date"),
                 end_date=item.get("end_date"),
             )
@@ -4442,7 +4441,11 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Profil pengguna tidak ditemukan.")
         qs = (
             Booking.objects
-            .filter(requested_by=profile, status__in=["Approved", "Completed"])
+            .filter(
+                requested_by=profile,
+                status__in=["Approved", "Completed"],
+                purpose="Skripsi/TA",
+            )
             .select_related("room")
             .order_by("-start_time")
         )
@@ -4471,7 +4474,6 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
             SuratBebasLabBookingHistory.objects.create(
                 surat_bebas_lab=instance,
                 lab_room_name=str(item.get("lab_room_name", ""))[:255],
-                purpose=str(item.get("purpose", ""))[:255],
                 start_date=item.get("start_date"),
                 end_date=item.get("end_date"),
             )

@@ -208,7 +208,6 @@ export function LabClearancePageContent() {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newEntry, setNewEntry] = useState<Omit<LabClearanceBookingHistory, "id">>({
     lab_room_name: "",
-    purpose: "",
     start_date: "",
     end_date: "",
   });
@@ -285,7 +284,7 @@ export function LabClearancePageContent() {
     setEditingIndex(null);
     setEditingEntry(null);
     setIsAddingNew(false);
-    setNewEntry({ lab_room_name: "", purpose: "", start_date: "", end_date: "" });
+    setNewEntry({ lab_room_name: "", start_date: "", end_date: "" });
     setIsDialogOpen(true);
     setIsSuggestionsLoading(true);
     void roomsService.getOptions().then(setRoomOptions).catch(() => {});
@@ -293,9 +292,8 @@ export function LabClearancePageContent() {
       .getBookingSuggestions()
       .then((suggestions) => {
         setBookingHistories(
-          suggestions.map(({ lab_room_name, purpose, start_date, end_date }) => ({
+          suggestions.map(({ lab_room_name, start_date, end_date }) => ({
             lab_room_name,
-            purpose,
             start_date,
             end_date,
           })),
@@ -794,7 +792,6 @@ export function LabClearancePageContent() {
                   <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Ruang Lab</th>
-                      <th className="px-3 py-2 font-semibold">Tujuan</th>
                       <th className="px-3 py-2 font-semibold">Mulai</th>
                       <th className="px-3 py-2 font-semibold">Selesai</th>
                       <th className="px-3 py-2 text-center font-semibold">Aksi</th>
@@ -819,17 +816,6 @@ export function LabClearancePageContent() {
                                 <option key={r.id} value={r.name}>{r.label}</option>
                               ))}
                             </select>
-                          </td>
-                          <td className="p-0">
-                            <input
-                              className="w-full bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
-                              value={editingEntry?.purpose ?? ""}
-                              onChange={(e) =>
-                                setEditingEntry((prev) =>
-                                  prev ? { ...prev, purpose: e.target.value } : prev,
-                                )
-                              }
-                            />
                           </td>
                           <td className="p-0">
                             <input
@@ -889,7 +875,6 @@ export function LabClearancePageContent() {
                       ) : (
                         <tr key={index} className="border-t last:border-b-0">
                           <td className="px-3 py-2 text-sm text-slate-700">{entry.lab_room_name || "-"}</td>
-                          <td className="px-3 py-2 text-sm text-slate-700">{entry.purpose || "-"}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-sm text-slate-700">
                             {entry.start_date || "-"}
                           </td>
@@ -942,16 +927,6 @@ export function LabClearancePageContent() {
                         </td>
                         <td className="p-0">
                           <input
-                            className="w-full bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
-                            placeholder="Tujuan"
-                            value={newEntry.purpose}
-                            onChange={(e) =>
-                              setNewEntry((p) => ({ ...p, purpose: e.target.value }))
-                            }
-                          />
-                        </td>
-                        <td className="p-0">
-                          <input
                             type="date"
                             className="bg-transparent px-3 py-2 text-sm text-slate-700 outline-none"
                             value={newEntry.start_date}
@@ -982,7 +957,6 @@ export function LabClearancePageContent() {
                                 setIsAddingNew(false);
                                 setNewEntry({
                                   lab_room_name: "",
-                                  purpose: "",
                                   start_date: "",
                                   end_date: "",
                                 });
@@ -998,7 +972,6 @@ export function LabClearancePageContent() {
                                 setIsAddingNew(false);
                                 setNewEntry({
                                   lab_room_name: "",
-                                  purpose: "",
                                   start_date: "",
                                   end_date: "",
                                 });
@@ -1013,7 +986,7 @@ export function LabClearancePageContent() {
                     {bookingHistories.length === 0 && !isAddingNew && (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="px-3 py-4 text-center text-xs text-slate-400"
                         >
                           Belum ada riwayat. Klik &ldquo;Tambah&rdquo; untuk menambahkan secara manual.

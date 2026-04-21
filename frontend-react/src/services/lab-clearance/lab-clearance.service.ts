@@ -30,7 +30,6 @@ export type LabClearanceDocument = {
 export type LabClearanceBookingHistory = {
   id: string;
   lab_room_name: string;
-  purpose: string;
   start_date: string;
   end_date: string;
 };
@@ -39,7 +38,6 @@ export type LabClearanceBookingSuggestion = {
   id: string;
   code: string;
   lab_room_name: string;
-  purpose: string;
   start_date: string;
   end_date: string;
   status: string;

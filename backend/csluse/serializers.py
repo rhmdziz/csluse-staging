@@ -1698,7 +1698,7 @@ def _apply_requester_mentor_rules(serializer_instance, attrs):
 class SuratBebasLabBookingHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = SuratBebasLabBookingHistory
-        fields = ["id", "lab_room_name", "purpose", "start_date", "end_date"]
+        fields = ["id", "lab_room_name", "start_date", "end_date"]
 
 
 class BookingSuggestionSerializer(serializers.ModelSerializer):
@@ -1714,7 +1714,7 @@ class BookingSuggestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ["id", "code", "lab_room_name", "purpose", "start_date", "end_date", "status"]
+        fields = ["id", "code", "lab_room_name", "start_date", "end_date", "status"]
 
 
 class SuratBebasLabDocumentSerializer(serializers.ModelSerializer):
