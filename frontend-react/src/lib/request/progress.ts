@@ -162,11 +162,6 @@ export function getSampleTestingProgressFlow(
       state: "wait",
     },
     {
-      key: "waiting-payment",
-      label: "Menunggu Pembayaran",
-      state: "wait",
-    },
-    {
       key: "completed",
       label: "Selesai",
       state: "wait",
@@ -194,17 +189,6 @@ export function getSampleTestingProgressFlow(
     steps[1].time = pickTime(item.approvedAt, item.updatedAt);
     steps[2].state = "finish";
     steps[2].time = pickTime(item.updatedAt);
-    steps[3].state = "process";
-    return steps;
-  }
-  if (status === "menunggu pembayaran") {
-    steps[1].state = "finish";
-    steps[1].time = pickTime(item.approvedAt, item.updatedAt);
-    steps[2].state = "finish";
-    steps[2].time = pickTime(item.updatedAt);
-    steps[3].state = "finish";
-    steps[3].time = pickTime(item.updatedAt);
-    steps[4].state = "process";
     return steps;
   }
   if (status === "completed") {
@@ -213,9 +197,7 @@ export function getSampleTestingProgressFlow(
     steps[2].state = "finish";
     steps[2].time = pickTime(item.updatedAt);
     steps[3].state = "finish";
-    steps[3].time = pickTime(item.updatedAt);
-    steps[4].state = "finish";
-    steps[4].time = pickTime(item.completedAt, item.updatedAt);
+    steps[3].time = pickTime(item.completedAt, item.updatedAt);
     return steps;
   }
   if (status === "rejected") {

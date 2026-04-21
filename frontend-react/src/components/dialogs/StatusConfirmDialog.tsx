@@ -20,7 +20,7 @@ import {
 
 type StatusConfirmDialogProps = {
   open: boolean;
-  actionType: "approve" | "reject" | null;
+  actionType: "approve" | "reject" | "complete" | null;
   onOpenChange: (open: boolean) => void;
   onConfirm: (note?: string) => void;
   isSubmitting?: boolean;
@@ -42,7 +42,7 @@ export default function StatusConfirmDialog({
   reasonPlaceholder = "Tuliskan alasan penolakan...",
 }: StatusConfirmDialogProps) {
   const [resolvedActionType, setResolvedActionType] = useState<
-    "approve" | "reject" | null
+    "approve" | "reject" | "complete" | null
   >(actionType);
   const [reason, setReason] = useState("");
 
@@ -59,7 +59,8 @@ export default function StatusConfirmDialog({
   }, [open]);
 
   const isApprove = resolvedActionType === "approve";
-  const shouldCollectReason = !isApprove && requireReasonOnReject;
+  const isComplete = resolvedActionType === "complete";
+  const shouldCollectReason = resolvedActionType === "reject" && requireReasonOnReject;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -69,10 +70,12 @@ export default function StatusConfirmDialog({
             className={
               isApprove
                 ? "bg-emerald-100 text-emerald-700"
+                : isComplete
+                  ? "bg-sky-100 text-sky-700"
                 : "bg-rose-100 text-rose-700"
             }
           >
-            {isApprove ? (
+            {isApprove || isComplete ? (
               <CheckCircle2 className="h-8 w-8" />
             ) : (
               <OctagonX className="h-8 w-8" />
@@ -81,11 +84,15 @@ export default function StatusConfirmDialog({
           <AlertDialogTitle>
             {isApprove
               ? `Setujui ${subjectLabel}?`
+              : isComplete
+                ? `Tandai ${subjectLabel}?`
               : `Tolak ${subjectLabel}?`}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {isApprove
               ? `${subjectLabel} akan diproses sebagai data yang disetujui.`
+              : isComplete
+                ? `${subjectLabel} akan diproses sebagai data yang selesai.`
               : `${subjectLabel} akan diproses sebagai data yang ditolak.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -108,6 +115,8 @@ export default function StatusConfirmDialog({
             className={
               isApprove
                 ? "rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                : isComplete
+                  ? "rounded-md bg-sky-600 text-white hover:bg-sky-700"
                 : "rounded-md bg-rose-600 text-white hover:bg-rose-700"
             }
           >
@@ -118,6 +127,8 @@ export default function StatusConfirmDialog({
               </>
             ) : isApprove ? (
               "Ya, Setujui"
+            ) : isComplete ? (
+              "Ya, Tandai Selesai"
             ) : (
               "Ya, Tolak"
             )}

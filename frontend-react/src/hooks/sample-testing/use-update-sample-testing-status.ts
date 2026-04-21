@@ -35,7 +35,9 @@ export function useUpdateSampleTestingStatus() {
             ? "Gagal menyetujui pengajuan pengujian sampel."
             : type === "reject"
               ? "Gagal menolak pengajuan pengujian sampel."
-              : "Gagal membatalkan pengajuan pengujian sampel.";
+              : type === "complete"
+                ? "Gagal menandai pengajuan pengujian sampel sebagai selesai."
+                : "Gagal membatalkan pengajuan pengujian sampel.";
 
         if (typeof result.data !== "undefined") {
           message = extractApiErrorMessage(result.data, message);

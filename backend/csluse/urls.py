@@ -18,6 +18,7 @@ router.register(r'dashboard-overview', views.DashboardOverviewViewSet, basename=
 router.register(r'faqs', views.FAQViewSet, basename='faqs')
 router.register(r'pengujians', views.PengujianViewSet, basename='pengujians')
 router.register(r'notifications', views.NotificationViewSet, basename='notifications')
+router.register(r'surat-bebas-lab', views.SuratBebasLabViewSet, basename='surat-bebas-lab')
 
 urlpatterns = [
     path('', include(router.urls)),

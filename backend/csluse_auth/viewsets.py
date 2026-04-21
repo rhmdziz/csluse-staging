@@ -4,7 +4,7 @@ from allauth.account.models import EmailAddress
 from django.contrib.admin.models import CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -19,6 +19,7 @@ from csluse.viewsets import DefaultPagination
 from .audit import log_admin_action
 from .models import Profile
 from .permissions import (
+    ADMINISTRATOR,
     SUPER_ADMINISTRATOR,
     IsAdministratorOrAbove,
     IsStaffOrAbove,
@@ -451,7 +452,17 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
     http_method_names = ["get"]
 
     def get_queryset(self):
-        return LogEntry.objects.select_related("user", "content_type").order_by("-action_time")
+        admin_actor_filter = (
+            Q(user__is_superuser=True)
+            | Q(user__groups__name=ADMINISTRATOR)
+            | Q(user__groups__name=SUPER_ADMINISTRATOR)
+        )
+        return (
+            LogEntry.objects.select_related("user", "content_type")
+            .filter(admin_actor_filter)
+            .distinct()
+            .order_by("-action_time")
+        )
 
     @action(detail=False, methods=["get"], url_path="recent")
     def recent(self, request):

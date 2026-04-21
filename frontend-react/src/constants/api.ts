@@ -120,6 +120,10 @@ const API_PENGUJIAN_COMPLETE = (id: string | number) =>
   `${API_PENGUJIANS}${id}/complete/`;
 const API_PENGUJIAN_UPLOAD_DOCUMENT = (id: string | number) =>
   `${API_PENGUJIANS}${id}/documents/upload/`;
+const API_PENGUJIAN_DELETE_DOCUMENT = (
+  id: string | number,
+  documentType: string,
+) => `${API_PENGUJIANS}${id}/documents/delete/${documentType}/`;
 
 // REGION: Equipments API Endpoints
 const API_EQUIPMENTS = `${API_BASE_URL}/equipments/`;
@@ -174,6 +178,15 @@ const API_DASHBOARD_OVERVIEW = `${API_BASE_URL}/dashboard-overview/`;
 const API_NOTIFICATIONS = `${API_BASE_URL}/notifications/`;
 const API_FAQS = `${API_BASE_URL}/faqs/`;
 const API_FAQS_BULK_DELETE = `${API_FAQS}bulk-delete/`;
+
+const API_SURAT_BEBAS_LAB = `${API_BASE_URL}/surat-bebas-lab/`;
+const API_SURAT_BEBAS_LAB_MY = `${API_SURAT_BEBAS_LAB}my/`;
+const API_SURAT_BEBAS_LAB_ALL = `${API_SURAT_BEBAS_LAB}all/`;
+const API_SURAT_BEBAS_LAB_DETAIL = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/`;
+const API_SURAT_BEBAS_LAB_DELETE_DOCUMENT = (id: string, documentType: string) =>
+  `${API_SURAT_BEBAS_LAB}${id}/documents/delete/${documentType}/`;
+const API_SURAT_BEBAS_LAB_APPROVE = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/approve/`;
+const API_SURAT_BEBAS_LAB_REJECT = (id: string) => `${API_SURAT_BEBAS_LAB}${id}/reject/`;
 
 export {
   API_BASE_URL,
@@ -256,6 +269,7 @@ export {
   API_PENGUJIAN_CANCEL,
   API_PENGUJIAN_COMPLETE,
   API_PENGUJIAN_UPLOAD_DOCUMENT,
+  API_PENGUJIAN_DELETE_DOCUMENT,
   API_EQUIPMENTS,
   API_EQUIPMENTS_DROPDOWN,
   API_EQUIPMENTS_EXPORT,
@@ -297,4 +311,11 @@ export {
   API_NOTIFICATIONS,
   API_FAQS,
   API_FAQS_BULK_DELETE,
+  API_SURAT_BEBAS_LAB,
+  API_SURAT_BEBAS_LAB_MY,
+  API_SURAT_BEBAS_LAB_ALL,
+  API_SURAT_BEBAS_LAB_DETAIL,
+  API_SURAT_BEBAS_LAB_DELETE_DOCUMENT,
+  API_SURAT_BEBAS_LAB_APPROVE,
+  API_SURAT_BEBAS_LAB_REJECT,
 };

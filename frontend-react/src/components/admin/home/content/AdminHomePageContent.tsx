@@ -482,7 +482,6 @@ const STATUS_COLOR_MAP: Record<string, string> = {
   Overdue: "bg-orange-500",
   "Lost/Damaged": "bg-red-700",
   Diproses: "bg-cyan-500",
-  "Menunggu Pembayaran": "bg-yellow-500",
 };
 
 const STATUS_LABEL_ID: Record<string, string> = {
@@ -497,7 +496,6 @@ const STATUS_LABEL_ID: Record<string, string> = {
   Overdue: "Terlambat",
   "Lost/Damaged": "Hilang/Rusak",
   Diproses: "Diproses",
-  "Menunggu Pembayaran": "Menunggu Pembayaran",
 };
 
 function getStatusColor(status: string): string {

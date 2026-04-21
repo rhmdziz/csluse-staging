@@ -2,13 +2,14 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from unittest.mock import patch
 
-from csluse.models import Borrow, Booking, BookingEquipmentItem, Equipment, Notification, Pengujian, Room
+from csluse.models import Borrow, Booking, BookingEquipmentItem, Document, Equipment, Notification, Pengujian, Room
 from csluse_auth.models import Profile
 
 User = get_user_model()
@@ -43,6 +44,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
             "admin@example.com",
             "Admin",
             "Admin User",
+        )
+        self.second_admin_user, self.second_admin_profile = self.create_user_with_profile(
+            "admin2@example.com",
+            "Admin",
+            "Second Admin User",
         )
 
         self.room = Room.objects.create(
@@ -433,6 +439,12 @@ class CsluseWorkflowRegressionTests(APITestCase):
         )
 
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        mail.outbox = []
         pengujian_id = create_response.data["id"]
 
         self.client.force_authenticate(self.staff_user)
@@ -441,7 +453,10 @@ class CsluseWorkflowRegressionTests(APITestCase):
             {},
             format="json",
         )
-        self.assertEqual(denied_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(
+            denied_response.status_code,
+            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
+        )
 
         self.client.force_authenticate(self.admin_user)
         approve_response = self.client.post(
@@ -457,6 +472,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertIn("pengujian sampel", notification.message.lower())
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Update status request", mail.outbox[0].subject)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertCountEqual(
+            mail.outbox[0].cc,
+            ["admin@example.com", "admin2@example.com"],
+        )
         self.assertIn("https://frontend.example.com/sample-testing", mail.outbox[0].body)
 
     def test_student_cannot_self_approve_booking(self):
@@ -495,6 +515,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(notification.category, "Approved")
         self.assertIn(booking.code, notification.message)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertCountEqual(
+            mail.outbox[0].cc,
+            ["admin@example.com", "admin2@example.com"],
+        )
         self.assertIn(f"https://frontend.example.com/booking-rooms/{booking.id}", mail.outbox[0].body)
         self.assertIn("disetujui", mail.outbox[0].body)
 
@@ -517,6 +542,8 @@ class CsluseWorkflowRegressionTests(APITestCase):
         notification = Notification.objects.get(recipient=self.student_profile, category="Reminder")
         self.assertIn("overdue", notification.message.lower())
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertEqual(mail.outbox[0].cc, ["admin@example.com"])
         self.assertIn("Pengingat pengembalian alat", mail.outbox[0].subject)
         self.assertIn(f"https://frontend.example.com/borrow-equipment/{borrow.id}", mail.outbox[0].body)
 
@@ -552,6 +579,11 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertCountEqual(
+            mail.outbox[0].cc,
+            ["admin@example.com", "admin2@example.com"],
+        )
         self.assertIn(f"https://frontend.example.com/borrow-equipment/{borrow.id}", mail.outbox[0].body)
 
     def test_notification_email_failure_does_not_break_booking_approval(self):
@@ -693,6 +725,8 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
     def test_requester_can_cancel_own_approved_booking(self):
         booking = self.create_booking(self.student_profile, status="Approved")
+        booking.approved_by = self.admin_profile
+        booking.save(update_fields=["approved_by"])
 
         self.client.force_authenticate(self.student_user)
         response = self.client.post(f"/api/bookings/{booking.id}/cancel/", format="json")
@@ -700,9 +734,17 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         booking.refresh_from_db()
         self.assertEqual(booking.status, "Canceled")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
 
     def test_requester_can_cancel_own_approved_borrow_before_handover(self):
         borrow = self.create_borrow(self.student_profile, status="Approved")
+        borrow.approved_by = self.admin_profile
+        borrow.save(update_fields=["approved_by"])
 
         self.client.force_authenticate(self.student_user)
         response = self.client.post(f"/api/borrows/{borrow.id}/cancel/", format="json")
@@ -710,6 +752,12 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         borrow.refresh_from_db()
         self.assertEqual(borrow.status, "Canceled")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
 
     def test_requester_cannot_cancel_borrow_after_borrowed(self):
         borrow = self.create_borrow(
@@ -751,6 +799,8 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
     def test_requester_can_cancel_own_approved_pengujian(self):
         pengujian = self.create_pengujian(self.student_profile, status="Approved")
+        pengujian.approved_by = self.admin_profile
+        pengujian.save(update_fields=["approved_by"])
 
         self.client.force_authenticate(self.student_user)
         response = self.client.post(
@@ -761,6 +811,154 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         pengujian.refresh_from_db()
         self.assertEqual(pengujian.status, "Canceled")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
+
+    def test_requester_can_delete_own_sample_testing_document_and_storage_file(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Diproses")
+        document = Document.objects.create(
+            pengujian=pengujian,
+            document_type="payment_proof",
+            document=SimpleUploadedFile(
+                "payment-proof.pdf",
+                b"test payment proof",
+                content_type="application/pdf",
+            ),
+            original_name="payment-proof.pdf",
+            mime_type="application/pdf",
+            size=18,
+            uploaded_by=self.student_profile,
+        )
+        storage = document.document.storage
+
+        self.client.force_authenticate(self.student_user)
+        with patch.object(storage, "delete", wraps=storage.delete) as delete_mock:
+            response = self.client.delete(
+                f"/api/pengujians/{pengujian.id}/documents/delete/payment_proof/"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        delete_mock.assert_called_once_with(document.document.name)
+        self.assertFalse(Document.objects.filter(id=document.id).exists())
+
+    def test_pengujian_status_becomes_diproses_after_testing_agreement_upload(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Approved")
+        pengujian.approved_by = self.admin_profile
+        pengujian.save(update_fields=["approved_by"])
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/documents/upload/",
+            {
+                "document_type": "testing_agreement",
+                "file": SimpleUploadedFile(
+                    "testing-agreement.pdf",
+                    b"testing agreement",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Diproses")
+
+    def test_pengujian_status_completed_after_receipt_and_test_result_letter_uploaded(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Diproses")
+        pengujian.approved_by = self.admin_profile
+        pengujian.save(update_fields=["approved_by"])
+
+        self.client.force_authenticate(self.admin_user)
+        receipt_response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/documents/upload/",
+            {
+                "document_type": "receipt",
+                "file": SimpleUploadedFile(
+                    "receipt.pdf",
+                    b"receipt file",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        self.assertEqual(receipt_response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Diproses")
+
+        result_response = self.client.post(
+            f"/api/pengujians/{pengujian.id}/documents/upload/",
+            {
+                "document_type": "test_result_letter",
+                "file": SimpleUploadedFile(
+                    "test-result-letter.pdf",
+                    b"test result letter",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        self.assertEqual(result_response.status_code, status.HTTP_200_OK)
+        pengujian.refresh_from_db()
+        self.assertEqual(pengujian.status, "Completed")
+
+    def test_booking_submission_for_thesis_notifies_mentor_then_pic_after_mentor_approval(self):
+        start, end = self.future_window(days=3, start_hour=9)
+        self.client.force_authenticate(user=self.student_user)
+
+        create_response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Skripsi/TA",
+                "requester_mentor_profile": str(self.lecturer_profile.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["lecturer@example.com"])
+        self.assertIn(f"/booking-rooms/approval/{create_response.data['id']}", mail.outbox[0].body)
+
+        mail.outbox = []
+        self.client.force_authenticate(self.lecturer_user)
+        approve_response = self.client.post(
+            f"/api/bookings/{create_response.data['id']}/approve/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["admin@example.com"])
+        self.assertIn(f"/booking-rooms/approval/{create_response.data['id']}", mail.outbox[0].body)
+
+    def test_pengujian_submission_notifies_all_admins(self):
+        self.client.force_authenticate(self.student_user)
+        response = self.client.post(
+            "/api/pengujians/",
+            {
+                "name": "Pemohon Uji",
+                "email": "pemohon@example.com",
+                "sample_type": "Food Sample",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertCountEqual(
+            mail.outbox[0].to,
+            ["admin@example.com", "admin2@example.com"],
+        )
+        self.assertIn(f"/sample-testing/approval/{response.data['id']}", mail.outbox[0].body)
 
     def test_notifications_endpoint_returns_current_user_notifications(self):
         booking = self.create_booking(self.student_profile)

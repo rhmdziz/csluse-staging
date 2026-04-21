@@ -98,7 +98,8 @@ function DashboardShell({ children }: UserLayoutProps) {
           (item) =>
             item.actions.length > 0 ||
             item.id === "schedule" ||
-            item.id === "notifications",
+            item.id === "notifications" ||
+            item.id === "bebas-laboratorium",
         ),
     [displayName, profile.role],
   );

@@ -276,7 +276,6 @@ export default function AdminSampleTestingDocumentsContent({
                   <option value="pending">Pending</option>
                   <option value="approved">Approved</option>
                   <option value="diproses">Diproses</option>
-                  <option value="menunggu pembayaran">Menunggu Pembayaran</option>
                   <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
                 </select>

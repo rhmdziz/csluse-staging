@@ -55,7 +55,7 @@ export function SampleTestingMetaItem({
   const displayValue = hasDisplayValue(value) ? String(value).trim() : "-";
 
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[124px_minmax(0,1fr)] md:items-start md:gap-4">
       <p className="text-xs text-slate-500">{label}</p>
       <p
         className={`text-xs leading-5 break-words ${displayValue === "-" ? "italic text-slate-400" : "text-slate-800"}`}
@@ -103,7 +103,7 @@ export default function SampleTestingDetailContent({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
         <div className="space-y-6">
           <SampleTestingSectionCard
             title="Detail Pengujian Sampel"
@@ -135,7 +135,7 @@ export default function SampleTestingDetailContent({
             subtitle="Informasi status permohonan dan riwayat proses saat ini."
             icon={<NotebookPen className="h-5 w-5" />}
           >
-            <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+            <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[124px_minmax(0,1fr)] md:items-start md:gap-4">
               <p className="text-xs text-slate-500">Status</p>
               <div className="flex items-center">
                 {onStatusClick ? (

@@ -100,6 +100,9 @@ const BorrowEquipmentAvailablePage = lazyWithReload(
 const BorrowEquipmentDetailPage = lazyWithReload(
   () => import("@/pages/dashboard/borrow-equipment/BorrowEquipmentDetailPage"),
 );
+const LabClearancePage = lazyWithReload(
+  () => import("@/pages/dashboard/lab-clearance/LabClearancePage"),
+);
 const NotificationsPage = lazyWithReload(() => import("@/pages/dashboard/account/NotificationsPage"));
 const MyProfilePage = lazyWithReload(() => import("@/pages/dashboard/account/MyProfilePage"));
 const AdminHomePage = lazyWithReload(() => import("@/pages/admin/home/AdminHomePage"));
@@ -434,6 +437,14 @@ export const router = createBrowserRouter([
             ),
           },
         ],
+      },
+      {
+        path: "bebas-laboratorium",
+        element: (
+          <RequireMenuAccess menuId="bebas-laboratorium">
+            {renderPage(LabClearancePage)}
+          </RequireMenuAccess>
+        ),
       },
       {
         path: "notifications",

@@ -101,6 +101,9 @@ const MENU_ACCESS_RULES: Record<string, readonly string[]> = {
     ROLE_VALUES.ADMIN,
     ROLE_VALUES.SUPER_ADMINISTRATOR,
   ],
+  "bebas-laboratorium": [
+    ROLE_VALUES.STUDENT,
+  ],
 } as const;
 
 function normalizeRoleValue(role?: string | null): string {

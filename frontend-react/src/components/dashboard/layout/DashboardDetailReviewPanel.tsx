@@ -262,29 +262,14 @@ function getPengujianStatusHint(
     return {
       title: "Pengujian sedang diproses",
       message: reviewer
-        ? "Lengkapi tahapan dokumen sampai invoice diterbitkan."
-        : "Lengkapi dokumen requester agar proses dapat lanjut ke tahap pembayaran.",
+        ? "Lengkapi dokumen proses pengujian sampai kuitansi dan surat hasil uji tersedia."
+        : "Lengkapi dokumen requester yang dibutuhkan selama proses pengujian berjalan.",
       indicators: reviewer
-        ? ["Upload invoice saat tahap administrasi pengujian siap masuk pembayaran."]
-        : ["Upload surat perjanjian yang sudah ditandatangani bila belum tersedia."],
+        ? ["Upload kuitansi dan surat hasil uji, atau tandai selesai secara manual bila proses sudah berakhir."]
+        : ["Upload surat perjanjian yang sudah ditandatangani atau bukti bayar bila diminta."],
       className: "border-blue-200 bg-blue-50/80",
       titleClassName: "text-blue-800",
       textClassName: "text-blue-900",
-    };
-  }
-
-  if (normalized === "menunggu pembayaran") {
-    return {
-      title: "Menunggu pembayaran",
-      message: reviewer
-        ? "Sistem sedang menunggu bukti bayar, kuitansi, dan surat hasil uji untuk menyelesaikan pengujian."
-        : "Upload bukti bayar, lalu lanjutkan ke kuitansi dan surat hasil uji untuk menyelesaikan proses.",
-      indicators: reviewer
-        ? ["Pantau dokumen requester pada section dokumen pengujian."]
-        : ["Setelah bukti bayar terunggah, lanjutkan upload kuitansi dan surat hasil uji."],
-      className: "border-violet-200 bg-violet-50/80",
-      titleClassName: "text-violet-800",
-      textClassName: "text-violet-900",
     };
   }
 
@@ -1207,7 +1192,7 @@ function PengujianReviewPanel({
     initialSampleTesting,
   });
   const { updateSampleTestingStatus, pendingAction } = useUpdateSampleTestingStatus();
-  const [confirmType, setConfirmType] = useState<"approve" | "reject" | null>(
+  const [confirmType, setConfirmType] = useState<"approve" | "reject" | "complete" | null>(
     null,
   );
 
@@ -1222,6 +1207,9 @@ function PengujianReviewPanel({
 
   const canReviewSampleTesting =
     isSampleTestingApproverRole(profile?.role) && isPendingStatus(sampleTesting.status);
+  const canCompleteSampleTesting =
+    isSampleTestingApproverRole(profile?.role) &&
+    ["approved", "diproses"].includes(normalizeStatus(sampleTesting.status));
   const isGuestRequester = isGuestRole(sampleTesting.requesterRole);
   const sampleTestingStatusHint = getPengujianStatusHint(
     sampleTesting.status,
@@ -1243,7 +1231,12 @@ function PengujianReviewPanel({
       current
         ? {
             ...current,
-            status: type === "approve" ? "Approved" : "Rejected",
+            status:
+              type === "approve"
+                ? "Approved"
+                : type === "complete"
+                  ? "Completed"
+                  : "Rejected",
             updatedAt: now,
             approvedById:
               type === "approve"
@@ -1255,7 +1248,7 @@ function PengujianReviewPanel({
                 : current.approvedByName,
             approvedAt: type === "approve" ? now : current.approvedAt,
             rejectedAt: type === "reject" ? now : current.rejectedAt,
-            completedAt: current.completedAt,
+            completedAt: type === "complete" ? now : current.completedAt,
           }
         : current,
     );
@@ -1264,7 +1257,9 @@ function PengujianReviewPanel({
     toast.success(
       type === "approve"
         ? "Pengajuan pengujian sampel berhasil disetujui."
-        : "Pengajuan pengujian sampel berhasil ditolak.",
+        : type === "complete"
+          ? "Pengajuan pengujian sampel berhasil ditandai selesai."
+          : "Pengajuan pengujian sampel berhasil ditolak.",
     );
     onActionComplete?.();
   };
@@ -1274,6 +1269,7 @@ function PengujianReviewPanel({
       <RequestReviewCard
         status={sampleTesting.status}
         code={sampleTesting.code}
+        itemGridClassName="md:grid-cols-[124px_minmax(0,1fr)]"
         meta={[
           { label: "Sampel", value: sampleTesting.sampleName || "-" },
           { label: "Jenis Sampel", value: sampleTesting.sampleType || "-" },
@@ -1348,20 +1344,31 @@ function PengujianReviewPanel({
             </Button>
           </>
         ) : null}
+        {canCompleteSampleTesting ? (
+          <Button
+            type="button"
+            className="h-10 rounded-md border border-sky-600 bg-sky-600 px-4 text-white shadow-sm hover:bg-sky-700"
+            onClick={() => setConfirmType("complete")}
+            disabled={pendingAction.sampleTestingId === sampleTesting.id}
+          >
+            <Check className="h-4 w-4" />
+            Tandai Selesai
+          </Button>
+        ) : null}
       </RequestReviewCard>
 
       <StatusConfirmDialog
         open={Boolean(confirmType)}
-        actionType={
-          confirmType === "reject" ? "reject" : confirmType ? "approve" : null
-        }
+        actionType={confirmType}
         onOpenChange={(open) => {
           if (!open) setConfirmType(null);
         }}
         onConfirm={handlePengujianAction}
         isSubmitting={pendingAction.sampleTestingId === sampleTesting.id}
         subjectLabel={
-          "pengajuan pengujian sampel ini"
+          confirmType === "complete"
+            ? "pengajuan pengujian sampel ini sebagai selesai"
+            : "pengajuan pengujian sampel ini"
         }
       />
     </>

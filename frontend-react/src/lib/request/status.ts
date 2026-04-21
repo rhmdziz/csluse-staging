@@ -53,7 +53,6 @@ export const SAMPLE_TESTING_STATUS_OPTIONS: StatusOption[] = [
   { value: "approved", label: "Disetujui" },
   { value: "canceled", label: "Dibatalkan" },
   { value: "diproses", label: "Diproses" },
-  { value: "menunggu pembayaran", label: "Menunggu Pembayaran" },
   { value: "rejected", label: "Ditolak" },
   { value: "completed", label: "Selesai" },
 ];
@@ -83,11 +82,6 @@ export function getStatusBadgeClass(
     return bordered
       ? "border-blue-200 bg-blue-50 text-blue-700"
       : "bg-blue-100 text-blue-700";
-  }
-  if (normalized === "menunggu pembayaran") {
-    return bordered
-      ? "border-violet-200 bg-violet-50 text-violet-700"
-      : "bg-violet-100 text-violet-700";
   }
   if (normalized === "pending") {
     return bordered
@@ -140,7 +134,6 @@ export function getStatusSummaryTone(status?: string | null): StatusSummaryTone 
 
   if (normalized === "approved") return "emerald";
   if (normalized === "diproses") return "blue";
-  if (normalized === "menunggu pembayaran") return "blue";
   if (normalized === "pending") return "amber";
   if (normalized === "canceled" || normalized === "cancelled") return "slate";
   if (normalized === "returned pending inspection" || normalized === "returned_pending_inspection") {
@@ -160,7 +153,6 @@ export function getStatusDisplayLabel(status?: string | null) {
   if (normalized === "approved") return "Approved";
   if (normalized === "canceled" || normalized === "cancelled") return "Canceled";
   if (normalized === "diproses") return "Diproses";
-  if (normalized === "menunggu pembayaran") return "Menunggu Pembayaran";
   if (normalized === "completed") return "Completed";
   if (normalized === "rejected") return "Rejected";
   if (normalized === "expired") return "Expired";
@@ -220,7 +212,6 @@ export function getSampleTestingStatusDisplayLabel(status?: string | null) {
   if (normalized === "approved") return "Disetujui";
   if (normalized === "canceled" || normalized === "cancelled") return "Dibatalkan";
   if (normalized === "diproses") return "Diproses";
-  if (normalized === "menunggu pembayaran") return "Menunggu Pembayaran";
   if (normalized === "completed") return "Selesai";
   if (normalized === "rejected") return "Ditolak";
 

@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Package,
   ShieldCheck,
+  Stamp,
   UserRound,
 } from "lucide-react";
 
@@ -98,6 +99,8 @@ export function getHeaderIcon(menuId: string, actionId: string | null) {
     }
     return Package;
   }
+
+  if (menuId === "bebas-laboratorium") return Stamp;
 
   if (menuId === "notifications") return Bell;
 
@@ -282,6 +285,14 @@ export const SIDEBAR_SHORTCUTS: SidebarShortcut[] = [
     ],
   },
   {
+    id: "bebas-laboratorium",
+    label: "Surat Bebas Laboratorium",
+    description: "Ajukan permohonan surat bebas laboratorium untuk mahasiswa tugas akhir.",
+    href: "/bebas-laboratorium",
+    icon: Stamp,
+    actions: [],
+  },
+  {
     id: "notifications",
     label: "Notifikasi",
     description: "Lihat update status pengajuan dan pemberitahuan terbaru.",
@@ -455,6 +466,9 @@ export function parseDashboardPath(pathname: string) {
       return { menu: "borrow-equipment", action: "request-form" };
     }
     return { menu: "borrow-equipment", action: "request-list" };
+  }
+  if (parts[0] === "bebas-laboratorium") {
+    return { menu: "bebas-laboratorium", action: null };
   }
   if (parts[0] === "notifications") {
     return { menu: "notifications", action: null };
