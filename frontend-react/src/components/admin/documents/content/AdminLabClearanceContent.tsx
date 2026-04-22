@@ -13,13 +13,20 @@ import {
   Loader2,
   Mail,
   ScrollText,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AdminHistoryTable, AdminRecordDetailItem } from "@/components/admin/history";
+import { DeleteRequestConfirmDialog } from "@/components/dialogs";
+import {
+  AdminHistoryBulkActions,
+  AdminHistoryTable,
+  AdminRecordDetailItem,
+} from "@/components/admin/history";
 import { AdminFilterCard, AdminPageHeader } from "@/components/admin/shared";
 import {
   AdminDetailDialogShell,
+  ConfirmDeleteDialog,
   DataPagination,
   DocumentPreviewDialog,
   InlineErrorAlert,
@@ -44,7 +51,13 @@ import {
   Input,
 } from "@/components/ui";
 
-import { useLabClearanceList, useLabClearanceReview } from "@/hooks/lab-clearance";
+import { API_SURAT_BEBAS_LAB_BULK_DELETE } from "@/constants/api";
+import {
+  useDeleteLabClearanceRequest,
+  useLabClearanceList,
+  useLabClearanceReview,
+} from "@/hooks/lab-clearance";
+import { useDeleteRecord } from "@/hooks/use-delete-record";
 import { labClearanceService as adminLabClearanceService, type LabClearanceResult } from "@/services/admin";
 import { formatDateKey, formatDateTimeWib, toEndOfDay, toStartOfDay } from "@/lib/date";
 import { getRequestStatusDisplayLabel, getStatusBadgeClass } from "@/lib/request";
@@ -54,6 +67,7 @@ import {
   type LabClearanceDetail,
   type LabClearanceDocument,
 } from "@/services/lab-clearance";
+import { BATCH_OPTIONS } from "@/constants/batches";
 
 const PAGE_SIZE = 20;
 
@@ -110,6 +124,7 @@ export default function AdminLabClearanceContent() {
   const [ordering, setOrdering] = useState("newest");
   const [createdRange, setCreatedRange] = useState<DateRange | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [detailsById, setDetailsById] = useState<Record<string, LabClearanceDetail | null>>({});
   const [loadingDetailIds, setLoadingDetailIds] = useState<Record<string, boolean>>({});
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
@@ -117,6 +132,7 @@ export default function AdminLabClearanceContent() {
   const [generateSuratDetail, setGenerateSuratDetail] = useState<LabClearanceDetail | null>(null);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [previewDocument, setPreviewDocument] = useState<LabClearanceDocument | null>(null);
@@ -156,8 +172,11 @@ export default function AdminLabClearanceContent() {
     },
   );
   const { approve, reject, pendingId } = useLabClearanceReview();
+  const { deleteRequest, pendingId: pendingDeleteRequestId } = useDeleteLabClearanceRequest();
+  const { deleteRecords, isDeleting } = useDeleteRecord();
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const selectedCount = selectedIds.length;
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedIds.includes(String(item.id)));
   const someVisibleSelected =
@@ -225,11 +244,17 @@ export default function AdminLabClearanceContent() {
     setRejectNote("");
     setApproveConfirmOpen(false);
     setRejectConfirmOpen(false);
+    setDeleteConfirmOpen(false);
     setReviewTargetId(id);
     void ensureDetailLoaded(id);
     const item = items.find((i) => String(i.id) === id);
     const profileId = item?.requested_by_detail?.id;
     if (item?.status === "Pending" && profileId) void fetchClearanceCheck(id, profileId);
+  };
+
+  const handleOpenDeleteRequest = (id: string) => {
+    handleOpenReview(id);
+    setDeleteConfirmOpen(true);
   };
 
   const handleGenerateSurat = async (id: string) => {
@@ -280,6 +305,58 @@ export default function AdminLabClearanceContent() {
     }
 
     setReviewError("Gagal menolak permohonan. Coba lagi.");
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!reviewTargetId || !reviewTarget) return;
+
+    const result = await deleteRequest(reviewTargetId);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success(`Permohonan ${reviewTarget.code} berhasil dihapus.`);
+    setDeleteConfirmOpen(false);
+    setReviewTargetId(null);
+    setRejectNote("");
+    setReviewError("");
+    setApproveConfirmOpen(false);
+    setRejectConfirmOpen(false);
+    setReloadKey((current) => current + 1);
+    setDetailsById((prev) => {
+      const next = { ...prev };
+      delete next[reviewTargetId];
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return;
+
+    const result = await deleteRecords(API_SURAT_BEBAS_LAB_BULK_DELETE, selectedIds);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    if (result.failedCount && result.deletedCount) {
+      toast.success(`${result.deletedCount} permohonan berhasil dihapus.`);
+      toast.error(
+        result.message ?? `${result.failedCount} permohonan gagal dihapus.`,
+      );
+    } else {
+      toast.success(
+        result.message ?? `${result.deletedCount} permohonan berhasil dihapus.`,
+      );
+    }
+
+    setIsBulkDeleteOpen(false);
+    setSelectedIds([]);
+    setReviewTargetId((current) =>
+      current && selectedIds.includes(current) ? null : current,
+    );
+    setReloadKey((current) => current + 1);
   };
 
   const toggleItemSelection = (id: string) => {
@@ -371,15 +448,21 @@ export default function AdminLabClearanceContent() {
             <label className="mb-0.5 block text-[11px] font-semibold text-slate-900/90">
               Angkatan
             </label>
-            <Input
+            <select
               value={batch}
-              placeholder="Contoh: 2022"
-              className="h-8 border-slate-400 bg-white px-2 py-0 text-xs placeholder:text-xs md:text-xs shadow-xs focus-visible:border-sky-600 focus-visible:ring-sky-100"
+              className="h-8 w-full rounded-md border border-slate-400 bg-white px-2 text-xs outline-none shadow-xs focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-100"
               onChange={(event) => {
                 setBatch(event.target.value);
                 setPage(1);
               }}
-            />
+            >
+              <option value="">Semua angkatan</option>
+              {BATCH_OPTIONS.map((batchOption) => (
+                <option key={batchOption} value={batchOption}>
+                  {batchOption}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="min-w-0">
@@ -419,12 +502,28 @@ export default function AdminLabClearanceContent() {
         </form>
       </AdminFilterCard>
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <AdminHistoryBulkActions
+            selectedCount={selectedCount}
+            isDeleting={isDeleting}
+            showExportActions={false}
+            onDeleteSelected={() => setIsBulkDeleteOpen(true)}
+            onClearSelection={() => setSelectedIds([])}
+          />
+        </div>
+        <p className="text-xs text-slate-500 sm:text-right">
+          Hapus terpilih hanya tersedia untuk admin dan mengikuti pilihan checkbox saat ini.
+        </p>
+      </div>
+
       {error ? <InlineErrorAlert>{error}</InlineErrorAlert> : null}
 
       <AdminHistoryTable
         columns={[
           { label: "Kode" },
           { label: "Pemohon" },
+          { label: "NIM" },
           { label: "Status" },
           { label: "Jumlah Dokumen" },
           { label: "Tanggal Pengajuan" },
@@ -434,7 +533,7 @@ export default function AdminLabClearanceContent() {
               "sticky right-0 z-10 relative whitespace-nowrap bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700",
           },
         ]}
-        colSpan={7}
+        colSpan={8}
         hasRows={items.length > 0}
         isLoading={isLoading}
         hasLoadedOnce={hasLoadedOnce}
@@ -464,9 +563,9 @@ export default function AdminLabClearanceContent() {
                   <p className="font-medium text-slate-800">
                     {item.requested_by_detail?.full_name || "-"}
                   </p>
-                  <p className="text-xs text-slate-500">
-                    {item.requested_by_detail?.id_number || item.requested_by_detail?.email || "-"}
-                  </p>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                  {item.requested_by_detail?.id_number || "-"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">
                   <span
@@ -506,6 +605,15 @@ export default function AdminLabClearanceContent() {
                         )}
                       </Button>
                     ) : null}
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                      onClick={() => handleOpenDeleteRequest(rowId)}
+                      aria-label={`Buka dialog hapus permohonan ${item.code}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -541,6 +649,7 @@ export default function AdminLabClearanceContent() {
             setReviewError("");
             setApproveConfirmOpen(false);
             setRejectConfirmOpen(false);
+            setDeleteConfirmOpen(false);
           }
         }}
         detail={reviewTarget}
@@ -549,15 +658,19 @@ export default function AdminLabClearanceContent() {
         rejectNote={rejectNote}
         approveConfirmOpen={approveConfirmOpen}
         rejectConfirmOpen={rejectConfirmOpen}
+        deleteConfirmOpen={deleteConfirmOpen}
         pendingId={pendingId}
+        pendingDeleteRequestId={pendingDeleteRequestId}
         clearanceCheck={reviewTargetId ? (clearanceChecks[reviewTargetId] ?? null) : null}
         isLoadingClearance={reviewTargetId ? Boolean(loadingClearanceIds[reviewTargetId]) : false}
         clearanceCheckError={reviewTargetId ? (clearanceCheckErrors[reviewTargetId] ?? "") : ""}
         onRejectNoteChange={setRejectNote}
         onApproveConfirmOpenChange={setApproveConfirmOpen}
         onRejectConfirmOpenChange={setRejectConfirmOpen}
+        onDeleteConfirmOpenChange={setDeleteConfirmOpen}
         onApprove={handleApprove}
         onReject={handleReject}
+        onDelete={handleDeleteRequest}
         onPreview={setPreviewDocument}
         onGenerateSurat={setGenerateSuratDetail}
       />
@@ -565,6 +678,15 @@ export default function AdminLabClearanceContent() {
       <DialogGenerateSurat
         detail={generateSuratDetail}
         onOpenChange={(open) => { if (!open) setGenerateSuratDetail(null); }}
+      />
+
+      <ConfirmDeleteDialog
+        open={isBulkDeleteOpen}
+        title="Hapus permohonan surat bebas lab terpilih?"
+        description={`${selectedCount} permohonan yang dipilih akan dihapus permanen.`}
+        isDeleting={isDeleting}
+        onOpenChange={setIsBulkDeleteOpen}
+        onConfirm={handleBulkDelete}
       />
     </section>
   );
@@ -579,15 +701,19 @@ function DialogReview({
   rejectNote,
   approveConfirmOpen,
   rejectConfirmOpen,
+  deleteConfirmOpen,
   pendingId,
+  pendingDeleteRequestId,
   clearanceCheck,
   isLoadingClearance,
   clearanceCheckError,
   onRejectNoteChange,
   onApproveConfirmOpenChange,
   onRejectConfirmOpenChange,
+  onDeleteConfirmOpenChange,
   onApprove,
   onReject,
+  onDelete,
   onPreview,
   onGenerateSurat,
 }: {
@@ -599,19 +725,24 @@ function DialogReview({
   rejectNote: string;
   approveConfirmOpen: boolean;
   rejectConfirmOpen: boolean;
+  deleteConfirmOpen: boolean;
   pendingId: string | null;
+  pendingDeleteRequestId: string | null;
   clearanceCheck: LabClearanceResult | null;
   isLoadingClearance: boolean;
   clearanceCheckError: string;
   onRejectNoteChange: (value: string) => void;
   onApproveConfirmOpenChange: (open: boolean) => void;
   onRejectConfirmOpenChange: (open: boolean) => void;
+  onDeleteConfirmOpenChange: (open: boolean) => void;
   onApprove: () => void;
   onReject: () => void;
+  onDelete: () => void;
   onPreview: (document: LabClearanceDocument) => void;
   onGenerateSurat: (detail: LabClearanceDetail) => void;
 }) {
   const isSubmitting = Boolean(detail?.id && pendingId === detail.id);
+  const isDeleting = Boolean(detail?.id && pendingDeleteRequestId === detail.id);
 
   return (
     <>
@@ -844,17 +975,38 @@ function DialogReview({
             <Button
               type="button"
               variant="outline"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDeleting}
               className="rounded-md border-slate-300 text-sm"
               onClick={() => onOpenChange(false)}
             >
               Tutup
             </Button>
+            {detail ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting || isDeleting}
+                className="rounded-md border-rose-200 text-sm text-rose-700 hover:bg-rose-50"
+                onClick={() => onDeleteConfirmOpenChange(true)}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Menghapus...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Hapus Permohonan
+                  </>
+                )}
+              </Button>
+            ) : null}
             {detail?.status === "Pending" ? (
               <>
                 <Button
                   type="button"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isDeleting}
                   variant="outline"
                   className="rounded-md border-rose-200 text-sm text-rose-700 hover:bg-rose-50"
                   onClick={() => onRejectConfirmOpenChange(true)}
@@ -863,7 +1015,7 @@ function DialogReview({
                 </Button>
                 <Button
                   type="button"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isDeleting}
                   className="rounded-md bg-[#0052C7] text-sm text-white hover:bg-[#0048B4]"
                   onClick={() => onApproveConfirmOpenChange(true)}
                 >
@@ -874,6 +1026,7 @@ function DialogReview({
             {detail?.status === "Approved" ? (
               <Button
                 type="button"
+                disabled={isDeleting}
                 className="rounded-md bg-emerald-600 text-sm text-white hover:bg-emerald-700"
                 onClick={() => onGenerateSurat(detail)}
               >
@@ -966,6 +1119,22 @@ function DialogReview({
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DeleteRequestConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) onDeleteConfirmOpenChange(false);
+        }}
+        onConfirm={() => void onDelete()}
+        isSubmitting={isDeleting}
+        title="Hapus Permohonan"
+        description={
+          detail
+            ? `Permohonan ${detail.code} akan dihapus permanen. Admin dapat menghapus permohonan milik pemohon.`
+            : "Permohonan ini akan dihapus permanen."
+        }
+        confirmLabel="Ya, Hapus Permohonan"
+      />
     </>
   );
 }

@@ -1372,6 +1372,7 @@ class AnnouncementListSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "content",
+            "created_by",
             "created_at",
         ]
 
@@ -1394,7 +1395,6 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 class ScheduleSerializer(serializers.ModelSerializer):
     room_detail = RoomListSerializer(source="room", read_only=True)
-    created_by_detail = ProfileSerializer(source="created_by", read_only=True)
 
     class Meta:
         model = Schedule
@@ -1408,16 +1408,12 @@ class ScheduleSerializer(serializers.ModelSerializer):
             "category",
             "room",
             "room_detail",
-            "created_by",
-            "created_by_detail",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_by"]
 
 
 class FAQSerializer(serializers.ModelSerializer):
-    created_by_detail = ProfileSerializer(source="created_by", read_only=True)
     image_detail = ImageSerializer(source="image", read_only=True)
 
     class Meta:
@@ -1428,8 +1424,6 @@ class FAQSerializer(serializers.ModelSerializer):
             "answer",
             "image",
             "image_detail",
-            "created_by",
-            "created_by_detail",
             "created_at",
             "updated_at",
         ]

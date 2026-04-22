@@ -148,6 +148,43 @@ export function useDeleteLabClearanceDocument() {
   return { deleteDocument, pendingDocumentType };
 }
 
+export function useDeleteLabClearanceRequest() {
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const deleteRequest = async (id: string) => {
+    setPendingId(id);
+
+    try {
+      const result = await labClearanceService.remove(id);
+      if (!result.ok) {
+        let message = "Gagal menghapus permohonan surat bebas laboratorium.";
+
+        if (typeof result.data !== "undefined") {
+          message = extractApiErrorMessage(result.data, message);
+        } else if (result.text) {
+          message = extractApiErrorMessageFromText(result.text, message);
+        }
+
+        return { ok: false as const, message };
+      }
+
+      return { ok: true as const, data: result.data };
+    } catch (error) {
+      return {
+        ok: false as const,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Terjadi kesalahan saat menghapus permohonan.",
+      };
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  return { deleteRequest, pendingId };
+}
+
 export function useUpdateLabClearanceBookingHistories() {
   const [isPending, setIsPending] = useState(false);
 

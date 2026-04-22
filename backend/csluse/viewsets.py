@@ -240,11 +240,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         uploaded_image = self.request.FILES.get('image')
         name = os.path.basename(uploaded_image.name) if uploaded_image else ''
-        instance = serializer.save(
-            created_by=getattr(self.request.user, 'profile', None)
-            if self.request.user.is_authenticated else None,
-            name=name,
-        )
+        instance = serializer.save(name=name)
         if instance.image and not instance.url:
             instance.url = instance.image.url
             instance.save(update_fields=['url'])
@@ -2336,7 +2332,7 @@ class AnnouncementViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
 # region Scheduling And Overview
 class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
-    queryset = Schedule.objects.select_related('room', 'created_by').order_by('start_time')
+    queryset = Schedule.objects.select_related('room').order_by('start_time')
     serializer_class = ScheduleSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = DefaultPagination
@@ -2375,7 +2371,7 @@ class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        instance = serializer.save(created_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save()
         log_admin_action(
             self.request.user,
             instance,
@@ -2394,13 +2390,12 @@ class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
         results = []
         success_count = 0
-        created_by = getattr(self.request.user, 'profile', None)
 
         for index, row in enumerate(rows, start=1):
             row_number = row.get("index", index) if isinstance(row, dict) else index
             serializer = self.get_serializer(data=row)
             if serializer.is_valid():
-                instance = serializer.save(created_by=created_by)
+                instance = serializer.save()
                 log_admin_action(
                     self.request.user,
                     instance,
@@ -2499,7 +2494,7 @@ class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
         schedule_qs = (
             Schedule.objects
-            .select_related('room', 'created_by', 'created_by__user')
+            .select_related('room')
             .prefetch_related('room__pics')
             .all()
         )
@@ -2661,7 +2656,7 @@ class CalendarViewSet(viewsets.ViewSet):
                 start_time__lt=end,
                 end_time__gt=start,
             )
-            .select_related('room', 'created_by')
+            .select_related('room')
         )
 
         booking_qs = (
@@ -2904,7 +2899,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
 
 # region FAQ
 class FAQViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
-    queryset = FAQ.objects.select_related('created_by').order_by('-created_at')
+    queryset = FAQ.objects.order_by('-created_at')
     serializer_class = FAQSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = DefaultPagination
@@ -2934,7 +2929,7 @@ class FAQViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        instance = serializer.save(created_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save()
         log_admin_action(
             self.request.user,
             instance,
@@ -4182,7 +4177,7 @@ def sync_borrow_statuses():
 BEBAS_LAB_DOCUMENT_TYPES = {"form_alat_kecil", "form_alat_besar", "form_permintaan_bahan"}
 
 
-class SuratBebasLabViewSet(viewsets.ModelViewSet):
+class SuratBebasLabViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         SuratBebasLab.objects
         .select_related("requested_by__user", "reviewed_by__user")
@@ -4193,6 +4188,8 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = DefaultPagination
     parser_classes = [JSONParser, MultiPartParser, FormParser]
+    bulk_delete_success_message = "Semua permohonan surat bebas laboratorium terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian permohonan surat bebas laboratorium gagal dihapus."
 
     def get_serializer_class(self):
         if self.action in {"list", "my", "all"}:
@@ -4208,6 +4205,10 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
     def _is_owner(self, instance):
         profile = self._current_profile()
         return profile and instance.requested_by_id == profile.id
+
+    def check_bulk_delete_permission(self, request):
+        if not is_administrator_or_above(request.user):
+            raise PermissionDenied("Akses ditolak.")
 
     def _apply_filters(self, qs):
         search = (
@@ -4370,11 +4371,18 @@ class SuratBebasLabViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if not self._is_owner(instance) and not self._is_admin():
+        is_admin = self._is_admin()
+        if not self._is_owner(instance) and not is_admin:
             raise PermissionDenied("Akses ditolak.")
-        if instance.status != "Pending":
+        if not is_admin and instance.status != "Pending":
             raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat dihapus."})
         return super().destroy(request, *args, **kwargs)
+
+    def perform_destroy(self, instance):
+        documents = list(instance.documents.all())
+        super().perform_destroy(instance)
+        for document in documents:
+            self._delete_document_file(document)
 
     @extend_schema(
         parameters=[

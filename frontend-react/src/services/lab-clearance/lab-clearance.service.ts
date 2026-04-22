@@ -3,6 +3,7 @@ import {
   API_SURAT_BEBAS_LAB_ALL,
   API_SURAT_BEBAS_LAB_APPROVE,
   API_SURAT_BEBAS_LAB_BOOKING_SUGGESTIONS,
+  API_SURAT_BEBAS_LAB_DELETE,
   API_SURAT_BEBAS_LAB_DELETE_DOCUMENT,
   API_SURAT_BEBAS_LAB_DETAIL,
   API_SURAT_BEBAS_LAB_MY,
@@ -186,6 +187,13 @@ export const labClearanceService = {
     const response = await authFetch(API_SURAT_BEBAS_LAB_DETAIL(id), { signal });
     if (!response.ok) return null;
     return (await response.json()) as LabClearanceDetail;
+  },
+
+  async remove(id: string): Promise<MutationResult> {
+    const response = await authFetch(API_SURAT_BEBAS_LAB_DELETE(id), {
+      method: "DELETE",
+    });
+    return parseMutationResponse(response);
   },
 
   async deleteDocument(id: string, documentType: LabClearanceDocumentType): Promise<MutationResult> {

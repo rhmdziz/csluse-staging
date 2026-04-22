@@ -36,17 +36,9 @@ class Image(BaseModel):
     image = models.ImageField(upload_to="images/")
     name = models.CharField(max_length=255, blank=True)
     url = models.URLField(blank=True)
-    created_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="images_created_by",
-    )
 
     def __str__(self):
-        creator_email = self.created_by.user.email if self.created_by else "unknown"
-        return f"{self.name or self.image.name} - {creator_email}"
+        return self.name or self.image.name
 
 
 class Room(BaseModel):
@@ -242,7 +234,8 @@ class Booking(BaseModel):
         return f"{self.code} - {self.requested_by.user.email} - {self.room.name} - {self.status}"
 
 
-class BookingEquipmentItem(BaseModel):
+class BookingEquipmentItem(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
     booking = models.ForeignKey(
         Booking,
         on_delete=models.CASCADE,
@@ -595,13 +588,6 @@ class Schedule(BaseModel):
         blank=True,
         related_name="schedules",
     )
-    created_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="schedules_created_by",
-    )
 
     class Meta:
         ordering = ["start_time", "title"]
@@ -619,13 +605,6 @@ class FAQ(BaseModel):
         null=True,
         blank=True,
         related_name="faqs",
-    )
-    created_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="faqs_created_by",
     )
 
     class Meta:

@@ -40,6 +40,7 @@ import {
   getStatusBadgeClass,
 } from "@/lib/request";
 import {
+  useDeleteLabClearanceRequest,
   useDeleteLabClearanceDocument,
   useLabClearanceList,
   useSubmitLabClearance,
@@ -87,6 +88,21 @@ const DOCUMENT_TYPE_LABEL: Record<LabClearanceDocumentType, string> = {
 
 function getLabClearanceStatusLabel(status?: string | null) {
   return getRequestStatusDisplayLabel(status);
+}
+
+function formatBookingHistoryDate(value?: string | null) {
+  if (!value?.trim()) return "-";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${value}T00:00:00Z`));
+  }
+
+  return formatDateTimeWib(value);
 }
 
 function extractLabClearanceDetailPayload(
@@ -223,6 +239,8 @@ export function LabClearancePageContent() {
   const [deleteDraft, setDeleteDraft] = useState<LabClearanceDocument | null>(
     null,
   );
+  const [deleteRequestTarget, setDeleteRequestTarget] =
+    useState<LabClearanceListItem | null>(null);
   const inputRefs = useRef<
     Partial<Record<LabClearanceDocumentType, HTMLInputElement | null>>
   >({});
@@ -231,6 +249,8 @@ export function LabClearancePageContent() {
     useLabClearanceList(page, PAGE_SIZE, "my", reloadKey);
   const { submit, isSubmitting, errorMessage, setErrorMessage } =
     useSubmitLabClearance();
+  const { deleteRequest, pendingId: pendingDeleteRequestId } =
+    useDeleteLabClearanceRequest();
   const { updateDocuments, pendingDocumentType } =
     useUpdateLabClearanceDocuments();
   const { deleteDocument, pendingDocumentType: pendingDeleteDocumentType } =
@@ -370,6 +390,28 @@ export function LabClearancePageContent() {
     setReloadKey((current) => current + 1);
   };
 
+  const handleDeleteRequest = async () => {
+    if (!deleteRequestTarget) return;
+
+    const result = await deleteRequest(deleteRequestTarget.id);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+
+    toast.success("Permohonan berhasil dihapus.");
+    setDeleteRequestTarget(null);
+    setDetailTarget((current) =>
+      current?.id === deleteRequestTarget.id ? null : current,
+    );
+    setDetailData((current) =>
+      current?.id === deleteRequestTarget.id ? null : current,
+    );
+    setPreviewDocument(null);
+    setDeleteDraft(null);
+    setReloadKey((current) => current + 1);
+  };
+
   return (
     <section className="space-y-4">
       {/* Info & template card */}
@@ -481,13 +523,24 @@ export function LabClearancePageContent() {
                     {formatDateTimeWib(item.created_at)}
                   </td>
                   <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                    <TableActionIconButton
-                      type="button"
-                      label="Dokumen"
-                      icon={<FileText className="h-3.5 w-3.5" />}
-                      className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
-                      onClick={() => setDetailTarget(item)}
-                    />
+                    <div className="flex justify-center gap-2">
+                      {item.status === "Pending" ? (
+                        <TableActionIconButton
+                          type="button"
+                          label="Hapus permohonan"
+                          icon={<Trash2 className="h-3.5 w-3.5" />}
+                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                          onClick={() => setDeleteRequestTarget(item)}
+                        />
+                      ) : null}
+                      <TableActionIconButton
+                        type="button"
+                        label="Dokumen"
+                        icon={<FileText className="h-3.5 w-3.5" />}
+                        className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
+                        onClick={() => setDetailTarget(item)}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))
@@ -614,8 +667,81 @@ export function LabClearancePageContent() {
 
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Riwayat Booking yang Diajukan
+                  </p>
+                  <div className="overflow-x-auto rounded-md border border-slate-200">
+                    <table className="min-w-full table-auto text-sm">
+                      <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="w-16 px-3 py-2 font-semibold">No</th>
+                          <th className="px-3 py-2 font-semibold">
+                            Ruang Lab
+                          </th>
+                          <th className="px-3 py-2 font-semibold">Mulai</th>
+                          <th className="px-3 py-2 font-semibold">Selesai</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailData.booking_histories.length ? (
+                          detailData.booking_histories.map((history, index) => (
+                            <tr key={history.id} className="border-t">
+                              <td className="px-3 py-2 text-slate-600">
+                                {index + 1}
+                              </td>
+                              <td className="px-3 py-2 text-slate-700">
+                                {history.lab_room_name || "-"}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                                {formatBookingHistoryDate(history.start_date)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                                {formatBookingHistoryDate(history.end_date)}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td
+                              colSpan={4}
+                              className="px-3 py-4 text-center text-sm text-slate-500"
+                            >
+                              Belum ada riwayat booking yang tersimpan pada
+                              pengajuan ini.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Dokumen Pengajuan
                   </p>
+                  {detailData.status === "Pending" ? (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={pendingDeleteRequestId === detailData.id}
+                        className="rounded-md border-rose-200 text-sm text-rose-700 hover:bg-rose-50"
+                        onClick={() => setDeleteRequestTarget(detailData)}
+                      >
+                        {pendingDeleteRequestId === detailData.id ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Menghapus...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Hapus Permohonan
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : null}
                   {detailData.documents.length ? (
                     <div className="space-y-2">
                       {detailData.documents.map((document) => (
@@ -1094,6 +1220,22 @@ export function LabClearancePageContent() {
             : ""
         } akan dihapus dari permohonan surat bebas laboratorium.`}
         confirmLabel="Ya, Hapus Dokumen"
+      />
+
+      <DeleteRequestConfirmDialog
+        open={Boolean(deleteRequestTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteRequestTarget(null);
+        }}
+        isSubmitting={pendingDeleteRequestId === deleteRequestTarget?.id}
+        onConfirm={() => void handleDeleteRequest()}
+        title="Hapus Permohonan"
+        description={
+          deleteRequestTarget
+            ? `Permohonan ${deleteRequestTarget.code} akan dihapus permanen. Aksi ini hanya tersedia saat status masih menunggu.`
+            : "Permohonan ini akan dihapus permanen."
+        }
+        confirmLabel="Ya, Hapus Permohonan"
       />
     </section>
   );

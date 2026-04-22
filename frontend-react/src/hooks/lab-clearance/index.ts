@@ -1,5 +1,6 @@
 export { useLabClearanceList } from "./use-lab-clearance-list";
 export {
+  useDeleteLabClearanceRequest,
   useDeleteLabClearanceDocument,
   useLabClearanceReview,
   useSubmitLabClearance,
