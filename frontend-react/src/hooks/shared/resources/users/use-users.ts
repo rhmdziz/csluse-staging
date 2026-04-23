@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   mapUser,
+  mapProfile,
   usersService,
   type UserFilters,
   type UserRoleAggregates,
@@ -10,7 +11,7 @@ import {
 } from "@/services/shared/resources";
 
 export type { UserFilters, UserRoleAggregates, UserRow };
-export { mapUser };
+export { mapProfile, mapUser };
 
 export function useUserDetail(userId?: string | number | null) {
   const [user, setUser] = useState<UserRow | null>(null);
@@ -34,13 +35,13 @@ export function useUserDetail(userId?: string | number | null) {
 
       try {
         const payload = await usersService.getDetail(userId, controller.signal);
-        setUser(mapUser(payload));
+        setUser(mapProfile(payload));
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === "AbortError") return;
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Terjadi kesalahan saat memuat detail user.",
+            : "Terjadi kesalahan saat memuat detail profile.",
         );
       } finally {
         if (isAborted || controller.signal.aborted) return;
@@ -95,6 +96,8 @@ export function useUsers(
     admin: 0,
     staff: 0,
     guest: 0,
+    preProvisioned: 0,
+    active: 0,
   });
 
   useEffect(() => {
@@ -117,7 +120,7 @@ export function useUsers(
           : Array.isArray(payload.results)
             ? payload.results
             : [];
-        const mappedUsers = list.map(mapUser);
+        const mappedUsers = list.map(mapProfile);
 
         setUsers(mappedUsers);
         setTotalCount(Array.isArray(payload) ? mappedUsers.length : (payload.count ?? mappedUsers.length));
@@ -128,6 +131,8 @@ export function useUsers(
           admin: Array.isArray(payload) ? 0 : Number(payload.aggregates?.admin ?? 0),
           staff: Array.isArray(payload) ? 0 : Number(payload.aggregates?.staff ?? 0),
           guest: Array.isArray(payload) ? 0 : Number(payload.aggregates?.guest ?? 0),
+          preProvisioned: Array.isArray(payload) ? 0 : Number(payload.aggregates?.pre_provisioned ?? 0),
+          active: Array.isArray(payload) ? 0 : Number(payload.aggregates?.active ?? 0),
         });
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === "AbortError") return;
@@ -157,6 +162,7 @@ export function useUsers(
     filters.batch,
     filters.search,
     filters.q,
+    filters.hasUser,
     filters.isMentor,
     reloadKey,
   ]);

@@ -16,7 +16,11 @@ function notifySessionExpired(): void {
   window.dispatchEvent(new Event("auth:session-expired"));
 }
 
-function clearTokens(): void {
+type ClearTokensOptions = {
+  silent?: boolean;
+};
+
+function clearTokens(options: ClearTokensOptions = {}): void {
   removeCookieValue("access_token");
   removeCookieValue("access");
   removeCookieValue("refresh_token");
@@ -30,7 +34,9 @@ function clearTokens(): void {
     window.localStorage.removeItem("profile_cached_at");
     window.localStorage.removeItem("user");
   }
-  notifySessionExpired();
+  if (!options.silent) {
+    notifySessionExpired();
+  }
 }
 
 async function refreshToken(): Promise<string | undefined> {

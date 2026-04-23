@@ -18,6 +18,7 @@ type UseUserManagementActionsArgs = {
   setUsers: React.Dispatch<React.SetStateAction<UserRow[]>>;
   setTotalCount: React.Dispatch<React.SetStateAction<number>>;
   setError: React.Dispatch<React.SetStateAction<string>>;
+  onDataChanged: () => void;
 };
 
 export function useUserManagementActions({
@@ -26,6 +27,7 @@ export function useUserManagementActions({
   setUsers,
   setTotalCount,
   setError,
+  onDataChanged,
 }: UseUserManagementActionsArgs) {
   const [deleteCandidate, setDeleteCandidate] = useState<UserRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Array<number | string>>([]);
@@ -95,52 +97,54 @@ export function useUserManagementActions({
   const handleDelete = async () => {
     if (!canManageUsers || !deleteCandidate?.id) return;
 
-    const result = await deleteUser(deleteCandidate.id);
+    const result = await deleteUser(deleteCandidate);
     if (!result.ok) {
-      setError(result.message || "Gagal menghapus user.");
+      setError(result.message || "Gagal menghapus data.");
       return;
     }
 
-    setUsers((prev) => prev.filter((item) => String(item.id) !== String(deleteCandidate.id)));
-    setTotalCount((prev) => Math.max(0, prev - 1));
     setSelectedIds((prev) => prev.filter((id) => String(id) !== String(deleteCandidate.id)));
     if (detailState.user && String(detailState.user.id) === String(deleteCandidate.id)) {
       closeDetail();
     }
     setDeleteCandidate(null);
-    toast.success("User berhasil dihapus.");
+    onDataChanged();
+    toast.success(
+      deleteCandidate.hasUser
+        ? "Akun berhasil dihapus."
+        : "Profile pre-provisioned berhasil dihapus.",
+    );
   };
 
   const handleBulkDelete = async () => {
     if (!canManageUsers || !selectedIds.length) return;
 
-    const result = await deleteUsers(selectedIds);
+    const result = await deleteUsers(selectedRows);
     if (!result.ok) {
-      setError(result.message || "Gagal menghapus user terpilih.");
-      toast.error(result.message || "Gagal menghapus user terpilih.");
+      setError(result.message || "Gagal menghapus akun/profile terpilih.");
+      toast.error(result.message || "Gagal menghapus akun/profile terpilih.");
       return;
     }
 
     const removedIds = new Set((result.deletedIds ?? []).map((id) => String(id)));
     if (removedIds.size > 0) {
-      setUsers((prev) => prev.filter((item) => !removedIds.has(String(item.id))));
-      setTotalCount((prev) => Math.max(0, prev - removedIds.size));
       setSelectedIds((prev) => prev.filter((id) => !removedIds.has(String(id))));
       if (detailState.user && removedIds.has(String(detailState.user.id))) {
         closeDetail();
       }
+      onDataChanged();
     }
 
     setIsBulkDeleteOpen(false);
 
     if ((result.failedCount ?? 0) > 0) {
       toast.warning(
-        `${result.deletedCount ?? 0} user berhasil dihapus, ${result.failedCount ?? 0} gagal.`,
+        `${result.deletedCount ?? 0} akun/profile berhasil dihapus, ${result.failedCount ?? 0} gagal.`,
       );
       return;
     }
 
-    toast.success(`${result.deletedCount ?? 0} user berhasil dihapus.`);
+    toast.success(`${result.deletedCount ?? 0} akun/profile berhasil dihapus.`);
   };
 
   return {

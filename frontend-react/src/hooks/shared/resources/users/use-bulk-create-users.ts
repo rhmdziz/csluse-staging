@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { toCreateUserPayload, type UserFormState } from "@/components/admin/user-management";
+import {
+  toCreateProfilePayload,
+  toCreateUserPayload,
+  type UserFormState,
+} from "@/components/admin/user-management";
+import { ROLE_VALUES } from "@/constants/roles";
 import {
   usersService,
+  type CreateProfilePayload,
   type CreateUserPayload,
 } from "@/services/shared/resources";
 
@@ -29,13 +35,21 @@ export function useBulkCreateUsers() {
     try {
       for (const row of rows) {
         try {
-          const payload = toCreateUserPayload({
-            email: row.email,
-            password: row.password,
-            form: row,
-          }) as CreateUserPayload;
-
-          const result = await usersService.create(payload);
+          const isGuestRole = row.role === ROLE_VALUES.GUEST;
+          const result = isGuestRole
+            ? await usersService.create(
+                toCreateUserPayload({
+                  email: row.email,
+                  password: row.password,
+                  form: row,
+                }) as CreateUserPayload,
+              )
+            : await usersService.createProfile(
+                toCreateProfilePayload({
+                  email: row.email,
+                  form: row,
+                }) as CreateProfilePayload,
+              );
 
           if (result.ok) {
             results.push({ index: row.index, status: "success", message: "Sukses" });

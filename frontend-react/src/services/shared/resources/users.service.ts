@@ -1,6 +1,7 @@
 import {
   API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN,
   API_AUTH_ADMIN_PROFILE_DETAIL,
+  API_AUTH_ADMIN_PROFILE,
   API_AUTH_PIC_USERS,
   API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS,
   API_AUTH_PIC_USERS_DROPDOWN,
@@ -20,6 +21,7 @@ export type UserFilters = {
   search?: string;
   q?: string;
   isMentor?: boolean;
+  hasUser?: boolean;
 };
 
 type ApiUserProfile = {
@@ -27,6 +29,7 @@ type ApiUserProfile = {
   full_name?: string | null;
   initials?: string | null;
   email?: string | null;
+  last_login?: string | null;
   role?: string | null;
   is_mentor?: boolean | null;
   user_type?: string | null;
@@ -57,10 +60,44 @@ type ApiUsersResponse = {
   } | null;
 };
 
+type ApiAdminProfile = {
+  id?: number | string | null;
+  user_id?: number | string | null;
+  email?: string | null;
+  full_name?: string | null;
+  initials?: string | null;
+  role?: string | null;
+  is_mentor?: boolean | null;
+  user_type?: string | null;
+  batch?: string | number | null;
+  department?: string | null;
+  id_number?: string | null;
+  institution?: string | null;
+  last_login?: string | null;
+  has_user?: boolean | null;
+  status?: string | null;
+};
+
+type ApiAdminProfilesResponse = {
+  count?: number;
+  results?: ApiAdminProfile[];
+  aggregates?: {
+    total?: number;
+    student?: number;
+    lecturer?: number;
+    admin?: number;
+    staff?: number;
+    guest?: number;
+    pre_provisioned?: number;
+    active?: number;
+  } | null;
+};
+
 export type UserRow = {
   id: number | string;
   uid: number | string;
   profileId: number | string | null;
+  userId: number | string | null;
   name: string;
   initials: string;
   email: string;
@@ -72,6 +109,9 @@ export type UserRow = {
   idNumber: string;
   institution: string;
   isVerified: boolean;
+  hasUser: boolean;
+  status: "active" | "pre_provisioned";
+  lastLogin: string;
 };
 
 export type UserRoleAggregates = {
@@ -81,6 +121,8 @@ export type UserRoleAggregates = {
   admin: number;
   staff: number;
   guest: number;
+  preProvisioned: number;
+  active: number;
 };
 
 export type CreateUserPayload = {
@@ -91,6 +133,19 @@ export type CreateUserPayload = {
   username: string;
   password1: string;
   password2: string;
+  role?: string;
+  is_mentor?: boolean;
+  department?: string;
+  batch?: string;
+  id_number?: string;
+  user_type?: string;
+};
+
+export type CreateProfilePayload = {
+  full_name: string;
+  initials?: string;
+  institution?: string;
+  email: string;
   role?: string;
   is_mentor?: boolean;
   department?: string;
@@ -173,6 +228,7 @@ export function mapUser(item: ApiUser): UserRow {
     id: rawId,
     uid: rawId,
     profileId: profile.id ?? null,
+    userId: item.id ?? null,
     name: String(name),
     initials: String(profile.initials ?? ""),
     email: String(email),
@@ -184,6 +240,35 @@ export function mapUser(item: ApiUser): UserRow {
     idNumber: String(profile.id_number ?? "-"),
     institution: String(profile.institution ?? "-"),
     isVerified: Boolean(item.is_verified),
+    hasUser: true,
+    status: "active",
+    lastLogin: String(profile.last_login ?? ""),
+  };
+}
+
+export function mapProfile(item: ApiAdminProfile): UserRow {
+  const rawId = item.id ?? item.email ?? "profile";
+  const hasUser = Boolean(item.has_user ?? item.user_id);
+
+  return {
+    id: rawId,
+    uid: rawId,
+    profileId: item.id ?? null,
+    userId: item.user_id ?? null,
+    name: String(item.full_name ?? item.email ?? "-"),
+    initials: String(item.initials ?? ""),
+    email: String(item.email ?? "-"),
+    role: normalizeRoleValue(item.role) || "-",
+    isMentor: Boolean(item.is_mentor),
+    userType: String(item.user_type ?? "-"),
+    batch: String(item.batch ?? "-"),
+    department: String(item.department ?? "-"),
+    idNumber: String(item.id_number ?? "-"),
+    institution: String(item.institution ?? "-"),
+    isVerified: hasUser,
+    hasUser,
+    status: hasUser ? "active" : "pre_provisioned",
+    lastLogin: String(item.last_login ?? ""),
   };
 }
 
@@ -208,6 +293,7 @@ function mapRoomPicUser(item: ApiRoomPicUser): RoomPicTaskUserRow {
     id: rawId,
     uid: rawId,
     profileId: item.profile_id ?? null,
+    userId: item.id ?? null,
     name: String(item.full_name ?? item.email ?? "-"),
     initials: "",
     email: String(item.email ?? "-"),
@@ -219,6 +305,9 @@ function mapRoomPicUser(item: ApiRoomPicUser): RoomPicTaskUserRow {
     idNumber: String(item.id_number ?? "-"),
     institution: "-",
     isVerified: false,
+    hasUser: true,
+    status: "active",
+    lastLogin: "",
     roomNames: Array.isArray(item.room_names)
       ? item.room_names.map((name) => String(name)).filter(Boolean)
       : [],
@@ -251,7 +340,7 @@ export const usersService = {
     filters: UserFilters = {},
     signal?: AbortSignal,
   ) {
-    const url = new URL(API_AUTH_USERS, window.location.origin);
+    const url = new URL(API_AUTH_ADMIN_PROFILE, window.location.origin);
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));
     if (filters.department) url.searchParams.set("department", filters.department);
@@ -259,32 +348,45 @@ export const usersService = {
     if (filters.batch) url.searchParams.set("batch", filters.batch);
     if (filters.search) url.searchParams.set("search", filters.search);
     if (filters.q) url.searchParams.set("q", filters.q);
+    if (typeof filters.hasUser === "boolean") {
+      url.searchParams.set("has_user", String(filters.hasUser));
+    }
     if (typeof filters.isMentor === "boolean") {
       url.searchParams.set("is_mentor", String(filters.isMentor));
     }
 
     const response = await authFetch(url.toString(), { method: "GET", signal });
     if (!response.ok) {
-      throw new Error(`Gagal memuat data user (${response.status})`);
+      throw new Error(`Gagal memuat data profile (${response.status})`);
     }
 
-    return (await response.json()) as ApiUsersResponse | ApiUser[];
+    return (await response.json()) as ApiAdminProfilesResponse | ApiAdminProfile[];
   },
 
   async getDetail(userId: string | number, signal?: AbortSignal) {
-    const response = await authFetch(`${API_AUTH_USERS}${userId}/`, {
+    const response = await authFetch(API_AUTH_ADMIN_PROFILE_DETAIL(userId), {
       method: "GET",
       signal,
     });
     if (!response.ok) {
-      throw new Error(`Gagal memuat detail user (${response.status})`);
+      throw new Error(`Gagal memuat detail profile (${response.status})`);
     }
 
-    return (await response.json()) as ApiUser;
+    return (await response.json()) as ApiAdminProfile;
   },
 
   async create(payload: CreateUserPayload) {
     const response = await authFetch(API_AUTH_REGISTER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    return parseMutationResponse(response);
+  },
+
+  async createProfile(payload: CreateProfilePayload) {
+    const response = await authFetch(API_AUTH_ADMIN_PROFILE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -304,6 +406,13 @@ export const usersService = {
 
   async remove(userId: number | string) {
     const response = await authFetch(`${API_AUTH_USERS}${userId}/`, {
+      method: "DELETE",
+    });
+    return parseMutationResponse(response);
+  },
+
+  async removeProfile(profileId: number | string) {
+    const response = await authFetch(API_AUTH_ADMIN_PROFILE_DETAIL(profileId), {
       method: "DELETE",
     });
     return parseMutationResponse(response);

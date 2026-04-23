@@ -1,13 +1,19 @@
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { API_AUTH_LOGIN, API_AUTH_USER_PROFILE } from "@/constants/api";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  API_AUTH_LOGIN,
+  API_AUTH_LOGIN_MICROSOFT,
+  API_AUTH_USER_PROFILE,
+} from "@/constants/api";
 import { authFetch } from "@/lib/auth";
 import {
   buildProfileFromApiResponse,
   persistProfileCache,
 } from "@/hooks/shared/profile";
+import { clearTokens } from "@/lib/auth";
 
 type LoginStatus = "idle" | "submitting" | "success" | "error";
+type MicrosoftLoginStatus = "idle" | "submitting";
 
 type LoginFormData = {
   username: string;
@@ -23,14 +29,45 @@ type LoginResponse = {
   detail?: string;
 };
 
+const MICROSOFT_AUTH_ERROR_MESSAGES: Record<string, string> = {
+  microsoft_cancelled: "Login Microsoft dibatalkan.",
+  microsoft_domain_invalid:
+    "Gunakan email kampus Prasetiya Mulya untuk login Microsoft.",
+  microsoft_profile_not_found:
+    "Akun internal belum terdaftar. Hubungi admin untuk menyiapkan profil Anda.",
+  microsoft_missing_email:
+    "Akun Microsoft tidak mengembalikan alamat email yang valid.",
+  microsoft_not_configured:
+    "Login Microsoft belum dikonfigurasi pada server.",
+  microsoft_failed: "Login Microsoft gagal. Silakan coba lagi.",
+};
+
 export function useLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     username: "",
     password: "",
   });
   const [status, setStatus] = useState<LoginStatus>("idle");
+  const [microsoftStatus, setMicrosoftStatus] =
+    useState<MicrosoftLoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const authProvider = searchParams.get("auth_provider");
+    const authError = searchParams.get("auth_error");
+    if (authProvider !== "microsoft" || !authError) {
+      return;
+    }
+
+    clearTokens({ silent: true });
+    setStatus("error");
+    setErrorMessage(
+      MICROSOFT_AUTH_ERROR_MESSAGES[authError] ?? "Login Microsoft gagal.",
+    );
+    router.replace("/login");
+  }, [router, searchParams]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -96,11 +133,29 @@ export function useLogin() {
     }
   };
 
+  const handleMicrosoftLogin = async () => {
+    setErrorMessage("");
+    setMicrosoftStatus("submitting");
+
+    try {
+      clearTokens({ silent: true });
+      window.location.assign(API_AUTH_LOGIN_MICROSOFT);
+    } catch (error) {
+      clearTokens({ silent: true });
+      setStatus("error");
+      setMicrosoftStatus("idle");
+      setErrorMessage("Terjadi kesalahan jaringan. Coba lagi.");
+      console.error("Microsoft login error:", error);
+    }
+  };
+
   return {
     formData,
     status,
+    microsoftStatus,
     errorMessage,
     handleChange,
     handleSubmit,
+    handleMicrosoftLogin,
   };
 }

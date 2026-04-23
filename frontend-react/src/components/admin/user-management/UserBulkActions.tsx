@@ -48,7 +48,7 @@ export default function UserBulkActions({
             onClick={onDeleteSelected}
           >
             <Trash2 className="h-4 w-4" />
-            Hapus Terpilih
+            Hapus Akun/Profile
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -57,7 +57,7 @@ export default function UserBulkActions({
             className="text-xs text-slate-500"
           >
             <X className="h-3.5 w-3.5" />
-            Clear selection
+            Bersihkan pilihan
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

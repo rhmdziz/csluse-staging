@@ -8,7 +8,7 @@ from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -28,6 +28,7 @@ from .permissions import (
 from .serializers import (
     AdminActionSerializer,
     AdminDashboardKpisSerializer,
+    AdminProfileSerializer,
     LabClearanceSerializer,
     PicUserDropdownSerializer,
     PicUserSerializer,
@@ -48,11 +49,25 @@ class ProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     http_method_names = ["get", "patch"]
 
+    def _get_authenticated_user(self):
+        user = getattr(self.request, "user", None)
+        if not getattr(user, "is_authenticated", False) or getattr(user, "pk", None) is None:
+            raise NotAuthenticated("Autentikasi diperlukan.")
+        return user
+
     def get_queryset(self):
-        return Profile.objects.filter(user=self.request.user)
+        user = self._get_authenticated_user()
+        return Profile.objects.filter(user=user)
 
     def get_object(self):
-        profile, _ = Profile.objects.get_or_create(user=self.request.user)
+        user = self._get_authenticated_user()
+        profile, _ = Profile.objects.get_or_create(
+            user=user,
+            defaults={
+                "email": str(getattr(user, "email", "") or "").strip().lower(),
+                "user_type": "External",
+            },
+        )
         return profile
 
     def list(self, request, *args, **kwargs):
@@ -85,10 +100,73 @@ class MentorViewSet(viewsets.ViewSet):
 
 
 class AdminProfileViewSet(viewsets.ModelViewSet):
-    serializer_class = ProfileSerializer
+    serializer_class = AdminProfileSerializer
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
     queryset = Profile.objects.select_related("user").all()
-    http_method_names = ["get", "patch"]
+    pagination_class = DefaultPagination
+    http_method_names = ["get", "post", "patch", "delete"]
+
+    def get_queryset(self):
+        request = self.request
+        queryset = Profile.objects.select_related("user").all()
+
+        filters = {
+            "department__iexact": request.query_params.get("department"),
+            "role__iexact": request.query_params.get("role"),
+            "batch": request.query_params.get("batch"),
+            "user_type__iexact": request.query_params.get("user_type"),
+        }
+        filters = {key: value for key, value in filters.items() if value}
+        if filters:
+            queryset = queryset.filter(**filters)
+
+        has_user = request.query_params.get("has_user")
+        if has_user is not None:
+            normalized = str(has_user).strip().lower()
+            if normalized in {"true", "1", "yes"}:
+                queryset = queryset.filter(user__isnull=False)
+            elif normalized in {"false", "0", "no"}:
+                queryset = queryset.filter(user__isnull=True)
+
+        search_term = request.query_params.get("search") or request.query_params.get("q")
+        if search_term:
+            queryset = queryset.filter(
+                Q(full_name__icontains=search_term)
+                | Q(email__icontains=search_term)
+                | Q(id_number__icontains=search_term)
+            )
+
+        return queryset.order_by("full_name", "email", "pk")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        aggregates = {
+            "total": queryset.count(),
+            "student": queryset.filter(role__iexact="Student").count(),
+            "lecturer": queryset.filter(role__iexact="Lecturer").count(),
+            "admin": queryset.filter(role__iexact="Admin").count(),
+            "staff": queryset.filter(role__iexact="Staff").count(),
+            "guest": queryset.filter(role__iexact="Guest").count(),
+            "pre_provisioned": queryset.filter(user__isnull=True).count(),
+            "active": queryset.filter(user__isnull=False).count(),
+        }
+
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page if page is not None else queryset, many=True)
+        if page is not None:
+            response = self.get_paginated_response(serializer.data)
+            response.data["aggregates"] = aggregates
+            return response
+        return Response({"results": serializer.data, "aggregates": aggregates})
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_admin_action(
+            self.request.user,
+            instance,
+            CHANGE,
+            "Created pre-provisioned profile via CSL Admin (profile management).",
+        )
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -98,6 +176,17 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
             CHANGE,
             "Updated profile via CSL Admin (profile management).",
         )
+
+    def perform_destroy(self, instance):
+        if instance.user_id:
+            raise PermissionDenied("Profile yang sudah terhubung ke user tidak bisa dihapus dari sini.")
+        log_admin_action(
+            self.request.user,
+            instance,
+            DELETION,
+            "Deleted pre-provisioned profile via CSL Admin (profile management).",
+        )
+        instance.delete()
 
 
 # endregion Profile Viewsets
@@ -469,15 +558,29 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("-action_time")
         )
 
+    def _get_authenticated_user_id(self, request):
+        user = getattr(request, "user", None)
+        if not getattr(user, "is_authenticated", False):
+            return None
+        return getattr(user, "pk", None)
+
     @action(detail=False, methods=["get"], url_path="recent")
     def recent(self, request):
-        queryset = self.get_queryset().exclude(user=request.user)[:10]
+        user_id = self._get_authenticated_user_id(request)
+        queryset = self.get_queryset()
+        if user_id is not None:
+            queryset = queryset.exclude(user_id=user_id)
+        queryset = queryset[:10]
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=["get"], url_path="my")
     def my(self, request):
-        queryset = self.get_queryset().filter(user=request.user)[:10]
+        user_id = self._get_authenticated_user_id(request)
+        queryset = self.get_queryset()
+        if user_id is None:
+            return Response([])
+        queryset = queryset.filter(user_id=user_id)[:10]
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -555,9 +658,9 @@ class LabClearanceViewSet(viewsets.ViewSet):
 
         data = {
             "profile_id": profile.id,
-            "full_name": profile.full_name or profile.user.email,
+            "full_name": profile.full_name or profile.email,
             "id_number": profile.id_number,
-            "email": profile.user.email,
+            "email": profile.email,
             "department": profile.department,
             "batch": profile.batch,
             "role": profile.role,
