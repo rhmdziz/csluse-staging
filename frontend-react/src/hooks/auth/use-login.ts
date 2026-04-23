@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   API_AUTH_LOGIN,
-  API_AUTH_LOGIN_ROUTE,
+  API_AUTH_LOGIN_MICROSOFT,
   API_AUTH_USER_PROFILE,
 } from "@/constants/api";
 import { authFetch } from "@/lib/auth";
@@ -12,6 +12,7 @@ import {
 } from "@/hooks/shared/profile";
 
 type LoginStatus = "idle" | "submitting" | "success" | "error";
+type MicrosoftLoginStatus = "idle" | "submitting";
 
 type LoginFormData = {
   username: string;
@@ -27,19 +28,10 @@ type LoginResponse = {
   detail?: string;
 };
 
-type LoginRouteResponse = {
-  mode?: "local" | "microsoft";
-  authorization_url?: string;
-  detail?: string;
-  code?: string;
-};
-
 const MICROSOFT_AUTH_ERROR_MESSAGES: Record<string, string> = {
   microsoft_cancelled: "Login Microsoft dibatalkan.",
   microsoft_domain_invalid:
     "Gunakan email kampus Prasetiya Mulya untuk login Microsoft.",
-  microsoft_email_mismatch:
-    "Email Microsoft yang dipilih tidak sesuai dengan email yang Anda masukkan.",
   microsoft_missing_email:
     "Akun Microsoft tidak mengembalikan alamat email yang valid.",
   microsoft_not_configured:
@@ -55,6 +47,8 @@ export function useLogin() {
     password: "",
   });
   const [status, setStatus] = useState<LoginStatus>("idle");
+  const [microsoftStatus, setMicrosoftStatus] =
+    useState<MicrosoftLoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -82,37 +76,6 @@ export function useLogin() {
     setStatus("submitting");
 
     try {
-      const loginRouteResponse = await fetch(API_AUTH_LOGIN_ROUTE, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          email: formData.username,
-        }),
-      });
-
-      const loginRouteData =
-        (await loginRouteResponse.json().catch(() => ({}))) as LoginRouteResponse;
-
-      if (!loginRouteResponse.ok) {
-        setStatus("error");
-        setFormData({ username: "", password: "" });
-        setErrorMessage(
-          loginRouteData.detail || "Login gagal. Coba lagi beberapa saat lagi.",
-        );
-        return;
-      }
-
-      if (
-        loginRouteData.mode === "microsoft" &&
-        loginRouteData.authorization_url
-      ) {
-        window.location.assign(loginRouteData.authorization_url);
-        return;
-      }
-
       const response = await fetch(API_AUTH_LOGIN, {
         method: "POST",
         headers: {
@@ -166,11 +129,27 @@ export function useLogin() {
     }
   };
 
+  const handleMicrosoftLogin = async () => {
+    setErrorMessage("");
+    setMicrosoftStatus("submitting");
+
+    try {
+      window.location.assign(API_AUTH_LOGIN_MICROSOFT);
+    } catch (error) {
+      setStatus("error");
+      setMicrosoftStatus("idle");
+      setErrorMessage("Terjadi kesalahan jaringan. Coba lagi.");
+      console.error("Microsoft login error:", error);
+    }
+  };
+
   return {
     formData,
     status,
+    microsoftStatus,
     errorMessage,
     handleChange,
     handleSubmit,
+    handleMicrosoftLogin,
   };
 }

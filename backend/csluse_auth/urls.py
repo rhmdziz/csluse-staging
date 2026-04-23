@@ -5,9 +5,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     EmailVerificationStatusView,
-    LoginRouteView,
     MicrosoftOAuth2LoginStartView,
-    google_oauth2_callback,
     microsoft_oauth2_callback,
 )
 from .viewsets import (
@@ -25,11 +23,6 @@ router.register(r'user/profile', ProfileViewSet, basename='profile')
 
 urlpatterns = [
     path(
-        'login/route/',
-        LoginRouteView.as_view(),
-        name='login_route',
-    ),
-    path(
         'password/reset/confirm/<uidb64>/<token>/',
         password_reset_confirm_redirect,
         name='password_reset_confirm',
@@ -43,11 +36,6 @@ urlpatterns = [
         'oauth/microsoft/login/callback/',
         microsoft_oauth2_callback,
         name='microsoft_callback',
-    ),
-    path(
-        'oauth/google/login/callback/',
-        google_oauth2_callback,
-        name='google_callback',
     ),
     path(
         'registration/check-email/',

@@ -65,7 +65,6 @@ INSTALLED_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
-    "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.microsoft",
     "dj_rest_auth",
     "dj_rest_auth.registration",
@@ -188,15 +187,6 @@ LOGIN_REDIRECT_URL = os.getenv("LOGIN_REDIRECT_URL")
 LOGOUT_REDIRECT_URL = os.getenv("LOGOUT_REDIRECT_URL")
 
 SOCIALACCOUNT_PROVIDERS = {
-    "google": {
-        "SCOPE": [
-            "profile",
-            "email",
-        ],
-        "AUTH_PARAMS": {
-            "access_type": "online",
-        },
-    },
     "microsoft": {
         "SCOPE": [
             "User.Read",

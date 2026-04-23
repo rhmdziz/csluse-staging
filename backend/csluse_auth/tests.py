@@ -13,7 +13,6 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from csluse.models import Booking, Borrow, Equipment, Pengujian, Room
 from csluse_auth.adapters import (
-    MICROSOFT_EXPECTED_EMAIL_SESSION_KEY,
     CustomSocialAccountAdapter,
 )
 from csluse_auth.models import Profile
@@ -275,32 +274,6 @@ class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(profile_response.status_code, status.HTTP_200_OK)
         self.assertEqual(profile_response.data["email"], self.user.email)
 
-
-class LoginRouteViewTests(APITestCase):
-    def test_non_campus_email_uses_local_login(self):
-        response = self.client.post(
-            "/api/auth/login/route/",
-            {"email": "user@example.com"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"mode": "local"})
-
-    @patch("csluse_auth.views.is_microsoft_oauth_configured", return_value=True)
-    def test_campus_email_returns_microsoft_authorization_url(self, _configured):
-        response = self.client.post(
-            "/api/auth/login/route/",
-            {"email": "user@student.prasetiyamulya.ac.id"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["mode"], "microsoft")
-        self.assertIn("/api/auth/oauth/microsoft/login/", response.data["authorization_url"])
-        self.assertIn("email=user@student.prasetiyamulya.ac.id", response.data["authorization_url"])
-
-
 class MicrosoftSocialAccountAdapterTests(AuthBaseTestMixin, TestCase):
     def setUp(self):
         self.adapter = CustomSocialAccountAdapter()
@@ -319,7 +292,6 @@ class MicrosoftSocialAccountAdapterTests(AuthBaseTestMixin, TestCase):
         sociallogin.is_existing = False
         sociallogin.user.email = existing_user.email
         sociallogin.connect = MagicMock()
-        self.request.session[MICROSOFT_EXPECTED_EMAIL_SESSION_KEY] = existing_user.email
 
         self.adapter.pre_social_login(self.request, sociallogin)
 

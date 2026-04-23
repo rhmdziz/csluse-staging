@@ -17,7 +17,6 @@ from .models import Profile
 User = get_user_model()
 
 MICROSOFT_PROVIDER = "microsoft"
-MICROSOFT_EXPECTED_EMAIL_SESSION_KEY = "auth.microsoft.expected_email"
 MICROSOFT_LOGIN_ERROR_QUERY_KEY = "auth_error"
 MICROSOFT_LOGIN_PROVIDER_QUERY_KEY = "auth_provider"
 
@@ -140,14 +139,6 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
                 self._redirect_with_error(request, "microsoft_domain_invalid")
             )
 
-        expected_email = normalize_email(
-            request.session.get(MICROSOFT_EXPECTED_EMAIL_SESSION_KEY)
-        )
-        if expected_email and email != expected_email:
-            raise ImmediateHttpResponse(
-                self._redirect_with_error(request, "microsoft_email_mismatch")
-            )
-
         existing_user = User.objects.filter(email__iexact=email).first()
         if existing_user and not sociallogin.is_existing:
             sociallogin.connect(request, existing_user)
@@ -185,6 +176,4 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
         return user
 
     def _redirect_with_error(self, request, error_code):
-        request.session.pop(MICROSOFT_EXPECTED_EMAIL_SESSION_KEY, None)
-        request.session.modified = True
         return HttpResponseRedirect(build_frontend_auth_url(error=error_code))

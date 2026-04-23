@@ -1,6 +1,5 @@
 "use client";
 
-
 import type { ComponentPropsWithoutRef } from "react";
 
 import { useEffect, useState } from "react";
@@ -18,6 +17,7 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
+  FieldSeparator,
   Input,
 } from "@/components/ui";
 
@@ -28,8 +28,15 @@ import { cn } from "@/lib/core";
 type LoginFormProps = ComponentPropsWithoutRef<"form">;
 
 export default function LoginPage({ className, ...props }: LoginFormProps) {
-  const { formData, status, errorMessage, handleChange, handleSubmit } =
-    useLogin();
+  const {
+    formData,
+    status,
+    microsoftStatus,
+    errorMessage,
+    handleChange,
+    handleSubmit,
+    handleMicrosoftLogin,
+  } = useLogin();
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -60,7 +67,7 @@ export default function LoginPage({ className, ...props }: LoginFormProps) {
             id="username"
             name="username"
             type="email"
-            placeholder="nim@student.prasetiyamulya.ac.id"
+            placeholder="Masukkan email"
             className="placeholder:text-muted-foreground/50"
             required
             value={formData.username}
@@ -120,6 +127,34 @@ export default function LoginPage({ className, ...props }: LoginFormProps) {
               </>
             ) : (
               "Login"
+            )}
+          </Button>
+        </Field>
+
+        <FieldSeparator>Atau gunakan SSO kampus</FieldSeparator>
+
+        <Field>
+          <Button
+            type="button"
+            disabled={microsoftStatus === "submitting"}
+            onClick={handleMicrosoftLogin}
+            className="h-auto justify-center border border-solid border-[#8a8a8a] bg-white px-6 py-2 text-left text-[14px] font-normal text-[#5e5e5e] shadow-none hover:bg-[#f7f7f7] hover:text-[#4f4f4f] disabled:bg-white disabled:text-[#5e5e5e]"
+          >
+            {microsoftStatus === "submitting" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <span className="mr-5 grid h-5 w-5 grid-cols-2 gap-[2px] shrink-0">
+                  <span className="bg-[#f25022]" />
+                  <span className="bg-[#7fba00]" />
+                  <span className="bg-[#00a4ef]" />
+                  <span className="bg-[#ffb900]" />
+                </span>
+                <span>Sign in with Microsoft</span>
+              </>
             )}
           </Button>
         </Field>

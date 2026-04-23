@@ -5,16 +5,9 @@ export type LoginPayload = {
   password: string;
 };
 
-export type LoginRoutePayload = {
-  email: string;
-};
-
 export const authService = {
   login(payload: LoginPayload) {
     return http.post("/api/auth/login/", payload);
-  },
-  loginRoute(payload: LoginRoutePayload) {
-    return http.post("/api/auth/login/route/", payload);
   },
   logout() {
     return http.get("/api/auth/logout/");
