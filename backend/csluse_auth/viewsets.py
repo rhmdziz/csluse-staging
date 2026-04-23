@@ -59,16 +59,6 @@ class ProfileViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(self.get_object())
         return Response(serializer.data)
 
-    @action(detail=False, methods=["get"], url_path="mentor-dropdown")
-    def mentor_dropdown(self, request):
-        queryset = (
-            User.objects.select_related("profile")
-            .filter(profile__role__iexact="Lecturer", profile__is_mentor=True)
-            .order_by("profile__full_name", "email")
-        )
-        serializer = PicUserDropdownSerializer(queryset, many=True)
-        return Response(serializer.data)
-
     def perform_update(self, serializer):
         instance = serializer.save()
         log_admin_action(
@@ -77,6 +67,21 @@ class ProfileViewSet(viewsets.ModelViewSet):
             CHANGE,
             "Updated own profile via CSL Admin (my profile).",
         )
+
+
+class MentorViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get"]
+
+    @action(detail=False, methods=["get"], url_path="dropdown")
+    def dropdown(self, request):
+        queryset = (
+            User.objects.select_related("profile")
+            .filter(profile__role__iexact="Lecturer", profile__is_mentor=True)
+            .order_by("profile__full_name", "email")
+        )
+        serializer = PicUserDropdownSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class AdminProfileViewSet(viewsets.ModelViewSet):
@@ -483,14 +488,13 @@ def _status_breakdown(model):
 
 
 class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AdminDashboardKpisSerializer
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
     http_method_names = ["get"]
     queryset = Profile.objects.none()
 
-    @extend_schema(responses=AdminDashboardKpisSerializer)
-    @action(detail=False, methods=["get"], url_path="kpis")
-    def kpis(self, request):
-        data = {
+    def _build_dashboard_data(self):
+        return {
             "total_users": User.objects.count(),
             "total_rooms": Room.objects.count(),
             "total_equipments": Equipment.objects.count(),
@@ -507,7 +511,10 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             "borrows_by_status": _status_breakdown(Borrow),
             "pengujians_by_status": _status_breakdown(Pengujian),
         }
-        return Response(data)
+
+    def list(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self._build_dashboard_data())
+        return Response(serializer.data)
 
 
 # endregion Admin Monitoring Viewsets

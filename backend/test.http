@@ -1,0 +1,394 @@
+### =========================================
+### CSLUSE role-based API permission test
+### Fokus: cek permission per role, bukan semua endpoint.
+### Urutan akun:
+### 1. student.test@gmail.com
+### 2. lecturer.test@gmail.com
+### 3. staff.test@gmail.com
+### 4. admin.test@gmail.com
+### 5. guest.test@gmail.com
+### =========================================
+
+@baseUrl = http://127.0.0.1:8000
+@apiUrl = {{baseUrl}}/api
+@authUrl = {{apiUrl}}/auth
+@adminUrl = {{apiUrl}}/admin
+
+@studentEmail = student.test@gmail.com
+@studentPassword = student.test
+
+@lecturerEmail = lecturer.test@gmail.com
+@lecturerPassword = lecturer.test
+
+@staffEmail = staff.test@gmail.com
+@staffPassword = staff.test
+
+@adminEmail = admin.test@gmail.com
+@adminPassword = admin.test
+
+@guestEmail = guest.test@gmail.com
+@guestPassword = guest.test
+
+@profileId = dd6af664-08db-4cc1-bf69-e7ed5e839e1e
+@bookingId = 862d79e7-c464-45dc-a1e5-4e410d6c41fe
+@borrowId = 673a5a37-7c1d-421b-8338-3282203dd66b
+@pengujianId = c6529189-d8bf-4fa8-9844-006ff82bf001
+@suratBebasLabId = 5c600fb6-f033-4829-adee-469018f3fc59
+@userId = 14
+@month = 2026-05
+
+### -----------------------------------------
+### Reference permission targets
+### -----------------------------------------
+### Public/basic authenticated:
+### - GET /api/auth/user/profile/
+### - GET /api/bookings/my/
+###
+### Lecturer or above:
+### - GET /api/users/mentors/dropdown/
+###
+### Staff or above:
+### - POST /api/images/
+### - GET /api/admin/pic-users/
+###
+### Administrator or above:
+### - GET /api/admin/users/
+### - GET /api/bookings/all/
+### - GET /api/borrows/all/
+### - GET /api/pengujians/all/
+### - POST /api/surat-bebas-lab/{id}/approve/
+###
+### -----------------------------------------
+
+
+### =========================================
+### STUDENT
+### Akun: student.test@gmail.com / student.test
+### Expected:
+### - own profile: 200
+### - own booking/borrow/pengujian: 200
+### - mentor dropdown: 200
+### - admin area: 403
+### - approval all scope: 403
+### =========================================
+
+### Student login
+POST {{authUrl}}/login/
+Content-Type: application/json
+
+{
+  "username": "{{studentEmail}}",
+  "password": "{{studentPassword}}"
+}
+
+> {% client.global.set("studentAccess", response.body.access); %}
+
+### Student - own profile
+GET {{authUrl}}/user/profile/
+Authorization: Bearer {{studentAccess}}
+
+### Student - mentor dropdown
+GET {{apiUrl}}/users/mentors/dropdown/
+Authorization: Bearer {{studentAccess}}
+
+### Student - booking my
+GET {{apiUrl}}/bookings/my/
+Authorization: Bearer {{studentAccess}}
+
+### Student - borrow my
+GET {{apiUrl}}/borrows/my/
+Authorization: Bearer {{studentAccess}}
+
+### Student - pengujian my
+GET {{apiUrl}}/pengujians/my/
+Authorization: Bearer {{studentAccess}}
+
+### Student - surat bebas lab my
+GET {{apiUrl}}/surat-bebas-lab/my/
+Authorization: Bearer {{studentAccess}}
+
+### Student - should be forbidden: admin users
+GET {{adminUrl}}/users/
+Authorization: Bearer {{studentAccess}}
+
+### Student - should be forbidden: booking all
+GET {{apiUrl}}/bookings/all/
+Authorization: Bearer {{studentAccess}}
+
+### Student - should be forbidden: borrow all
+GET {{apiUrl}}/borrows/all/
+Authorization: Bearer {{studentAccess}}
+
+### Student - should be forbidden: pengujian all
+GET {{apiUrl}}/pengujians/all/
+Authorization: Bearer {{studentAccess}}
+
+### Student - should be forbidden: admin approve surat bebas lab
+POST {{apiUrl}}/surat-bebas-lab/{{suratBebasLabId}}/approve/
+Authorization: Bearer {{studentAccess}}
+
+
+### =========================================
+### LECTURER
+### Akun: lecturer.test@gmail.com / lecturer.test
+### Expected:
+### - own/basic endpoint: 200
+### - mentor dropdown: 200
+### - admin users: 403
+### - admin PIC list: 403
+### - booking/borrow/pengujian all: tergantung reviewer role, umumnya 403 kecuali memang assigned reviewer
+### =========================================
+
+### Lecturer login
+POST {{authUrl}}/login/
+Content-Type: application/json
+
+{
+  "username": "{{lecturerEmail}}",
+  "password": "{{lecturerPassword}}"
+}
+
+> {% client.global.set("lecturerAccess", response.body.access); %}
+
+### Lecturer - own profile
+GET {{authUrl}}/user/profile/
+Authorization: Bearer {{lecturerAccess}}
+
+### Lecturer - mentor dropdown
+GET {{apiUrl}}/users/mentors/dropdown/
+Authorization: Bearer {{lecturerAccess}}
+
+### Lecturer - booking my
+GET {{apiUrl}}/bookings/my/
+Authorization: Bearer {{lecturerAccess}}
+
+### Lecturer - should usually be forbidden: admin users
+GET {{adminUrl}}/users/
+Authorization: Bearer {{lecturerAccess}}
+
+### Lecturer - should usually be forbidden: PIC users
+GET {{adminUrl}}/pic-users/
+Authorization: Bearer {{lecturerAccess}}
+
+### Lecturer - booking review check on assigned item only
+GET {{apiUrl}}/bookings/{{bookingId}}/review-check/
+Authorization: Bearer {{lecturerAccess}}
+
+### Lecturer - borrow review check on assigned item only
+GET {{apiUrl}}/borrows/{{borrowId}}/review-check/
+Authorization: Bearer {{lecturerAccess}}
+
+
+### =========================================
+### STAFF
+### Akun: staff.test@gmail.com / staff.test
+### Expected:
+### - own/basic endpoint: 200
+### - staff-or-above endpoint: 200
+### - admin users: 403
+### - booking/borrow/pengujian all: bisa 403 bila bukan admin scope
+### =========================================
+
+### Staff login
+POST {{authUrl}}/login/
+Content-Type: application/json
+
+{
+  "username": "{{staffEmail}}",
+  "password": "{{staffPassword}}"
+}
+
+> {% client.global.set("staffAccess", response.body.access); %}
+
+### Staff - own profile
+GET {{authUrl}}/user/profile/
+Authorization: Bearer {{staffAccess}}
+
+### Staff - PIC users list
+GET {{adminUrl}}/pic-users/
+Authorization: Bearer {{staffAccess}}
+
+### Staff - PIC users dropdown
+GET {{adminUrl}}/pic-users/dropdown/
+Authorization: Bearer {{staffAccess}}
+
+### Staff - admin actions my
+GET {{adminUrl}}/actions/my/
+Authorization: Bearer {{staffAccess}}
+
+### Staff - should be forbidden: admin users
+GET {{adminUrl}}/users/
+Authorization: Bearer {{staffAccess}}
+
+### Staff - should be forbidden: admin dashboard
+GET {{adminUrl}}/dashboard/
+Authorization: Bearer {{staffAccess}}
+
+
+### =========================================
+### ADMINISTRATOR
+### Akun: admin.test@gmail.com / admin.test
+### Expected:
+### - own/basic endpoint: 200
+### - admin users/dashboard/actions: 200
+### - booking/borrow/pengujian all: 200
+### - surat bebas lab approve/reject: 200 jika data valid
+### =========================================
+
+### Admin login
+POST {{authUrl}}/login/
+Content-Type: application/json
+
+{
+  "username": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {% client.global.set("adminAccess", response.body.access); %}
+
+### Admin - own profile
+GET {{authUrl}}/user/profile/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - admin users
+GET {{adminUrl}}/users/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - admin actions
+GET {{adminUrl}}/actions/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - admin actions recent
+GET {{adminUrl}}/actions/recent/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - admin dashboard
+GET {{adminUrl}}/dashboard/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - booking all
+GET {{apiUrl}}/bookings/all/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - booking requesters
+GET {{apiUrl}}/bookings/all/requesters/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - booking export
+GET {{apiUrl}}/bookings/all/export/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - borrow all
+GET {{apiUrl}}/borrows/all/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - borrow requesters
+GET {{apiUrl}}/borrows/all/requesters/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - borrow export
+GET {{apiUrl}}/borrows/all/export/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - pengujian all
+GET {{apiUrl}}/pengujians/all/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - pengujian requesters
+GET {{apiUrl}}/pengujians/all/requesters/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - pengujian export
+GET {{apiUrl}}/pengujians/all/export/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - pengujian all documents
+GET {{apiUrl}}/pengujians/all/documents/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - surat bebas lab all
+GET {{apiUrl}}/surat-bebas-lab/all/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - surat bebas lab approve
+POST {{apiUrl}}/surat-bebas-lab/{{suratBebasLabId}}/approve/
+Authorization: Bearer {{adminAccess}}
+
+### Admin - surat bebas lab reject
+POST {{apiUrl}}/surat-bebas-lab/{{suratBebasLabId}}/reject/
+Authorization: Bearer {{adminAccess}}
+Content-Type: application/json
+
+{
+  "note": "Rejected from admin role test"
+}
+
+### Admin - lab clearance check
+GET {{adminUrl}}/lab-clearance/check/?user_id={{userId}}
+Authorization: Bearer {{adminAccess}}
+
+
+### =========================================
+### GUEST
+### Akun: guest.test@gmail.com / guest.test
+### Expected:
+### - own/basic endpoint: 200
+### - admin area: 403
+### - approval all scope: 403
+### =========================================
+
+### Guest login
+POST {{authUrl}}/login/
+Content-Type: application/json
+
+{
+  "username": "{{guestEmail}}",
+  "password": "{{guestPassword}}"
+}
+
+> {% client.global.set("guestAccess", response.body.access); %}
+
+### Guest - own profile
+GET {{authUrl}}/user/profile/
+Authorization: Bearer {{guestAccess}}
+
+### Guest - booking my
+GET {{apiUrl}}/bookings/my/
+Authorization: Bearer {{guestAccess}}
+
+### Guest - borrow my
+GET {{apiUrl}}/borrows/my/
+Authorization: Bearer {{guestAccess}}
+
+### Guest - should be forbidden: admin users
+GET {{adminUrl}}/users/
+Authorization: Bearer {{guestAccess}}
+
+### Guest - should be forbidden: PIC users
+GET {{adminUrl}}/pic-users/
+Authorization: Bearer {{guestAccess}}
+
+### Guest - should be forbidden: booking all
+GET {{apiUrl}}/bookings/all/
+Authorization: Bearer {{guestAccess}}
+
+
+### =========================================
+### Optional cross-check helpers
+### =========================================
+
+### Admin - booking by month
+GET {{apiUrl}}/bookings/by-month/?month={{month}}&status=Approved
+Authorization: Bearer {{adminAccess}}
+
+### Admin - borrow by month
+GET {{apiUrl}}/borrows/by-month/?month={{month}}&status=Approved
+Authorization: Bearer {{adminAccess}}
+
+### Student - should be forbidden: admin profile list
+GET {{adminUrl}}/profile/
+Authorization: Bearer {{studentAccess}}
+
+### Staff - should be forbidden: surat bebas lab approve
+POST {{apiUrl}}/surat-bebas-lab/{{suratBebasLabId}}/approve/
+Authorization: Bearer {{staffAccess}}

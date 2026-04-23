@@ -6,5 +6,6 @@ db.sqlite3
 .DS_Store
 .env
 .env.prod
-
-# /frontend/*
+.idea
+.claude/
+.pycache/

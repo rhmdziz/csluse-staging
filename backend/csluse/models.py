@@ -443,7 +443,8 @@ class SuratBebasLab(BaseModel):
         return f"{self.code} - {self.requested_by}"
 
 
-class SuratBebasLabBookingHistory(BaseModel):
+class SuratBebasLabBookingHistory(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
     surat_bebas_lab = models.ForeignKey(
         SuratBebasLab,
         on_delete=models.CASCADE,

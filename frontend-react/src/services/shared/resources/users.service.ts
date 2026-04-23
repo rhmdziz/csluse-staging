@@ -1,7 +1,6 @@
 import {
   API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN,
   API_AUTH_ADMIN_PROFILE_DETAIL,
-  API_AUTH_MENTOR_USERS_DROPDOWN,
   API_AUTH_PIC_USERS,
   API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS,
   API_AUTH_PIC_USERS_DROPDOWN,
@@ -9,6 +8,7 @@ import {
   API_AUTH_REGISTER,
   API_AUTH_USERS,
   API_AUTH_USERS_BULK_DELETE,
+  API_USERS_MENTORS_DROPDOWN,
 } from "@/constants/api";
 import { normalizeRoleValue } from "@/constants/roles";
 import { authFetch } from "@/lib/auth";
@@ -323,7 +323,7 @@ export const usersService = {
   },
 
   async getMentorOptions(signal?: AbortSignal) {
-    const response = await authFetch(API_AUTH_MENTOR_USERS_DROPDOWN, {
+    const response = await authFetch(API_USERS_MENTORS_DROPDOWN, {
       method: "GET",
       signal,
     });

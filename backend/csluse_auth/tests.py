@@ -426,7 +426,7 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
         )
 
     def test_admin_dashboard_kpis_include_pengujian_totals(self):
-        response = self.client.get("/api/admin/dashboard/kpis/")
+        response = self.client.get("/api/admin/dashboard/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["total_rooms"], 1)
