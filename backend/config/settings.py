@@ -276,12 +276,23 @@ CSRF_TRUSTED_ORIGINS = [
 # region Database Settings
 
 
+# DATABASES = {
+#     "default": dj_database_url.config(
+#         default=os.getenv("DATABASE_URL"),
+#         conn_max_age=600,
+#         conn_health_checks=True,
+#     )
+# }
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "csluse_db",
+        "USER": "csluser",
+        "PASSWORD": "strongpassword",
+        "HOST": "db",
+        "PORT": "5432",
+    }
 }
 
 

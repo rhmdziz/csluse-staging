@@ -18,3 +18,19 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  db:
+    image: postgres:13
+    container_name: postgres13
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: csluse_db
+      POSTGRES_USER: csluser
+      POSTGRES_PASSWORD: strongpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

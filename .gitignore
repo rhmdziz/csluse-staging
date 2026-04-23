@@ -10,3 +10,4 @@ db.sqlite3
 # /frontend/*
 .idea/
 .claude/
+db/

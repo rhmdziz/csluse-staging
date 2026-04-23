@@ -1,3 +1,5 @@
+import sys
+
 from django.contrib.auth import get_user_model
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
@@ -66,7 +68,7 @@ def _pick_user_group_role(user):
 
 @receiver(post_save, sender=User)
 def create_profile_for_new_user(sender, instance, created, **kwargs):
-    if not created:
+    if not created or "loaddata" in sys.argv:
         return
 
     email = str(getattr(instance, "email", "") or "").strip().lower()
@@ -132,7 +134,7 @@ def sync_profile_role_to_group(sender, instance, **kwargs):
 @receiver(m2m_changed, sender=User.groups.through)
 def sync_group_to_profile_role(sender, instance, action, **kwargs):
     """Keep Profile.role in sync when Django auth groups are edited directly."""
-    if action not in {"post_add", "post_remove", "post_clear"}:
+    if action not in {"post_add", "post_remove", "post_clear"} or "loaddata" in sys.argv:
         return
 
     profile, _ = Profile.objects.get_or_create(

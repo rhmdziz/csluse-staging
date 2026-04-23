@@ -1,4 +1,5 @@
 from datetime import timedelta
+import sys
 
 from django.db.models.signals import m2m_changed, post_delete, pre_save
 from django.dispatch import receiver
@@ -14,6 +15,8 @@ from csluse_auth.permissions import (
 
 from .models import Image, Booking, BookingEquipmentItem, Borrow, Room, Pengujian
 
+def is_loaddata():
+    return 'loaddata' in sys.argv
 
 def validate_start_not_in_past(start_time, label="start time"):
     if not start_time:
