@@ -139,6 +139,12 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
                 self._redirect_with_error(request, "microsoft_domain_invalid")
             )
 
+        existing_profile = Profile.objects.filter(email__iexact=email).first()
+        if existing_profile is None:
+            raise ImmediateHttpResponse(
+                self._redirect_with_error(request, "microsoft_profile_not_found")
+            )
+
         existing_user = User.objects.filter(email__iexact=email).first()
         if existing_user and not sociallogin.is_existing:
             sociallogin.connect(request, existing_user)
@@ -155,6 +161,12 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
             return user
 
         email = normalize_email(user.email)
+        profile = Profile.objects.filter(email__iexact=email).first()
+        if profile is None:
+            raise ImmediateHttpResponse(
+                self._redirect_with_error(request, "microsoft_profile_not_found")
+            )
+
         if email:
             email_address, _ = EmailAddress.objects.get_or_create(
                 user=user,
@@ -166,13 +178,10 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
                 email_address.primary = True
                 email_address.save(update_fields=["verified", "primary"])
 
-        profile, _ = Profile.objects.update_or_create(
-            user=user,
-            defaults={"user_type": "Internal", "role": "Guest"},
-        )
-        if hasattr(user, "profile"):
-            user.profile.user_type = profile.user_type
-            user.profile.role = profile.role
+        profile.user = user
+        profile.email = email
+        profile.user_type = "Internal"
+        profile.save(update_fields=["user", "email", "user_type", "updated_at"])
         return user
 
     def _redirect_with_error(self, request, error_code):

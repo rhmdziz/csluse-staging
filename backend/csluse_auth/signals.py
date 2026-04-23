@@ -69,24 +69,52 @@ def create_profile_for_new_user(sender, instance, created, **kwargs):
     if not created:
         return
 
+    email = str(getattr(instance, "email", "") or "").strip().lower()
     full_name = f"{instance.first_name} {instance.last_name}".strip()
-    
+
+    profile = None
+    if email:
+        profile = (
+            Profile.objects.filter(user__isnull=True, email__iexact=email)
+            .order_by("created_at")
+            .first()
+        )
+
+    if profile is not None:
+        profile.user = instance
+        if full_name and not profile.full_name:
+            profile.full_name = full_name
+        if not profile.email:
+            profile.email = email
+        profile.save()
+        return
+
     profile, profile_created = Profile.objects.get_or_create(
         user=instance,
         defaults={
+            "email": email,
             **({"full_name": full_name} if full_name else {}),
             "user_type": "External",
         },
     )
-    
+
+    updated_fields = []
+    if email and profile.email != email:
+        profile.email = email
+        updated_fields.append("email")
     if not profile_created and not profile.full_name and full_name:
         profile.full_name = full_name
-        profile.save()
+        updated_fields.append("full_name")
+    if updated_fields:
+        profile.save(update_fields=updated_fields)
 
 
 @receiver(post_save, sender=Profile)
 def sync_profile_role_to_group(sender, instance, **kwargs):
     """Keep Django auth groups in sync with Profile.role."""
+    if instance.user is None:
+        return
+
     role_value = instance.role
     if not role_value:
         # If role is cleared, remove role groups to keep both sources consistent.
@@ -109,8 +137,16 @@ def sync_group_to_profile_role(sender, instance, action, **kwargs):
 
     profile, _ = Profile.objects.get_or_create(
         user=instance,
-        defaults={"user_type": "External"},
+        defaults={
+            "email": str(getattr(instance, "email", "") or "").strip().lower(),
+            "user_type": "External",
+        },
     )
+    if getattr(instance, "email", None):
+        next_email = str(instance.email).strip().lower()
+        if profile.email != next_email:
+            Profile.objects.filter(pk=profile.pk).update(email=next_email)
+            profile.email = next_email
 
     selected_group_role = _pick_user_group_role(instance)
 

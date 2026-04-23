@@ -10,6 +10,7 @@ import {
   buildProfileFromApiResponse,
   persistProfileCache,
 } from "@/hooks/shared/profile";
+import { clearTokens } from "@/lib/auth";
 
 type LoginStatus = "idle" | "submitting" | "success" | "error";
 type MicrosoftLoginStatus = "idle" | "submitting";
@@ -32,6 +33,8 @@ const MICROSOFT_AUTH_ERROR_MESSAGES: Record<string, string> = {
   microsoft_cancelled: "Login Microsoft dibatalkan.",
   microsoft_domain_invalid:
     "Gunakan email kampus Prasetiya Mulya untuk login Microsoft.",
+  microsoft_profile_not_found:
+    "Akun internal belum terdaftar. Hubungi admin untuk menyiapkan profil Anda.",
   microsoft_missing_email:
     "Akun Microsoft tidak mengembalikan alamat email yang valid.",
   microsoft_not_configured:
@@ -58,6 +61,7 @@ export function useLogin() {
       return;
     }
 
+    clearTokens({ silent: true });
     setStatus("error");
     setErrorMessage(
       MICROSOFT_AUTH_ERROR_MESSAGES[authError] ?? "Login Microsoft gagal.",
@@ -134,8 +138,10 @@ export function useLogin() {
     setMicrosoftStatus("submitting");
 
     try {
+      clearTokens({ silent: true });
       window.location.assign(API_AUTH_LOGIN_MICROSOFT);
     } catch (error) {
+      clearTokens({ silent: true });
       setStatus("error");
       setMicrosoftStatus("idle");
       setErrorMessage("Terjadi kesalahan jaringan. Coba lagi.");

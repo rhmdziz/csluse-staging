@@ -138,7 +138,7 @@ export default function LoginPage({ className, ...props }: LoginFormProps) {
             type="button"
             disabled={microsoftStatus === "submitting"}
             onClick={handleMicrosoftLogin}
-            className="h-auto justify-center border border-solid border-[#8a8a8a] bg-white px-6 py-2 text-left text-[14px] font-normal text-[#5e5e5e] shadow-none hover:bg-[#f7f7f7] hover:text-[#4f4f4f] disabled:bg-white disabled:text-[#5e5e5e]"
+            className="h-auto justify-center rounded-none border border-solid border-[#8a8a8a] bg-white px-6 py-2 text-left text-[14px] font-normal text-[#5e5e5e] shadow-none hover:bg-[#f7f7f7] hover:text-[#4f4f4f] disabled:bg-white disabled:text-[#5e5e5e]"
           >
             {microsoftStatus === "submitting" ? (
               <>

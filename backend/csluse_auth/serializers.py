@@ -27,6 +27,10 @@ ROLE_NORMALIZATION_MAP = {
 ROLE_WITH_DEPARTMENT = {"Student", "Lecturer"}
 ROLE_WITH_BATCH = {"Student"}
 ROLE_WITH_ID_NUMBER = {"Student", "Lecturer", "Staff", "Admin"}
+USER_TYPE_NORMALIZATION_MAP = {
+    "INTERNAL": "Internal",
+    "EXTERNAL": "External",
+}
 
 
 # region Authentication Serializers
@@ -234,7 +238,7 @@ class CustomRegisterSerializer(RegisterSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
-    email = serializers.EmailField(source="user.email", read_only=True)
+    email = serializers.EmailField(read_only=True)
     last_login = serializers.DateTimeField(source="user.last_login", read_only=True)
     initials = serializers.CharField(required=False, allow_blank=True, max_length=3)
     role = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -270,6 +274,17 @@ class ProfileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Role tidak valid.")
         return value
 
+    def validate_user_type(self, value):
+        if value in (None, ""):
+            return None if value == "" else value
+        normalized = USER_TYPE_NORMALIZATION_MAP.get(str(value).strip().upper())
+        if normalized:
+            return normalized
+        valid_user_types = {choice[0] for choice in Profile.USER_TYPE_CHOICES}
+        if value not in valid_user_types:
+            raise serializers.ValidationError("User type tidak valid.")
+        return value
+
     def validate_initials(self, value):
         return Profile.normalize_initials(value)
 
@@ -292,6 +307,14 @@ class ProfileSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         return _apply_role_field_rules(attrs, instance=self.instance)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        user_type = data.get("user_type")
+        normalized_user_type = USER_TYPE_NORMALIZATION_MAP.get(str(user_type or "").strip().upper())
+        if normalized_user_type:
+            data["user_type"] = normalized_user_type
+        return data
 
 
 class RoomPicDetailSerializer(serializers.ModelSerializer):
@@ -337,6 +360,47 @@ class UserBulkDeleteSerializer(serializers.Serializer):
 
 
 # endregion Profile Serializers
+
+
+class AdminProfileSerializer(ProfileSerializer):
+    email = serializers.EmailField()
+    user_id = serializers.IntegerField(read_only=True, allow_null=True)
+    has_user = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta(ProfileSerializer.Meta):
+        fields = ProfileSerializer.Meta.fields + ("user_id", "has_user", "status")
+        read_only_fields = ("id", "user_id", "has_user", "status")
+
+    def validate_email(self, value):
+        normalized = str(value or "").strip().lower()
+        queryset = Profile.objects.filter(email__iexact=normalized)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("Email profile sudah digunakan.")
+        return normalized
+
+    def create(self, validated_data):
+        return Profile.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        email = validated_data.get("email")
+        user = getattr(instance, "user", None)
+        if email and user is not None and user.email != email:
+            user.email = email
+            update_fields = ["email"]
+            if not user.username:
+                user.username = _generate_unique_username(email.split("@")[0])
+                update_fields.append("username")
+            user.save(update_fields=update_fields)
+        return super().update(instance, validated_data)
+
+    def get_has_user(self, obj):
+        return bool(getattr(obj, "user_id", None))
+
+    def get_status(self, obj):
+        return "active" if getattr(obj, "user_id", None) else "pre_provisioned"
 
 
 # region PIC Serializers

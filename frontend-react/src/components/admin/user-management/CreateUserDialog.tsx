@@ -22,6 +22,7 @@ import { useCreateUser } from "@/hooks/shared/resources/users";
 import {
   createEmptyUserForm,
   getVisibleUserFields,
+  toCreateProfilePayload,
   toCreateUserPayload,
   USER_MODAL_WIDTH_CLASS,
 } from "@/components/admin/user-management";
@@ -49,9 +50,10 @@ export default function CreateUserDialog({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [form, setForm] = useState(() => createEmptyUserForm(normalizedRoleParam));
-  const { createUser, isSubmitting, errorMessage, setErrorMessage } = useCreateUser();
+  const { createUser, createProfile, isSubmitting, errorMessage, setErrorMessage } = useCreateUser();
 
   const visibleFields = getVisibleUserFields(form.role);
+  const isGuestRole = form.role === ROLE_VALUES.GUEST;
 
   const resetState = () => {
     setShowPassword(false);
@@ -67,15 +69,21 @@ export default function CreateUserDialog({
 
     if (!form.full_name.trim()) return setErrorMessage("Nama wajib diisi.");
     if (!email.trim()) return setErrorMessage("Email wajib diisi.");
-    if (!password) return setErrorMessage("Password wajib diisi.");
+    if (isGuestRole && !password) return setErrorMessage("Password wajib diisi.");
 
-    const result = await createUser(toCreateUserPayload({ email, password, form }) as never);
+    const result = isGuestRole
+      ? await createUser(toCreateUserPayload({ email, password, form }) as never)
+      : await createProfile(toCreateProfilePayload({ email, form }) as never);
     if (!result.ok) return;
 
     onCreated();
     onOpenChange(false);
     resetState();
-    toast.success("User berhasil dibuat.");
+    toast.success(
+      isGuestRole
+        ? "User berhasil dibuat."
+        : "Profile internal berhasil dibuat. User akan terhubung saat login Microsoft pertama.",
+    );
   };
 
   return (
@@ -83,8 +91,12 @@ export default function CreateUserDialog({
       open={open}
       onOpenChange={onOpenChange}
       onCloseReset={resetState}
-      title="Buat User"
-      description="Tambahkan user baru dan lengkapi informasi akun yang dibutuhkan."
+      title={isGuestRole ? "Buat User" : "Buat Profile Internal"}
+      description={
+        isGuestRole
+          ? "Tambahkan user baru dan lengkapi informasi akun yang dibutuhkan."
+          : "Siapkan profile internal terlebih dahulu. User akan dibuat saat login Microsoft pertama."
+      }
       icon={<UserPlus className="h-5 w-5" />}
       contentClassName={`${USER_MODAL_WIDTH_CLASS} gap-0 p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
     >
@@ -124,27 +136,29 @@ export default function CreateUserDialog({
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium">Password</label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Minimal 8 karakter"
-                  className="border-sky-300 bg-sky-50/60 pr-10 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+            {isGuestRole ? (
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Password</label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Minimal 8 karakter"
+                    className="border-sky-300 bg-sky-50/60 pr-10 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="space-y-1">
               <label className="text-xs font-medium">Role</label>
@@ -245,7 +259,7 @@ export default function CreateUserDialog({
           </Button>
           <Button type="submit" disabled={isSubmitting} className="gap-2">
             <UserPlus className="h-4 w-4" />
-            {isSubmitting ? "Menyimpan..." : "Buat User"}
+            {isSubmitting ? "Menyimpan..." : isGuestRole ? "Buat User" : "Buat Profile"}
           </Button>
         </DialogFooter>
       </form>

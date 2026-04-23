@@ -6,6 +6,7 @@ from .models import Profile
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
     list_display = (
+        "email",
         "user",
         "full_name",
         "initials",
@@ -16,12 +17,14 @@ class ProfileAdmin(admin.ModelAdmin):
         "department",
         "batch",
     )
-    search_fields = ("user__email", "full_name", "initials", "id_number", "institution")
+    search_fields = ("email", "user__email", "full_name", "initials", "id_number", "institution")
     list_filter = ("role", "user_type", "department", "batch")
     readonly_fields = ("user_groups",)
 
     def user_groups(self, obj):
         """Show Django auth groups attached to the user."""
+        if obj.user is None:
+            return "-"
         return ", ".join(obj.user.groups.values_list("name", flat=True))
 
     user_groups.short_description = "Groups"

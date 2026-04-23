@@ -33,7 +33,7 @@ import {
 
 import { Button, Input } from "@/components/ui";
 
-import { API_AUTH_USERS_EXPORT } from "@/constants/api";
+import { API_AUTH_ADMIN_PROFILE } from "@/constants/api";
 
 import { BATCH_OPTIONS } from "@/constants/batches";
 
@@ -47,7 +47,7 @@ import { useLoadProfile } from "@/hooks/shared/profile";
 
 import { useUserManagementActions } from "@/hooks/shared/resources/users";
 
-import { mapUser, useUsers } from "@/hooks/shared/resources/users";
+import { mapProfile, useUsers } from "@/hooks/shared/resources/users";
 
 import { USER_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
@@ -55,6 +55,7 @@ type FiltersState = {
   department: string;
   role: string;
   batch: string;
+  status: string;
 };
 
 const PAGE_SIZE = 20;
@@ -71,12 +72,12 @@ type UserManagementContentProps = {
 
 export default function UserManagementContent({
   forcedRole,
-  title = "User Management",
+  title = "Akun dan Profile",
   description,
   showExportActions = true,
   showImportButton = true,
   showCreateButton = true,
-  createButtonLabel = "Buat User",
+  createButtonLabel = "Tambah Akun/Profile",
 }: UserManagementContentProps) {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const searchParams = useSearchParams();
@@ -93,6 +94,7 @@ export default function UserManagementContent({
     department: "",
     role: "",
     batch: "",
+    status: "",
   });
   const [reloadKey, setReloadKey] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -103,6 +105,12 @@ export default function UserManagementContent({
     () => ({
       ...filters,
       role: roleParam ? normalizeRoleValue(roleParam) : filters.role,
+      hasUser:
+        filters.status === "active"
+          ? true
+          : filters.status === "pre_provisioned"
+            ? false
+            : undefined,
     }),
     [filters, roleParam],
   );
@@ -129,21 +137,25 @@ export default function UserManagementContent({
 
   const { exportPdf, exportExcel, isExportingPdf, isExportingExcel } =
     useAdminRecordExport({
-      endpoint: API_AUTH_USERS_EXPORT,
+      endpoint: API_AUTH_ADMIN_PROFILE,
       filters: {
         department: effectiveFilters.department,
         role: effectiveFilters.role,
         batch: effectiveFilters.batch,
         search: debouncedSearch,
+        has_user:
+          typeof effectiveFilters.hasUser === "boolean"
+            ? String(effectiveFilters.hasUser)
+            : "",
       },
-      mapItem: mapUser,
-      title: "User Management",
-      pdfFilename: "user-management.pdf",
-      excelFilename: "user-management.xlsx",
+      mapItem: mapProfile,
+      title: "Akun dan Profile",
+      pdfFilename: "akun-dan-profile.pdf",
+      excelFilename: "akun-dan-profile.xlsx",
       columns: USER_EXPORT_COLUMNS,
-      emptyMessage: "Tidak ada data user untuk diunduh.",
-      pdfSuccessMessage: "PDF user management berhasil diunduh.",
-      excelSuccessMessage: "Excel user management berhasil diunduh.",
+      emptyMessage: "Tidak ada data akun/profile untuk diunduh.",
+      pdfSuccessMessage: "PDF akun/profile berhasil diunduh.",
+      excelSuccessMessage: "Excel akun/profile berhasil diunduh.",
     });
 
   const actions = useUserManagementActions({
@@ -152,6 +164,7 @@ export default function UserManagementContent({
     setUsers,
     setTotalCount,
     setError,
+    onDataChanged: () => setReloadKey((prev) => prev + 1),
   });
 
   useEffect(() => {
@@ -178,16 +191,16 @@ export default function UserManagementContent({
 
   const columnCount = isRoleScoped
     ? canManageUsers
-      ? 7
-      : 6
-    : canManageUsers
       ? 8
-      : 7;
+      : 7
+    : canManageUsers
+      ? 9
+      : 8;
 
   const resetFilters = () => {
     setSearch("");
     setDebouncedSearch("");
-    setFilters({ department: "", role: "", batch: "" });
+    setFilters({ department: "", role: "", batch: "", status: "" });
     setPage(1);
   };
 
@@ -197,7 +210,7 @@ export default function UserManagementContent({
         <div className="min-w-0 flex-1 space-y-4">
           <AdminPageHeader
             title={title}
-            description={description ?? `Total ${totalUsers} user terdaftar.`}
+            description={description ?? `Total ${totalUsers} akun/profile terdaftar.`}
             icon={<UserPlus className="h-5 w-5 text-sky-200" />}
           />
 
@@ -224,7 +237,7 @@ export default function UserManagementContent({
                 event.preventDefault();
                 setPage(1);
               }}>
-                <AdminFilterGrid columns={4}>
+                <AdminFilterGrid columns={5}>
                 <AdminFilterField label="Cari">
                   <Input
                     type="search"
@@ -262,6 +275,18 @@ export default function UserManagementContent({
                   options={BATCH_OPTIONS}
                   onChange={(value) => {
                     setFilters((prev) => ({ ...prev, batch: value }));
+                    setPage(1);
+                  }}
+                />
+                <SelectField
+                  label="Status"
+                  value={filters.status}
+                  options={[
+                    { value: "pre_provisioned", label: "Belum Login" },
+                    { value: "active", label: "Sudah Login" },
+                  ]}
+                  onChange={(value) => {
+                    setFilters((prev) => ({ ...prev, status: value }));
                     setPage(1);
                   }}
                 />
@@ -313,7 +338,7 @@ export default function UserManagementContent({
                       onClick={() => setBulkOpen(true)}
                     >
                       <FileUp className="h-4 w-4" />
-                      Import User
+                      Import Akun/Profile
                     </Button>
                   ) : null}
                   {showCreateButton ? (
@@ -349,7 +374,7 @@ export default function UserManagementContent({
             totalPages={totalPages}
             totalCount={totalCount}
             pageSize={PAGE_SIZE}
-            itemLabel="user"
+            itemLabel="profile"
             isLoading={isLoading}
             onPageChange={setPage}
           />
@@ -390,10 +415,12 @@ export default function UserManagementContent({
       />
       <ConfirmDeleteDialog
         open={Boolean(actions.deleteCandidate)}
-        title="Hapus user?"
+        title={actions.deleteCandidate?.hasUser ? "Hapus user?" : "Hapus profile?"}
         description={
           actions.deleteCandidate
-            ? `User ${actions.deleteCandidate.name || actions.deleteCandidate.email} akan dihapus.`
+            ? actions.deleteCandidate.hasUser
+              ? `User ${actions.deleteCandidate.name || actions.deleteCandidate.email} akan dihapus.`
+              : `Profile pre-provisioned ${actions.deleteCandidate.name || actions.deleteCandidate.email} akan dihapus.`
             : "Data yang dihapus tidak bisa dikembalikan."
         }
         isDeleting={actions.isDeleting}
@@ -406,8 +433,8 @@ export default function UserManagementContent({
       />
       <ConfirmDeleteDialog
         open={actions.isBulkDeleteOpen}
-        title="Hapus user terpilih?"
-        description={`${actions.selectedCount} user yang dipilih akan dihapus permanen.`}
+        title="Hapus item terpilih?"
+        description={`${actions.selectedCount} item yang dipilih akan dihapus permanen.`}
         isDeleting={actions.isDeleting}
         onOpenChange={actions.setIsBulkDeleteOpen}
         onConfirm={() => {
@@ -421,7 +448,7 @@ export default function UserManagementContent({
 type SelectFieldProps = {
   label: string;
   value: string;
-  options: string[];
+  options: Array<string | { value: string; label: string }>;
   onChange: (value: string) => void;
 };
 
@@ -435,8 +462,11 @@ function SelectField({ label, value, options, onChange }: SelectFieldProps) {
       >
         <option value="">Semua</option>
         {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
+          <option
+            key={typeof opt === "string" ? opt : opt.value}
+            value={typeof opt === "string" ? opt : opt.value}
+          >
+            {typeof opt === "string" ? opt : opt.label}
           </option>
         ))}
       </select>

@@ -58,10 +58,12 @@ function normalizeHeader(value: unknown) {
 }
 
 function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
+  const roleForTemplate = hasRoleScope ? scopedRole : "";
+  const passwordRequired = roleForTemplate ? roleForTemplate === ROLE_VALUES.GUEST : true;
   const headers = [
     "nama lengkap",
     "email",
-    "password",
+    ...(passwordRequired ? ["password"] : []),
     ...(hasRoleScope ? [] : ["role"]),
     "initials",
     "department",
@@ -73,7 +75,7 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     [
       "Aziz Rahmad",
       "aziz@student.prasetiyamulya.ac.id",
-      "Password123",
+      ...(passwordRequired ? [""] : []),
       ...(hasRoleScope ? [] : [ROLE_VALUES.STUDENT]),
       "AZR",
       DEPARTMENT_VALUES[0],
@@ -84,7 +86,7 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     [
       "Dina Guest",
       "dina.guest@example.com",
-      "Password123",
+      ...(passwordRequired ? ["Password123"] : []),
       ...(hasRoleScope ? [] : [ROLE_VALUES.GUEST]),
       "DGT",
       "",
@@ -98,7 +100,9 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     ["Field", "Wajib", "Aturan", "Contoh"],
     ["nama lengkap", "Ya", "Isi nama lengkap user.", "Aziz Rahmad"],
     ["email", "Ya", "Gunakan email unik yang valid.", "aziz@student.prasetiyamulya.ac.id"],
-    ["password", "Ya", "Gunakan password awal user.", "Password123"],
+    ...(passwordRequired
+      ? [["password", scopedRole === ROLE_VALUES.GUEST ? "Ya" : "Khusus Guest", "Gunakan password awal untuk akun Guest. Internal tidak memerlukan password.", "Password123"]]
+      : []),
     [
       "role",
       hasRoleScope ? "Tidak" : "Ya",
@@ -210,6 +214,7 @@ export default function BulkCreateDialog({
         const lineNumber = index + 2;
         const rawRole = normalizeRoleValue(String(row[headerIndexes.role ?? -1] || "").trim());
         const normalizedRole = normalizedRoleParam || rawRole;
+        const requiresPassword = normalizedRole === ROLE_VALUES.GUEST;
         const visibleFields = getVisibleUserFields(normalizedRole);
         const full_name = String(row[headerIndexes.full_name ?? -1] || "").trim();
         const email = String(row[headerIndexes.email ?? -1] || "").trim();
@@ -248,8 +253,9 @@ export default function BulkCreateDialog({
         const reasons: string[] = [];
         if (!full_name) reasons.push("nama lengkap wajib diisi");
         if (!email) reasons.push("email wajib diisi");
-        if (!password) reasons.push("password wajib diisi");
         if (!hasRoleScope && !normalizedRole) reasons.push("role wajib diisi");
+        if (!hasRoleScope && rawRole && !normalizedRole) reasons.push("role tidak valid");
+        if (requiresPassword && !password) reasons.push("password wajib diisi untuk guest");
         if (department && !DEPARTMENT_VALUES.includes(department)) {
           reasons.push("department tidak sesuai opsi");
         }
@@ -314,7 +320,7 @@ export default function BulkCreateDialog({
       onCompleted();
       onOpenChange(false);
       resetState();
-      toast.success(`${successCount} user berhasil dibuat.`);
+      toast.success(`${successCount} akun/profile berhasil dibuat.`);
     }
   };
 
@@ -336,11 +342,11 @@ export default function BulkCreateDialog({
       open={open}
       onOpenChange={onOpenChange}
       onReset={resetState}
-      title="Bulk Tambah User"
+      title="Bulk Tambah Akun/Profile"
       description={
         <>
-          Upload file Excel dengan kolom wajib: nama lengkap, email, password
-          {hasRoleScope ? "." : ", role."} Kolom opsional: initials,
+          Upload file Excel dengan kolom wajib: nama lengkap, email
+          {hasRoleScope ? "." : ", role."} Password hanya wajib untuk guest. Kolom opsional: initials,
           department, batch, id number, institution.
         </>
       }
@@ -359,7 +365,7 @@ export default function BulkCreateDialog({
             Batal
           </Button>
           <Button type="button" onClick={() => void handleSubmitBulk()} disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}>
-            {isSubmitting ? "Memproses..." : "Buat User"}
+            {isSubmitting ? "Memproses..." : "Buat Akun/Profile"}
           </Button>
         </div>
       }
@@ -420,7 +426,9 @@ export default function BulkCreateDialog({
                     <td className="px-2 py-2">{row.full_name}</td>
                     <td className="px-2 py-2 text-muted-foreground">{row.email}</td>
                     <td className="px-2 py-2">{row.initials || "-"}</td>
-                    <td className="px-2 py-2">{row.password || "-"}</td>
+                    <td className="px-2 py-2">
+                      {row.role === ROLE_VALUES.GUEST ? row.password || "-" : "-"}
+                    </td>
                     <td className="px-2 py-2">{row.role || "-"}</td>
                     <td className="px-2 py-2">{row.department || "-"}</td>
                     <td className="px-2 py-2">{row.batch || "-"}</td>

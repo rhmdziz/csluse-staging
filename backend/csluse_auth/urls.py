@@ -5,6 +5,8 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     EmailVerificationStatusView,
+    LoginView,
+    LogoutView,
     MicrosoftOAuth2LoginStartView,
     microsoft_oauth2_callback,
 )
@@ -22,6 +24,11 @@ router = DefaultRouter()
 router.register(r'user/profile', ProfileViewSet, basename='profile')
 
 urlpatterns = [
+    path(
+        'login/',
+        LoginView.as_view(),
+        name='login',
+    ),
     path(
         'password/reset/confirm/<uidb64>/<token>/',
         password_reset_confirm_redirect,
@@ -41,6 +48,11 @@ urlpatterns = [
         'registration/check-email/',
         EmailVerificationStatusView.as_view(),
         name='email_verification_status',
+    ),
+    path(
+        'logout/',
+        LogoutView.as_view(),
+        name='logout',
     ),
     path('', include(router.urls)),
     path('', include('dj_rest_auth.urls')),

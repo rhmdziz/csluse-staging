@@ -133,12 +133,12 @@ export default function UserDetailDialog({
                     : "bg-red-500/10 text-red-700"
                 }`}
               >
-                {user.isVerified ? (
+                {user.hasUser ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   <XCircle className="h-4 w-4" />
                 )}
-                {user.isVerified ? "Verified" : "Unverified"}
+                {user.hasUser ? "Sudah Login" : "Belum Login"}
               </span>
             </div>
 
@@ -150,6 +150,12 @@ export default function UserDetailDialog({
                 onChange={(value) => setForm((prev) => ({ ...prev, full_name: value }))}
               />
               <DetailField label="Email" value={user.email} editable={false} onChange={() => undefined} />
+              <DetailField
+                label="Status"
+                value={user.hasUser ? "Sudah Login" : "Belum Login"}
+                editable={false}
+                onChange={() => undefined}
+              />
               <DetailField
                 label="Inisial"
                 value={form.initials}

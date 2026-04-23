@@ -4032,8 +4032,8 @@ def build_requester_dropdown_response(queryset):
     return Response([
         {
             "id": str(profile.id),
-            "full_name": profile.full_name or profile.user.email,
-            "email": profile.user.email,
+            "full_name": profile.full_name or profile.email,
+            "email": profile.email,
             "department": profile.department,
         }
         for profile in profiles

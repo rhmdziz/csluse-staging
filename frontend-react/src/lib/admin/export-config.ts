@@ -75,13 +75,15 @@ export const USER_EXPORT_COLUMNS: ExportColumn<UserRow>[] = [
   { header: "nama lengkap", cell: (user) => user.name },
   { header: "email", cell: (user) => user.email },
   { header: "role", cell: (user) => user.role || "-" },
+  { header: "status", cell: (user) => (user.status === "active" ? "Sudah Login" : "Belum Login") },
   { header: "initials", cell: (user) => user.initials || "-" },
   { header: "department", cell: (user) => user.department || "-" },
   { header: "batch", cell: (user) => user.batch || "-" },
   { header: "id number", cell: (user) => user.idNumber || "-" },
   { header: "institution", cell: (user) => user.institution || "-" },
   { header: "User Type", cell: (user) => user.userType || "-" },
-  { header: "Verified", cell: (user) => (user.isVerified ? "Verified" : "Unverified") },
+  { header: "Linked Account", cell: (user) => (user.hasUser ? "Ya" : "Belum") },
+  { header: "Last Login", cell: (user) => user.lastLogin || "-" },
 ];
 
 export const ROOM_EXPORT_COLUMNS: ExportColumn<RoomRow>[] = [

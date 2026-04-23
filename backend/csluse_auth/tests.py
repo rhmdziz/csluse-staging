@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from allauth.account.models import EmailAddress
+from allauth.core.exceptions import ImmediateHttpResponse
 from django.contrib.admin.models import DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseRedirect
@@ -333,11 +334,28 @@ class MicrosoftSocialAccountAdapterTests(AuthBaseTestMixin, TestCase):
 
         sociallogin.connect.assert_called_once_with(self.request, existing_user)
 
+    def test_pre_social_login_rejects_missing_preprovisioned_profile(self):
+        sociallogin = MagicMock()
+        sociallogin.provider = "microsoft"
+        sociallogin.is_existing = False
+        sociallogin.user.email = "missing@student.prasetiyamulya.ac.id"
+
+        with self.assertRaises(ImmediateHttpResponse) as exc:
+            self.adapter.pre_social_login(self.request, sociallogin)
+
+        self.assertIn("microsoft_profile_not_found", exc.exception.response["Location"])
+
     @patch("csluse_auth.adapters.DefaultSocialAccountAdapter.save_user")
-    def test_save_user_marks_email_verified_and_sets_internal_guest_profile(
+    def test_save_user_marks_email_verified_and_attaches_existing_internal_profile(
         self,
         save_user_mock,
     ):
+        profile = Profile.objects.create(
+            email="new@student.prasetiyamulya.ac.id",
+            full_name="New Internal User",
+            role="Student",
+            user_type="Internal",
+        )
         user = User.objects.create_user(
             username="ms_student",
             email="new@student.prasetiyamulya.ac.id",
@@ -348,14 +366,15 @@ class MicrosoftSocialAccountAdapterTests(AuthBaseTestMixin, TestCase):
         sociallogin.provider = "microsoft"
 
         saved_user = self.adapter.save_user(self.request, sociallogin, form=None)
-        profile = saved_user.profile
+        profile.refresh_from_db()
         email_address = EmailAddress.objects.get(user=saved_user, email=saved_user.email)
 
         self.assertEqual(saved_user, user)
         self.assertTrue(email_address.verified)
         self.assertTrue(email_address.primary)
+        self.assertEqual(profile.user, saved_user)
         self.assertEqual(profile.user_type, "Internal")
-        self.assertEqual(profile.role, "Guest")
+        self.assertEqual(profile.role, "Student")
 
 
 class MicrosoftOAuthCallbackTests(AuthBaseTestMixin, APITestCase):

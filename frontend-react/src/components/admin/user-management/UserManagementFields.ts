@@ -93,6 +93,33 @@ export function toCreateUserPayload(args: {
   return payload;
 }
 
+export function toCreateProfilePayload(args: {
+  email: string;
+  form: UserFormState;
+}) {
+  const { email, form } = args;
+  const normalizedEmail = email.trim();
+  const visibleFields = getVisibleUserFields(form.role);
+  const payload: Record<string, string | boolean> = {
+    full_name: form.full_name.trim(),
+    email: normalizedEmail,
+    user_type:
+      form.role === ROLE_VALUES.GUEST
+        ? USER_TYPE_VALUES.EXTERNAL
+        : USER_TYPE_VALUES.INTERNAL,
+  };
+
+  if (form.initials.trim()) payload.initials = form.initials.trim();
+  if (form.role) payload.role = form.role;
+  if (form.role === ROLE_VALUES.LECTURER) payload.is_mentor = form.is_mentor;
+  if (visibleFields.department && form.department) payload.department = form.department;
+  if (visibleFields.batch && form.batch) payload.batch = form.batch;
+  if (visibleFields.idNumber && form.id_number) payload.id_number = form.id_number;
+  if (visibleFields.institution && form.institution) payload.institution = form.institution;
+
+  return payload;
+}
+
 export function toUpdateUserPayload(form: UserFormState) {
   const visibleFields = getVisibleUserFields(form.role);
   return {

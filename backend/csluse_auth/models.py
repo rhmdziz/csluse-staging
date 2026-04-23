@@ -75,9 +75,12 @@ class Profile(BaseModel):
 
     user = models.OneToOneField(
         get_user_model(),
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="profile",
+        blank=True,
+        null=True,
     )
+    email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=150, blank=True)
     initials = models.CharField(max_length=3, blank=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, blank=True, null=True)
@@ -110,10 +113,11 @@ class Profile(BaseModel):
         return fallback or "USR"
 
     def save(self, *args, **kwargs):
+        self.email = str(self.email or getattr(self.user, "email", "") or "").strip().lower()
         self.initials = self.normalize_initials(
             self.initials,
             full_name=self.full_name,
-            email=getattr(self.user, "email", ""),
+            email=self.email,
         )
 
         if self.role != "Guest":
@@ -127,7 +131,7 @@ class Profile(BaseModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.user.email} - {self.full_name} - {self.role}"
+        return f"{self.email} - {self.full_name} - {self.role}"
 
 
 # endregion Profile Models
