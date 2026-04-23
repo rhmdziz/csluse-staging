@@ -2,7 +2,7 @@
 
 import { Network } from "lucide-react";
 
-const ORGANIZATION_STRUCTURE_PDF_SRC = "/documents/Struktur CSL.pdf";
+const ORGANIZATION_STRUCTURE_PDF_SRC = "/documents/pdf/Struktur CSL.pdf";
 
 export default function DashboardOrganizationStructurePage() {
   return (

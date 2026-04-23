@@ -50,7 +50,7 @@ function SampleTestingDetailSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -201,7 +201,7 @@ export default function SampleTestingDetailPage() {
       </div>
 
       {isApprovalPage ? (
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
           <div className="space-y-4">
             <SampleTestingDocumentsSection
               item={item}
@@ -266,6 +266,7 @@ export default function SampleTestingDetailPage() {
               status={item.status}
               onStatusClick={() => setProgressOpen(true)}
               approvedByName={item.approvedByName}
+              itemGridClassName="md:grid-cols-[124px_minmax(0,1fr)]"
             >
               <SampleTestingMetaItem
                 label="Tanggal Dibuat"
@@ -279,7 +280,7 @@ export default function SampleTestingDetailPage() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]">
           <div className="space-y-4">
             <SampleTestingDocumentsSection
               item={item}
@@ -340,6 +341,7 @@ export default function SampleTestingDetailPage() {
               status={item.status}
               onStatusClick={() => setProgressOpen(true)}
               approvedByName={item.approvedByName}
+              itemGridClassName="md:grid-cols-[124px_minmax(0,1fr)]"
             >
               <SampleTestingMetaItem
                 label="Tanggal Dibuat"

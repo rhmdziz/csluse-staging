@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import {
   CalendarClock,
   CheckCircle2,
-  CircleDollarSign,
   ClipboardCheck,
   Eye,
   FileText,
@@ -51,9 +50,7 @@ const PAGE_SIZE = 10;
 
 function canShowDocumentAction(status: string) {
   const normalized = normalizeStatus(status);
-  return ["approved", "diproses", "menunggu pembayaran", "completed"].includes(
-    normalized,
-  );
+  return ["approved", "diproses", "completed"].includes(normalized);
 }
 
 export default function SampleTestingAllListPage() {
@@ -116,7 +113,7 @@ export default function SampleTestingAllListPage() {
 
   return (
     <section className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <SampleTestingSummaryCard
           label="Total Pengajuan"
           value={aggregates.total}
@@ -140,12 +137,6 @@ export default function SampleTestingAllListPage() {
           value={aggregates.diproses}
           icon={<Settings2 className="h-4 w-4" />}
           tone={getStatusSummaryTone("Diproses")}
-        />
-        <SampleTestingSummaryCard
-          label="Menunggu Bayar"
-          value={aggregates.menungguPembayaran}
-          icon={<CircleDollarSign className="h-4 w-4" />}
-          tone={getStatusSummaryTone("menunggu pembayaran")}
         />
         <SampleTestingSummaryCard
           label="Selesai"

@@ -18,23 +18,25 @@ import {
 type AdminHistoryBulkActionsProps = {
   selectedCount: number;
   isDeleting: boolean;
-  isExportingSelectedExcel: boolean;
-  isExportingSelectedPdf: boolean;
-  onExportSelectedExcel: () => void;
-  onExportSelectedPdf: () => void;
+  isExportingSelectedExcel?: boolean;
+  isExportingSelectedPdf?: boolean;
+  onExportSelectedExcel?: () => void;
+  onExportSelectedPdf?: () => void;
   onDeleteSelected: () => void;
   onClearSelection: () => void;
+  showExportActions?: boolean;
 };
 
 export default function AdminHistoryBulkActions({
   selectedCount,
   isDeleting,
-  isExportingSelectedExcel,
-  isExportingSelectedPdf,
-  onExportSelectedExcel,
-  onExportSelectedPdf,
+  isExportingSelectedExcel = false,
+  isExportingSelectedPdf = false,
+  onExportSelectedExcel = () => {},
+  onExportSelectedPdf = () => {},
   onDeleteSelected,
   onClearSelection,
+  showExportActions = true,
 }: AdminHistoryBulkActionsProps) {
   return (
     <DropdownMenu>
@@ -56,31 +58,35 @@ export default function AdminHistoryBulkActions({
         sideOffset={6}
         className="min-w-38"
       >
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="cursor-pointer">
-            <Download className="h-4 w-4" />
-            Export Terpilih
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-44">
-            <DropdownMenuItem
-              className="cursor-pointer"
-              disabled={isExportingSelectedExcel}
-              onSelect={onExportSelectedExcel}
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              Export Excel
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              disabled={isExportingSelectedPdf}
-              onSelect={onExportSelectedPdf}
-            >
-              <Download className="h-4 w-4" />
-              Export PDF
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
+        {showExportActions ? (
+          <>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="cursor-pointer">
+                <Download className="h-4 w-4" />
+                Export Terpilih
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-44">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  disabled={isExportingSelectedExcel}
+                  onSelect={onExportSelectedExcel}
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Export Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  disabled={isExportingSelectedPdf}
+                  onSelect={onExportSelectedPdf}
+                >
+                  <Download className="h-4 w-4" />
+                  Export PDF
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem
           className="cursor-pointer text-rose-600 focus:text-rose-700"
           onSelect={onDeleteSelected}

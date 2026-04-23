@@ -4,7 +4,7 @@ from allauth.account.models import EmailAddress
 from django.contrib.admin.models import CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -19,6 +19,7 @@ from csluse.viewsets import DefaultPagination
 from .audit import log_admin_action
 from .models import Profile
 from .permissions import (
+    ADMINISTRATOR,
     SUPER_ADMINISTRATOR,
     IsAdministratorOrAbove,
     IsStaffOrAbove,
@@ -58,16 +59,6 @@ class ProfileViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(self.get_object())
         return Response(serializer.data)
 
-    @action(detail=False, methods=["get"], url_path="mentor-dropdown")
-    def mentor_dropdown(self, request):
-        queryset = (
-            User.objects.select_related("profile")
-            .filter(profile__role__iexact="Lecturer", profile__is_mentor=True)
-            .order_by("profile__full_name", "email")
-        )
-        serializer = PicUserDropdownSerializer(queryset, many=True)
-        return Response(serializer.data)
-
     def perform_update(self, serializer):
         instance = serializer.save()
         log_admin_action(
@@ -76,6 +67,21 @@ class ProfileViewSet(viewsets.ModelViewSet):
             CHANGE,
             "Updated own profile via CSL Admin (my profile).",
         )
+
+
+class MentorViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get"]
+
+    @action(detail=False, methods=["get"], url_path="dropdown")
+    def dropdown(self, request):
+        queryset = (
+            User.objects.select_related("profile")
+            .filter(profile__role__iexact="Lecturer", profile__is_mentor=True)
+            .order_by("profile__full_name", "email")
+        )
+        serializer = PicUserDropdownSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class AdminProfileViewSet(viewsets.ModelViewSet):
@@ -451,7 +457,17 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
     http_method_names = ["get"]
 
     def get_queryset(self):
-        return LogEntry.objects.select_related("user", "content_type").order_by("-action_time")
+        admin_actor_filter = (
+            Q(user__is_superuser=True)
+            | Q(user__groups__name=ADMINISTRATOR)
+            | Q(user__groups__name=SUPER_ADMINISTRATOR)
+        )
+        return (
+            LogEntry.objects.select_related("user", "content_type")
+            .filter(admin_actor_filter)
+            .distinct()
+            .order_by("-action_time")
+        )
 
     @action(detail=False, methods=["get"], url_path="recent")
     def recent(self, request):
@@ -472,14 +488,13 @@ def _status_breakdown(model):
 
 
 class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AdminDashboardKpisSerializer
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
     http_method_names = ["get"]
     queryset = Profile.objects.none()
 
-    @extend_schema(responses=AdminDashboardKpisSerializer)
-    @action(detail=False, methods=["get"], url_path="kpis")
-    def kpis(self, request):
-        data = {
+    def _build_dashboard_data(self):
+        return {
             "total_users": User.objects.count(),
             "total_rooms": Room.objects.count(),
             "total_equipments": Equipment.objects.count(),
@@ -496,7 +511,10 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
             "borrows_by_status": _status_breakdown(Borrow),
             "pengujians_by_status": _status_breakdown(Pengujian),
         }
-        return Response(data)
+
+    def list(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self._build_dashboard_data())
+        return Response(serializer.data)
 
 
 # endregion Admin Monitoring Viewsets
@@ -518,9 +536,6 @@ class LabClearanceViewSet(viewsets.ViewSet):
         profile = get_object_or_404(Profile, id=profile_id)
 
         ACTIVE_BORROW_STATUSES = ["Pending", "Approved", "Borrowed", "Returned Pending Inspection", "Overdue"]
-        ACTIVE_BOOKING_STATUSES = ["Pending", "Approved"]
-        ACTIVE_PENGUJIAN_STATUSES = ["Pending", "Approved", "Diproses", "Menunggu Pembayaran"]
-
         active_services = []
 
         for b in Borrow.objects.select_related("equipment").filter(
@@ -536,35 +551,7 @@ class LabClearanceViewSet(viewsets.ViewSet):
                 "end_time": b.end_time,
             })
 
-        for bk in Booking.objects.select_related("room").filter(
-            requested_by=profile, status__in=ACTIVE_BOOKING_STATUSES
-        ):
-            active_services.append({
-                "id": bk.id,
-                "code": bk.code,
-                "type": "booking",
-                "label": bk.room.name if bk.room else "-",
-                "status": bk.status,
-                "start_time": bk.start_time,
-                "end_time": bk.end_time,
-            })
-
-        for p in Pengujian.objects.filter(
-            requested_by=profile, status__in=ACTIVE_PENGUJIAN_STATUSES
-        ):
-            active_services.append({
-                "id": p.id,
-                "code": p.code,
-                "type": "pengujian",
-                "label": p.name or "-",
-                "status": p.status,
-                "start_time": p.created_at,
-                "end_time": None,
-            })
-
         borrow_count = sum(1 for s in active_services if s["type"] == "borrow")
-        booking_count = sum(1 for s in active_services if s["type"] == "booking")
-        pengujian_count = sum(1 for s in active_services if s["type"] == "pengujian")
 
         data = {
             "profile_id": profile.id,
@@ -579,8 +566,8 @@ class LabClearanceViewSet(viewsets.ViewSet):
             "summary": {
                 "total_active": len(active_services),
                 "borrow_count": borrow_count,
-                "booking_count": booking_count,
-                "pengujian_count": pengujian_count,
+                "booking_count": 0,
+                "pengujian_count": 0,
             },
         }
         serializer = LabClearanceSerializer(data)

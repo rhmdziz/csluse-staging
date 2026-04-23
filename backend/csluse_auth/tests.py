@@ -16,6 +16,7 @@ from csluse_auth.adapters import (
     CustomSocialAccountAdapter,
 )
 from csluse_auth.models import Profile
+from csluse_auth.audit import log_admin_action
 from csluse_auth.permissions import ADMINISTRATOR, SUPER_ADMINISTRATOR, assign_role
 
 User = get_user_model()
@@ -211,6 +212,41 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["aggregates"]["total"], 1)
         self.assertEqual(response.data["aggregates"]["guest"], 1)
         self.assertEqual(response.data["aggregates"]["student"], 0)
+
+
+class AdminActionViewSetTests(AuthBaseTestMixin, APITestCase):
+    def setUp(self):
+        self.admin = self.create_user(
+            email="audit-admin@example.com",
+            full_name="Audit Admin",
+            role="Admin",
+        )
+        assign_role(self.admin, ADMINISTRATOR)
+        self.client.force_authenticate(user=self.admin)
+
+    def test_recent_only_returns_actions_from_admin_actors(self):
+        student = self.create_user(
+            email="student-audit@example.com",
+            full_name="Student Audit",
+            role="Student",
+            verified=True,
+        )
+        admin_target = self.create_user(
+            email="managed-user@example.com",
+            full_name="Managed User",
+            role="Guest",
+            verified=True,
+        )
+
+        log_admin_action(self.admin, admin_target.profile, DELETION, "Admin deleted a managed profile.")
+        log_admin_action(student, student.profile, DELETION, "Student updated own profile.")
+
+        response = self.client.get("/api/admin/actions/recent/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["actor"], self.admin.email)
+        self.assertEqual(response.data[0]["object_id"], str(admin_target.profile.pk))
 
 
 class JwtCookieAuthFlowTests(AuthBaseTestMixin, APITestCase):
@@ -497,7 +533,7 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
         )
 
     def test_admin_dashboard_kpis_include_pengujian_totals(self):
-        response = self.client.get("/api/admin/dashboard/kpis/")
+        response = self.client.get("/api/admin/dashboard/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["total_rooms"], 1)

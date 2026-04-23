@@ -38,6 +38,7 @@ type RequestReviewCardProps = {
   statusHintTitleClassName?: string;
   statusHintTextClassName?: string;
   children?: ReactNode;
+  itemGridClassName?: string;
 };
 
 export function RequestReviewCard({
@@ -57,6 +58,7 @@ export function RequestReviewCard({
   statusHintTitleClassName = "text-emerald-800",
   statusHintTextClassName = "text-emerald-900",
   children,
+  itemGridClassName = "md:grid-cols-[180px_minmax(0,1fr)]",
 }: RequestReviewCardProps) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
@@ -86,7 +88,7 @@ export function RequestReviewCard({
           {meta.map((item) => (
             <div
               key={`${item.label}-${item.value}`}
-              className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
+              className={`grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 ${itemGridClassName} md:items-start md:gap-4`}
             >
               <p className="text-xs text-slate-500">{item.label}</p>
               <p className="text-xs leading-5 text-slate-800 break-words">
@@ -122,7 +124,7 @@ export function RequestReviewCard({
               return (
                 <div
                   key={`${item.label}-${item.value}`}
-                  className={`grid gap-1 rounded-md border px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-center md:gap-4 ${containerClass}`}
+                  className={`grid gap-1 rounded-md border px-4 py-3 ${itemGridClassName} md:items-center md:gap-4 ${containerClass}`}
                 >
                   <p className={`text-xs ${labelClass}`}>{item.label}</p>
                   <p className={`text-xs ${valueClass}`}>{item.value}</p>

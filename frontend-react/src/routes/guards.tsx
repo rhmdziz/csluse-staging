@@ -220,6 +220,7 @@ export function RequireMenuAccess({
     | "booking-rooms"
     | "borrow-equipment"
     | "sample-testing"
+    | "bebas-laboratorium"
     | "notifications"
     | "my-profile";
 }) {

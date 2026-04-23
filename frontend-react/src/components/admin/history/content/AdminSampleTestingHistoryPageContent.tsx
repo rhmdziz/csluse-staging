@@ -85,12 +85,7 @@ const ORDERING_OPTIONS = [
 
 function canShowDocumentAction(status: string) {
   const normalized = normalizeStatus(status);
-  return [
-    "approved",
-    "diproses",
-    "menunggu pembayaran",
-    "completed",
-  ].includes(normalized);
+  return ["approved", "diproses", "completed"].includes(normalized);
 }
 
 export default function AdminSampleTestingHistoryPage() {
@@ -378,7 +373,6 @@ export default function AdminSampleTestingHistoryPage() {
               { label: "Pending", value: aggregates.pending },
               { label: "Approved", value: aggregates.approved },
               { label: "Diproses", value: aggregates.diproses },
-              { label: "Menunggu Bayar", value: aggregates.menungguPembayaran },
               { label: "Completed", value: aggregates.completed },
               { label: "Rejected", value: aggregates.rejected },
             ]}

@@ -1,6 +1,8 @@
 import {
   API_PENGUJIAN_APPROVE,
   API_PENGUJIAN_CANCEL,
+  API_PENGUJIAN_COMPLETE,
+  API_PENGUJIAN_DELETE_DOCUMENT,
   API_PENGUJIAN_DETAIL,
   API_PENGUJIAN_REJECT,
   API_PENGUJIAN_UPLOAD_DOCUMENT,
@@ -38,7 +40,7 @@ export type CreateSampleTestingPayload = {
   sampleTestingType?: string;
 };
 
-export type SampleTestingStatusActionType = "approve" | "reject" | "cancel";
+export type SampleTestingStatusActionType = "approve" | "reject" | "cancel" | "complete";
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -154,7 +156,9 @@ export const sampleTestingService = {
         ? API_PENGUJIAN_APPROVE(sampleTestingId)
         : type === "reject"
           ? API_PENGUJIAN_REJECT(sampleTestingId)
-          : API_PENGUJIAN_CANCEL(sampleTestingId),
+          : type === "complete"
+            ? API_PENGUJIAN_COMPLETE(sampleTestingId)
+            : API_PENGUJIAN_CANCEL(sampleTestingId),
       { method: "POST" },
     );
 
@@ -174,6 +178,18 @@ export const sampleTestingService = {
       method: "POST",
       body: formData,
     });
+
+    return parseMutationResponse(response);
+  },
+
+  async deleteDocument(
+    sampleTestingId: string | number,
+    documentType: string,
+  ) {
+    const response = await authFetch(
+      API_PENGUJIAN_DELETE_DOCUMENT(sampleTestingId, documentType),
+      { method: "DELETE" },
+    );
 
     return parseMutationResponse(response);
   },

@@ -18,7 +18,11 @@
       "Bash(python3 -c ' *)",
       "Bash(python3)",
       "Bash(python manage.py makemigrations csluse --name remove_use_table)",
-      "Bash(python3 manage.py makemigrations csluse --name remove_use_table)"
+      "Bash(python3 manage.py makemigrations csluse --name remove_use_table)",
+      "Bash(python manage.py makemigrations csluse)",
+      "Bash(python3 manage.py makemigrations csluse)",
+      "Bash(python manage.py makemigrations csluse --name suratbebaslabbookinghistory)",
+      "Bash(.venv/bin/python manage.py makemigrations csluse --name suratbebaslabbookinghistory)"
     ]
   }
 }

@@ -19,7 +19,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/shared";
 import { InlineErrorAlert } from "@/components/shared";
 import { Skeleton } from "@/components/ui";
-import { API_AUTH_ADMIN_DASHBOARD_KPIS } from "@/constants/api";
+import { API_AUTH_ADMIN_DASHBOARD } from "@/constants/api";
 import { useAdminActions, type AdminAction } from "@/hooks/admin";
 import { useLoadProfile } from "@/hooks/shared/profile";
 import { authFetch } from "@/lib/auth";
@@ -205,7 +205,7 @@ export default function Page() {
       setKpisError("");
 
       try {
-        const response = await authFetch(API_AUTH_ADMIN_DASHBOARD_KPIS, {
+        const response = await authFetch(API_AUTH_ADMIN_DASHBOARD, {
           method: "GET",
           signal: controller.signal,
         });
@@ -482,7 +482,6 @@ const STATUS_COLOR_MAP: Record<string, string> = {
   Overdue: "bg-orange-500",
   "Lost/Damaged": "bg-red-700",
   Diproses: "bg-cyan-500",
-  "Menunggu Pembayaran": "bg-yellow-500",
 };
 
 const STATUS_LABEL_ID: Record<string, string> = {
@@ -497,7 +496,6 @@ const STATUS_LABEL_ID: Record<string, string> = {
   Overdue: "Terlambat",
   "Lost/Damaged": "Hilang/Rusak",
   Diproses: "Diproses",
-  "Menunggu Pembayaran": "Menunggu Pembayaran",
 };
 
 function getStatusColor(status: string): string {

@@ -3,12 +3,13 @@ import re
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+from django.conf import settings
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.db.models import Prefetch, Q, Sum
 from rest_framework import viewsets, status
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -30,6 +31,8 @@ from .models import (
     FAQ,
     Pengujian,
     Notification,
+    SuratBebasLab,
+    SuratBebasLabBookingHistory,
 )
 from .serializers import (
     ImageSerializer,
@@ -64,6 +67,11 @@ from .serializers import (
     PengujianListSerializer,
     DashboardOverviewSerializer,
     NotificationSerializer,
+    SuratBebasLabSerializer,
+    SuratBebasLabListSerializer,
+    SuratBebasLabDocumentSerializer,
+    SuratBebasLabBookingHistorySerializer,
+    BookingSuggestionSerializer,
 )
 from csluse_auth.audit import log_admin_action
 from csluse_auth.models import Profile
@@ -76,12 +84,13 @@ from csluse_auth.permissions import (
     ADMINISTRATOR,
     SUPER_ADMINISTRATOR,
 )
-from .email_notifications import (
-    build_email_context,
-    notification_cta_label,
-    notification_cta_url,
-    send_notification_email,
+from .notification_service import (
+    notify_borrow_overdue,
+    notify_new_request_submission,
+    notify_post_mentor_approval,
+    notify_request_status,
 )
+from .email_notifications import build_email_context, send_notification_email
 
 STATUS_VALUE_MAP = {
     "pending": "Pending",
@@ -89,9 +98,9 @@ STATUS_VALUE_MAP = {
     "canceled": "Canceled",
     "cancelled": "Canceled",
     "diproses": "Diproses",
-    "menunggu pembayaran": "Menunggu Pembayaran",
-    "waiting_payment": "Menunggu Pembayaran",
-    "waiting payment": "Menunggu Pembayaran",
+    "menunggu pembayaran": "Diproses",
+    "waiting_payment": "Diproses",
+    "waiting payment": "Diproses",
     "rejected": "Rejected",
     "expired": "Expired",
     "returned_pending_inspection": "Returned Pending Inspection",
@@ -219,7 +228,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     queryset = Image.objects.all().order_by('-created_at')
     serializer_class = ImageSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_permissions(self):
         if self.action == "create":
@@ -231,11 +240,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         uploaded_image = self.request.FILES.get('image')
         name = os.path.basename(uploaded_image.name) if uploaded_image else ''
-        instance = serializer.save(
-            created_by=getattr(self.request.user, 'profile', None)
-            if self.request.user.is_authenticated else None,
-            name=name,
-        )
+        instance = serializer.save(name=name)
         if instance.image and not instance.url:
             instance.url = instance.image.url
             instance.save(update_fields=['url'])
@@ -1137,6 +1142,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             "mentor_approved_at",
             "updated_at",
         ])
+        notify_post_mentor_approval(booking, kind="booking", actor_profile=actor_profile)
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
@@ -1148,7 +1154,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(rejected_at=now)
-        _notify_request_status(
+        notify_request_status(
             booking,
             kind="booking",
             status_value="Rejected",
@@ -1333,7 +1339,8 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return self._apply_list_filters(qs, allow_requester_filter=False)
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        notify_new_request_submission(instance, kind="booking")
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -1476,7 +1483,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="booking", status_value="Approved", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="booking", status_value="Approved", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -1503,7 +1510,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="booking", status_value="Rejected", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="booking", status_value="Rejected", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -1535,7 +1542,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        _notify_request_status(
+        notify_request_status(
             instance,
             kind="booking",
             status_value="Canceled",
@@ -1661,6 +1668,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             "mentor_approved_at",
             "updated_at",
         ])
+        notify_post_mentor_approval(borrow, kind="borrow", actor_profile=actor_profile)
         serializer = self.get_serializer(borrow)
         return Response(serializer.data)
 
@@ -1672,7 +1680,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(rejected_at=now)
-        _notify_request_status(
+        notify_request_status(
             borrow,
             kind="borrow",
             status_value="Rejected",
@@ -1868,7 +1876,8 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         ).distinct()
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        notify_new_request_submission(instance, kind="borrow")
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -2013,7 +2022,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="borrow", status_value="Approved", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="borrow", status_value="Approved", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -2041,7 +2050,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="borrow", status_value="Rejected", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="borrow", status_value="Rejected", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -2074,7 +2083,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        _notify_request_status(
+        notify_request_status(
             instance,
             kind="borrow",
             status_value="Canceled",
@@ -2323,7 +2332,7 @@ class AnnouncementViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
 # region Scheduling And Overview
 class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
-    queryset = Schedule.objects.select_related('room', 'created_by').order_by('start_time')
+    queryset = Schedule.objects.select_related('room').order_by('start_time')
     serializer_class = ScheduleSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = DefaultPagination
@@ -2362,7 +2371,7 @@ class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        instance = serializer.save(created_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save()
         log_admin_action(
             self.request.user,
             instance,
@@ -2381,13 +2390,12 @@ class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
         results = []
         success_count = 0
-        created_by = getattr(self.request.user, 'profile', None)
 
         for index, row in enumerate(rows, start=1):
             row_number = row.get("index", index) if isinstance(row, dict) else index
             serializer = self.get_serializer(data=row)
             if serializer.is_valid():
-                instance = serializer.save(created_by=created_by)
+                instance = serializer.save()
                 log_admin_action(
                     self.request.user,
                     instance,
@@ -2486,7 +2494,7 @@ class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
         schedule_qs = (
             Schedule.objects
-            .select_related('room', 'created_by', 'created_by__user')
+            .select_related('room')
             .prefetch_related('room__pics')
             .all()
         )
@@ -2648,7 +2656,7 @@ class CalendarViewSet(viewsets.ViewSet):
                 start_time__lt=end,
                 end_time__gt=start,
             )
-            .select_related('room', 'created_by')
+            .select_related('room')
         )
 
         booking_qs = (
@@ -2862,7 +2870,6 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                         pengujians,
                         "Approved",
                         "Diproses",
-                        "Menunggu Pembayaran",
                     )
                 ),
                 "completed": (
@@ -2892,7 +2899,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
 
 # region FAQ
 class FAQViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
-    queryset = FAQ.objects.select_related('created_by').order_by('-created_at')
+    queryset = FAQ.objects.order_by('-created_at')
     serializer_class = FAQSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = DefaultPagination
@@ -2922,7 +2929,7 @@ class FAQViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        instance = serializer.save(created_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save()
         log_admin_action(
             self.request.user,
             instance,
@@ -3076,13 +3083,32 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             )
 
     def _resolve_pengujian_status_after_document_upload(self, pengujian, document_type):
-        if document_type == "invoice":
-            return "Menunggu Pembayaran"
-        if document_type == "test_result_letter":
-            return "Completed"
-        if pengujian.status == "Approved":
+        if document_type == "testing_agreement" and pengujian.status == "Approved":
             return "Diproses"
+
+        existing_documents = self._get_existing_document_map(pengujian)
+        receipt_document = existing_documents.get("receipt")
+        test_result_document = existing_documents.get("test_result_letter")
+        if (
+            receipt_document
+            and receipt_document.document
+            and test_result_document
+            and test_result_document.document
+        ):
+            return "Completed"
+
+        if pengujian.status == "Approved":
+            return pengujian.status
         return pengujian.status
+
+    def _delete_document_file(self, document_instance):
+        if not document_instance.document:
+            return
+
+        document_name = document_instance.document.name or ""
+        document_storage = document_instance.document.storage
+        if document_name and document_storage is not None:
+            document_storage.delete(document_name)
 
     def _ensure_transition(self, pengujian, allowed_sources, target_status):
         if pengujian.status not in allowed_sources:
@@ -3251,7 +3277,8 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        instance = serializer.save(requested_by=getattr(self.request.user, 'profile', None))
+        notify_new_request_submission(instance, kind="pengujian")
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -3314,7 +3341,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, approved_at=now)
-        _notify_request_status(instance, kind="pengujian", status_value="Approved", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="pengujian", status_value="Approved", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='all/export')
@@ -3394,7 +3421,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         serializer.save(approved_by=actor_profile, rejected_at=now)
-        _notify_request_status(instance, kind="pengujian", status_value="Rejected", actor_profile=actor_profile, request=request)
+        notify_request_status(instance, kind="pengujian", status_value="Rejected", actor_profile=actor_profile, request=request)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
@@ -3408,7 +3435,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        _notify_request_status(
+        notify_request_status(
             instance,
             kind="pengujian",
             status_value="Canceled",
@@ -3495,11 +3522,45 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("document_type", OpenApiTypes.STR, OpenApiParameter.PATH),
+        ]
+    )
+    @action(
+        detail=True,
+        methods=['delete'],
+        url_path=r'documents/delete/(?P<document_type>[^/.]+)',
+    )
+    def delete_document(self, request, pk=None, document_type=None):
+        instance = self.get_object()
+        document_type = str(document_type or "").strip()
+
+        existing_documents = self._get_existing_document_map(instance)
+        self._ensure_document_upload_permission(instance, document_type)
+        self._validate_document_upload_sequence(instance, document_type, existing_documents)
+
+        document_instance = existing_documents.get(document_type)
+        if document_instance is None:
+            raise ValidationError({"document_type": "Dokumen tidak ditemukan."})
+
+        self._delete_document_file(document_instance)
+        document_instance.delete()
+
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "deleted_document_type": document_type,
+                "pengujian": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
         instance = self.get_object()
         self._ensure_review_permission(instance)
-        self._ensure_transition(instance, ["Approved", "Diproses", "Menunggu Pembayaran"], "Completed")
+        self._ensure_transition(instance, ["Approved", "Diproses"], "Completed")
         serializer = self._transition_serializer(
             instance,
             data={'status': 'Completed', **request.data},
@@ -4038,199 +4099,6 @@ def _request_identifier(instance, fallback):
     )
 
 
-def _notification_recipient_email(recipient):
-    if recipient is None:
-        return None
-    user = getattr(recipient, "user", None)
-    email = getattr(user, "email", None)
-    return (email or "").strip() or None
-
-
-def _notification_recipient_name(instance, recipient):
-    return (
-        _profile_display_name(recipient)
-        or getattr(instance, "name", None)
-        or _notification_recipient_email(recipient)
-        or "Pengguna"
-    )
-
-
-def _notification_email_extra_context(
-    instance,
-    *,
-    recipient,
-    kind,
-    title,
-    message,
-    cta_url,
-    cta_label,
-):
-    return {
-        "user_display": _notification_recipient_name(instance, recipient),
-        "notification_title": title,
-        "notification_message": message,
-        "request_label": _request_label(kind).title(),
-        "request_label_lower": _request_label(kind),
-        "request_identifier": _request_identifier(instance, _request_label(kind).title()),
-        "cta_url": cta_url,
-        "cta_label": cta_label,
-    }
-
-
-def _send_request_status_email(
-    instance,
-    *,
-    recipient,
-    kind,
-    title,
-    message,
-    status_value,
-    request=None,
-):
-    recipient_email = _notification_recipient_email(recipient)
-    if not recipient_email:
-        return
-
-    cta_url = notification_cta_url(kind, instance)
-    cta_label = notification_cta_label(kind)
-    context = build_email_context(
-        request=request,
-        extra_context={
-            **_notification_email_extra_context(
-                instance,
-                recipient=recipient,
-                kind=kind,
-                title=title,
-                message=message,
-                cta_url=cta_url,
-                cta_label=cta_label,
-            ),
-            "status_label": (
-                "disetujui"
-                if status_value == "Approved"
-                else "dibatalkan"
-                if status_value == "Canceled"
-                else "ditolak"
-            ),
-        },
-    )
-    send_notification_email(
-        recipient_email,
-        template_base="csluse/email/request_status",
-        context=context,
-    )
-
-
-def _send_borrow_overdue_email(
-    instance,
-    *,
-    recipient,
-    title,
-    message,
-    due_text,
-    equipment_name,
-    request=None,
-):
-    recipient_email = _notification_recipient_email(recipient)
-    if not recipient_email:
-        return
-
-    cta_url = notification_cta_url("borrow", instance)
-    context = build_email_context(
-        request=request,
-        extra_context={
-            **_notification_email_extra_context(
-                instance,
-                recipient=recipient,
-                kind="borrow",
-                title=title,
-                message=message,
-                cta_url=cta_url,
-                cta_label="Lihat Detail Peminjaman",
-            ),
-            "equipment_name": equipment_name,
-            "due_text": due_text,
-        },
-    )
-    send_notification_email(
-        recipient_email,
-        template_base="csluse/email/borrow_overdue",
-        context=context,
-    )
-
-
-def _notify_request_status(instance, *, kind, status_value, actor_profile=None, request=None):
-    recipient = getattr(instance, "requested_by", None)
-    if recipient is None:
-        return
-
-    request_label = _request_label(kind)
-    request_identifier = _request_identifier(instance, request_label.title())
-    actor_name = _profile_display_name(actor_profile) or "tim laboratorium"
-    if status_value == "Approved":
-        category = "Approved"
-        action_label = "disetujui"
-    elif status_value == "Canceled":
-        category = "General"
-        action_label = "dibatalkan"
-    else:
-        category = "Rejected"
-        action_label = "ditolak"
-    title = f"{request_label.title()} {request_identifier} {action_label}"
-    message = (
-        f"Pengajuan {request_label} Anda ({request_identifier}) telah "
-        f"{action_label} oleh {actor_name}."
-    )
-
-    _create_notification(
-        recipient,
-        title=title,
-        category=category,
-        message=message,
-    )
-    _send_request_status_email(
-        instance,
-        recipient=recipient,
-        kind=kind,
-        title=title,
-        message=message,
-        status_value=status_value,
-        request=request,
-    )
-
-
-def _notify_borrow_overdue(instance, request=None):
-    recipient = getattr(instance, "requested_by", None)
-    if recipient is None:
-        return
-
-    borrow_identifier = _request_identifier(instance, "Borrow")
-    equipment_name = getattr(getattr(instance, "equipment", None), "name", "alat")
-    due_at = getattr(instance, "end_time", None)
-    due_text = timezone.localtime(due_at).strftime("%d %b %Y %H:%M WIB") if due_at else "jadwal pengembalian"
-    title = f"Peminjaman {borrow_identifier} melewati batas waktu"
-    message = (
-        f"Peminjaman alat Anda ({borrow_identifier}) untuk {equipment_name} "
-        f"sudah overdue sejak {due_text}. Segera lakukan pengembalian."
-    )
-
-    _create_notification(
-        recipient,
-        title=title,
-        category="Reminder",
-        message=message,
-    )
-    _send_borrow_overdue_email(
-        instance,
-        recipient=recipient,
-        title=title,
-        message=message,
-        due_text=due_text,
-        equipment_name=equipment_name,
-        request=request,
-    )
-
-
 def build_status_aggregates(queryset, completed_statuses=None):
     completed_statuses = completed_statuses or ["Completed"]
     return {
@@ -4238,7 +4106,6 @@ def build_status_aggregates(queryset, completed_statuses=None):
         "pending": queryset.filter(status="Pending").count(),
         "approved": queryset.filter(status="Approved").count(),
         "diproses": queryset.filter(status="Diproses").count(),
-        "menunggu_pembayaran": queryset.filter(status="Menunggu Pembayaran").count(),
         "completed": queryset.filter(status__in=completed_statuses).count(),
         "rejected": queryset.filter(status="Rejected").count(),
         "expired": queryset.filter(status="Expired").count(),
@@ -4300,11 +4167,419 @@ def sync_borrow_statuses():
         )
         for item in overdue_borrows:
             item.status = "Overdue"
-            _notify_borrow_overdue(item)
+            notify_borrow_overdue(item)
     return {
         "expired_pending": expired_pending,
         "marked_overdue": len(overdue_borrows),
     }
+
+
+BEBAS_LAB_DOCUMENT_TYPES = {"form_alat_kecil", "form_alat_besar", "form_permintaan_bahan"}
+
+
+class SuratBebasLabViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+    queryset = (
+        SuratBebasLab.objects
+        .select_related("requested_by__user", "reviewed_by__user")
+        .prefetch_related("documents__uploaded_by__user", "booking_histories")
+        .order_by("-created_at")
+    )
+    serializer_class = SuratBebasLabSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = DefaultPagination
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    bulk_delete_success_message = "Semua permohonan surat bebas laboratorium terpilih berhasil dihapus."
+    bulk_delete_failure_message = "Sebagian permohonan surat bebas laboratorium gagal dihapus."
+
+    def get_serializer_class(self):
+        if self.action in {"list", "my", "all"}:
+            return SuratBebasLabListSerializer
+        return SuratBebasLabSerializer
+
+    def _current_profile(self):
+        return getattr(self.request.user, "profile", None)
+
+    def _is_admin(self):
+        return is_administrator_or_above(self.request.user)
+
+    def _is_owner(self, instance):
+        profile = self._current_profile()
+        return profile and instance.requested_by_id == profile.id
+
+    def check_bulk_delete_permission(self, request):
+        if not is_administrator_or_above(request.user):
+            raise PermissionDenied("Akses ditolak.")
+
+    def _apply_filters(self, qs):
+        search = (
+            self.request.query_params.get("search")
+            or self.request.query_params.get("q")
+            or ""
+        ).strip()
+        status_param = self.request.query_params.get("status")
+        requested_by = self.request.query_params.get("requested_by")
+        batch = (self.request.query_params.get("batch") or "").strip()
+        created_after = self.request.query_params.get("created_after")
+        created_before = self.request.query_params.get("created_before")
+        ordering = (self.request.query_params.get("ordering") or "").strip().lower()
+        if search:
+            qs = qs.filter(
+                Q(requested_by__full_name__icontains=search)
+                | Q(requested_by__user__email__icontains=search)
+                | Q(requested_by__id_number__icontains=search)
+                | Q(code__icontains=search)
+            ).distinct()
+        if status_param:
+            qs = qs.filter(status=status_param)
+        if requested_by:
+            qs = qs.filter(requested_by_id=requested_by)
+        if batch:
+            qs = qs.filter(requested_by__batch__icontains=batch)
+        if created_after:
+            qs = qs.filter(created_at__gte=created_after)
+        if created_before:
+            qs = qs.filter(created_at__lte=created_before)
+        if ordering == "oldest":
+            qs = qs.order_by("created_at", "id")
+        else:
+            qs = qs.order_by("-created_at", "-id")
+        return qs
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "my":
+            return self._apply_filters(qs.filter(requested_by=self._current_profile()))
+        if self.action == "all":
+            if not self._is_admin():
+                raise PermissionDenied("Akses ditolak.")
+            return self._apply_filters(qs)
+        if not self._is_admin():
+            return self._apply_filters(qs.filter(requested_by=self._current_profile()))
+        return self._apply_filters(qs)
+
+    def perform_create(self, serializer):
+        instance = serializer.save(requested_by=self._current_profile())
+        self._save_documents(instance)
+        self._save_booking_histories(instance)
+
+    def _save_booking_histories(self, instance):
+        import json
+        raw = self.request.data.get("booking_histories", "")
+        if not raw:
+            return
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            raise ValidationError({"booking_histories": "Format tidak valid (harus JSON array)."})
+        if not isinstance(items, list):
+            return
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            SuratBebasLabBookingHistory.objects.create(
+                surat_bebas_lab=instance,
+                lab_room_name=str(item.get("lab_room_name", ""))[:255],
+                start_date=item.get("start_date"),
+                end_date=item.get("end_date"),
+            )
+
+    def _save_documents(self, instance):
+        request = self.request
+        saved = 0
+        for doc_type in BEBAS_LAB_DOCUMENT_TYPES:
+            file_obj = request.FILES.get(doc_type)
+            if not file_obj:
+                continue
+            self._replace_document(instance, doc_type, file_obj)
+            saved += 1
+        if saved == 0:
+            instance.delete()
+            raise ValidationError({"documents": "Minimal satu dokumen harus dilampirkan."})
+
+    def _replace_document(self, instance, document_type, file_obj):
+        document_instance = instance.documents.filter(document_type=document_type).first()
+        if document_instance is None:
+            Document.objects.create(
+                surat_bebas_lab=instance,
+                document_type=document_type,
+                document=file_obj,
+                original_name=file_obj.name,
+                mime_type=file_obj.content_type,
+                size=file_obj.size,
+                uploaded_by=self._current_profile(),
+                pengujian=None,
+            )
+            return
+
+        old_document_name = document_instance.document.name if document_instance.document else ""
+        document_instance.document = file_obj
+        document_instance.original_name = file_obj.name
+        document_instance.mime_type = file_obj.content_type
+        document_instance.size = file_obj.size
+        document_instance.uploaded_by = self._current_profile()
+        document_instance.pengujian = None
+        document_instance.save()
+
+        if old_document_name and old_document_name != document_instance.document.name:
+            document_storage = document_instance.document.storage
+            if document_storage is not None:
+                document_storage.delete(old_document_name)
+
+    def _delete_document_file(self, document_instance):
+        if not document_instance.document:
+            return
+
+        document_name = document_instance.document.name or ""
+        document_storage = document_instance.document.storage
+        if document_name and document_storage is not None:
+            document_storage.delete(document_name)
+
+    def _build_mutation_response(self, instance, **extra):
+        instance.refresh_from_db()
+        serializer = SuratBebasLabSerializer(instance, context=self.get_serializer_context())
+        return Response(
+            {
+                "surat_bebas_lab": serializer.data,
+                **extra,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._is_owner(instance):
+            raise PermissionDenied("Anda hanya dapat mengubah permohonan milik sendiri.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat diubah."})
+
+        updated_document_types = []
+        for document_type in BEBAS_LAB_DOCUMENT_TYPES:
+            file_obj = request.FILES.get(document_type)
+            if not file_obj:
+                continue
+            self._replace_document(instance, document_type, file_obj)
+            updated_document_types.append(document_type)
+
+        if not updated_document_types:
+            raise ValidationError({"documents": "Minimal satu dokumen harus dikirim untuk diperbarui."})
+
+        return self._build_mutation_response(
+            instance,
+            action="documents_updated",
+            updated_document_types=updated_document_types,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        is_admin = self._is_admin()
+        if not self._is_owner(instance) and not is_admin:
+            raise PermissionDenied("Akses ditolak.")
+        if not is_admin and instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat dihapus."})
+        return super().destroy(request, *args, **kwargs)
+
+    def perform_destroy(self, instance):
+        documents = list(instance.documents.all())
+        super().perform_destroy(instance)
+        for document in documents:
+            self._delete_document_file(document)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("document_type", OpenApiTypes.STR, OpenApiParameter.PATH),
+        ]
+    )
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path=r"documents/delete/(?P<document_type>[^/.]+)",
+    )
+    def delete_document(self, request, pk=None, document_type=None):  # noqa: ARG002
+        instance = self.get_object()
+        if not self._is_owner(instance) and not self._is_admin():
+            raise PermissionDenied("Akses ditolak.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya dokumen dari permohonan Pending yang dapat dihapus."})
+
+        document_type = str(document_type or "").strip()
+        if document_type not in BEBAS_LAB_DOCUMENT_TYPES:
+            raise ValidationError({"document_type": "Jenis dokumen tidak dikenali."})
+
+        document_instance = instance.documents.filter(document_type=document_type).first()
+        if document_instance is None:
+            raise ValidationError({"document_type": "Dokumen tidak ditemukan."})
+        if instance.documents.count() <= 1:
+            raise ValidationError(
+                {"documents": "Minimal satu dokumen harus tersisa pada permohonan."}
+            )
+
+        self._delete_document_file(document_instance)
+        document_instance.delete()
+
+        return self._build_mutation_response(
+            instance,
+            action="document_deleted",
+            deleted_document_type=document_type,
+        )
+
+    @action(detail=False, methods=["get"], url_path="my")
+    def my(self, _request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        serializer = SuratBebasLabListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=False, methods=["get"], url_path="all")
+    def all(self, _request):
+        if not self._is_admin():
+            raise PermissionDenied("Akses ditolak.")
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        serializer = SuratBebasLabListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=False, methods=["get"], url_path="booking-suggestions")
+    def booking_suggestions(self, _request):
+        profile = self._current_profile()
+        if not profile:
+            raise PermissionDenied("Profil pengguna tidak ditemukan.")
+        qs = (
+            Booking.objects
+            .filter(
+                requested_by=profile,
+                status__in=["Approved", "Completed"],
+                purpose="Skripsi/TA",
+            )
+            .select_related("room")
+            .order_by("-start_time")
+        )
+        serializer = BookingSuggestionSerializer(qs, many=True)
+        return Response({"results": serializer.data, "count": qs.count()})
+
+    @action(detail=True, methods=["patch"], url_path="update-booking-histories")
+    def update_booking_histories(self, request, pk=None):  # noqa: ARG002
+        instance = self.get_object()
+        if not self._is_owner(instance) and not self._is_admin():
+            raise PermissionDenied("Anda hanya dapat mengubah permohonan milik sendiri.")
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat diubah."})
+        import json
+        raw = request.data.get("booking_histories", "")
+        try:
+            items = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            raise ValidationError({"booking_histories": "Format tidak valid (harus JSON array)."})
+        if not isinstance(items, list):
+            raise ValidationError({"booking_histories": "booking_histories harus berupa array."})
+        instance.booking_histories.all().delete()
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            SuratBebasLabBookingHistory.objects.create(
+                surat_bebas_lab=instance,
+                lab_room_name=str(item.get("lab_room_name", ""))[:255],
+                start_date=item.get("start_date"),
+                end_date=item.get("end_date"),
+            )
+        return self._build_mutation_response(instance, action="booking_histories_updated")
+
+    @action(detail=True, methods=["post"], url_path="send-letter")
+    def send_letter(self, request, pk=None):  # noqa: ARG002
+        if not self._is_admin():
+            raise PermissionDenied("Hanya Admin yang dapat mengirim surat.")
+        instance = self.get_object()
+        if instance.status != "Approved":
+            raise ValidationError({"status": "Surat hanya dapat dikirim untuk permohonan yang sudah disetujui."})
+
+        pdf_file = request.FILES.get("letter_pdf")
+        if not pdf_file:
+            raise ValidationError({"letter_pdf": "File PDF surat harus dilampirkan."})
+
+        requester = instance.requested_by
+        requester_email = (
+            requester.user.email if requester and getattr(requester, "user", None) else None
+        )
+        if not requester_email:
+            raise ValidationError({"email": "Email pemohon tidak ditemukan."})
+
+        requester_name = getattr(requester, "full_name", None) or requester_email
+        attachment_name = f"surat-bebas-lab-{instance.code}.pdf"
+        pdf_bytes = pdf_file.read()
+
+        frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
+        cta_url = f"{frontend_url}/lab-clearance" if frontend_url else ""
+        context = build_email_context(
+            request=request,
+            extra_context={
+                "notification_title": "Surat Bebas Penggunaan Laboratorium",
+                "notification_message": (
+                    "Surat bebas penggunaan laboratorium Anda telah diterbitkan dan "
+                    f"terlampir pada email ini untuk pengajuan {instance.code}."
+                ),
+                "user_display": requester_name,
+                "request_identifier": instance.code,
+                "cta_url": cta_url,
+                "cta_label": "Buka Halaman Surat Bebas Lab",
+            },
+        )
+
+        sent = send_notification_email(
+            requester_email,
+            template_base="csluse/email/lab_clearance_letter",
+            context=context,
+            attachments=[(attachment_name, pdf_bytes, "application/pdf")],
+        )
+        if not sent:
+            raise ValidationError({"email": "Gagal mengirim email surat ke pemohon."})
+
+        return Response({"message": f"Surat berhasil dikirim ke {requester_email}."})
+
+    @action(detail=True, methods=["post"])
+    def approve(self, _request, pk=None):  # noqa: ARG002
+        if not self._is_admin():
+            raise PermissionDenied("Hanya Admin yang dapat menyetujui permohonan.")
+        instance = self.get_object()
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat disetujui."})
+        now = timezone.now()
+        serializer = SuratBebasLabSerializer(
+            instance,
+            data={"status": "Approved"},
+            partial=True,
+            context={**self.get_serializer_context(), "allow_status_transition": True},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(reviewed_by=self._current_profile(), reviewed_at=now)
+        return self._build_mutation_response(
+            instance,
+            action="approved",
+        )
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):  # noqa: ARG002
+        if not self._is_admin():
+            raise PermissionDenied("Hanya Admin yang dapat menolak permohonan.")
+        instance = self.get_object()
+        if instance.status != "Pending":
+            raise ValidationError({"status": "Hanya permohonan berstatus Pending yang dapat ditolak."})
+        note = (request.data.get("note") or "").strip()
+        now = timezone.now()
+        serializer = SuratBebasLabSerializer(
+            instance,
+            data={"status": "Rejected", "note": note},
+            partial=True,
+            context={**self.get_serializer_context(), "allow_status_transition": True},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(reviewed_by=self._current_profile(), reviewed_at=now)
+        return self._build_mutation_response(
+            instance,
+            action="rejected",
+        )
 
 
 # endregion

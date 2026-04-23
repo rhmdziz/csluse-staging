@@ -36,17 +36,9 @@ class Image(BaseModel):
     image = models.ImageField(upload_to="images/")
     name = models.CharField(max_length=255, blank=True)
     url = models.URLField(blank=True)
-    created_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="images_created_by",
-    )
 
     def __str__(self):
-        creator_email = self.created_by.user.email if self.created_by else "unknown"
-        return f"{self.name or self.image.name} - {creator_email}"
+        return self.name or self.image.name
 
 
 class Room(BaseModel):
@@ -242,7 +234,8 @@ class Booking(BaseModel):
         return f"{self.code} - {self.requested_by.user.email} - {self.room.name} - {self.status}"
 
 
-class BookingEquipmentItem(BaseModel):
+class BookingEquipmentItem(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
     booking = models.ForeignKey(
         Booking,
         on_delete=models.CASCADE,
@@ -364,7 +357,6 @@ class Pengujian(BaseModel):
         ("Approved", "Approved"),
         ("Canceled", "Canceled"),
         ("Diproses", "Diproses"),
-        ("Menunggu Pembayaran", "Menunggu Pembayaran"),
         ("Rejected", "Rejected"),
         ("Completed", "Completed"),
     ]
@@ -415,6 +407,57 @@ class Pengujian(BaseModel):
         return f"{self.name} - {self.email}"
 
 
+class SuratBebasLab(BaseModel):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Rejected", "Rejected"),
+    ]
+
+    code = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    requested_by = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="surat_bebas_lab_requests",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
+    note = models.TextField(blank=True, default="")
+    reviewed_by = models.ForeignKey(
+        Profile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="surat_bebas_lab_reviews",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            now = timezone.localtime(timezone.now())
+            yymm = now.strftime("%y%m")
+            with transaction.atomic():
+                self.code = _next_code(SuratBebasLab, "BL", yymm)
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} - {self.requested_by}"
+
+
+class SuratBebasLabBookingHistory(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
+    surat_bebas_lab = models.ForeignKey(
+        SuratBebasLab,
+        on_delete=models.CASCADE,
+        related_name="booking_histories",
+    )
+    lab_room_name = models.CharField(max_length=255)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"{self.surat_bebas_lab.code} - {self.lab_room_name} ({self.start_date})"
+
+
 class Document(BaseModel):
     DOCUMENT_TYPE_CHOICES = [
         ("testing_agreement", "Surat perjanjian pengujian"),
@@ -423,14 +466,26 @@ class Document(BaseModel):
         ("payment_proof", "Bukti bayar"),
         ("receipt", "Kuitansi"),
         ("test_result_letter", "Surat hasil uji"),
+        ("form_alat_kecil", "F-027A Peminjaman dan Pengembalian Alat Kecil"),
+        ("form_alat_besar", "F-027B Pemakaian Alat Besar"),
+        ("form_permintaan_bahan", "F-028 Permintaan Bahan"),
     ]
 
     pengujian = models.ForeignKey(
         Pengujian,
         on_delete=models.CASCADE,
         related_name="documents",
+        null=True,
+        blank=True,
     )
-    document = models.FileField(upload_to="documents/sample-testing/")
+    surat_bebas_lab = models.ForeignKey(
+        SuratBebasLab,
+        on_delete=models.CASCADE,
+        related_name="documents",
+        null=True,
+        blank=True,
+    )
+    document = models.FileField(upload_to="documents/")
     document_type = models.CharField(max_length=64, choices=DOCUMENT_TYPE_CHOICES)
     original_name = models.CharField(max_length=255, blank=True)
     mime_type = models.CharField(max_length=255, blank=True)
@@ -447,12 +502,20 @@ class Document(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["pengujian", "document_type"],
+                condition=models.Q(pengujian__isnull=False),
                 name="unique_pengujian_document_type",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["surat_bebas_lab", "document_type"],
+                condition=models.Q(surat_bebas_lab__isnull=False),
+                name="unique_surat_bebas_lab_document_type",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.pengujian.code} - {self.document_type}"
+        parent = self.pengujian or self.surat_bebas_lab
+        code = getattr(parent, "code", str(self.id))
+        return f"{code} - {self.document_type}"
 
 
 # endregion Sample Testing Models
@@ -526,13 +589,6 @@ class Schedule(BaseModel):
         blank=True,
         related_name="schedules",
     )
-    created_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="schedules_created_by",
-    )
 
     class Meta:
         ordering = ["start_time", "title"]
@@ -550,13 +606,6 @@ class FAQ(BaseModel):
         null=True,
         blank=True,
         related_name="faqs",
-    )
-    created_by = models.ForeignKey(
-        Profile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="faqs_created_by",
     )
 
     class Meta:

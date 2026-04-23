@@ -21,12 +21,6 @@ export type Faq = {
     name?: string | null;
   } | null;
   imageUrl?: string;
-  created_by?: string | number | null;
-  created_by_detail?: {
-    full_name?: string | null;
-    email?: string | null;
-    role?: string | null;
-  } | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

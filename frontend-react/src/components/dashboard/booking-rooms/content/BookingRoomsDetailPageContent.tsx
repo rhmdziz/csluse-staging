@@ -86,7 +86,7 @@ function DetailMetaItem({
   if (!hasDisplayValue(value)) return null;
 
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-xs leading-5 text-slate-800 break-words">{value}</p>
     </div>
@@ -106,7 +106,7 @@ function BookingDetailSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]">
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -265,8 +265,8 @@ export default function BookingRoomsDetailPage() {
       <div
         className={
           isApprovalPage
-            ? "grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
-            : "grid gap-4 xl:grid-cols-[1.1fr_0.9fr]"
+            ? "grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]"
+            : "grid gap-4 xl:grid-cols-[minmax(0,1.22fr)_minmax(340px,0.92fr)]"
         }
       >
         {isApprovalPage ? (
@@ -327,7 +327,7 @@ export default function BookingRoomsDetailPage() {
                   {booking.equipmentItems.map((item) => (
                     <div
                       key={item.id || `${item.equipmentName}-${item.quantity}`}
-                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
+                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4"
                     >
                       <p className="text-xs text-slate-500">Peralatan</p>
                       <p className="text-xs leading-5 text-slate-800 break-words">
@@ -346,6 +346,7 @@ export default function BookingRoomsDetailPage() {
                 onStatusClick={() => setProgressOpen(true)}
                 approvedByName={booking.approvedByName}
                 rejectionNote={booking.rejectionNote}
+                itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
               >
                 {hasMentorApprovalTrace(booking) ? (
                   <>
@@ -430,7 +431,7 @@ export default function BookingRoomsDetailPage() {
                   {booking.equipmentItems.map((item) => (
                     <div
                       key={item.id || `${item.equipmentName}-${item.quantity}`}
-                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
+                      className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4"
                     >
                       <p className="text-xs text-slate-500">Peralatan</p>
                       <p className="text-xs leading-5 text-slate-800 break-words">
@@ -451,6 +452,7 @@ export default function BookingRoomsDetailPage() {
                 onStatusClick={() => setProgressOpen(true)}
                 approvedByName={booking.approvedByName}
                 rejectionNote={booking.rejectionNote}
+                itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
               >
                 {hasMentorApprovalTrace(booking) ? (
                   <>

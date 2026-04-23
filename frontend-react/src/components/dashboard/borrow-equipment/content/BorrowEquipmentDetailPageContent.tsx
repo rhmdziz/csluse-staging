@@ -94,7 +94,7 @@ function DetailMetaItem({
   if (!hasDisplayValue(value)) return null;
 
   return (
-    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+    <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50/80 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)] md:items-start md:gap-4">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-xs leading-5 text-slate-800 break-words">{value}</p>
     </div>
@@ -114,7 +114,7 @@ function BorrowDetailSkeleton() {
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]">
         <div className="space-y-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             <div className="flex items-start gap-3">
@@ -271,7 +271,7 @@ export default function BorrowEquipmentDetailPage() {
       <div
         className={
           isAllPage
-            ? "grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
+            ? "grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(340px,0.85fr)]"
             : "space-y-4"
         }
       >
@@ -318,6 +318,7 @@ export default function BorrowEquipmentDetailPage() {
                 onStatusClick={() => setProgressOpen(true)}
                 approvedByName={item.approvedByName}
                 rejectionNote={item.rejectionNote}
+                itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
               >
                 {hasMentorApprovalTrace(item) ? (
                   <>
@@ -378,7 +379,7 @@ export default function BorrowEquipmentDetailPage() {
           </>
         ) : (
           <>
-            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.22fr)_minmax(340px,0.92fr)]">
               <div className="space-y-4">
                 <DetailCard
                   title="Detail Peminjaman Alat"
@@ -422,6 +423,7 @@ export default function BorrowEquipmentDetailPage() {
                   onStatusClick={() => setProgressOpen(true)}
                   approvedByName={item.approvedByName}
                   rejectionNote={item.rejectionNote}
+                  itemGridClassName="md:grid-cols-[150px_minmax(0,1fr)]"
                 >
                   {hasMentorApprovalTrace(item) ? (
                     <>

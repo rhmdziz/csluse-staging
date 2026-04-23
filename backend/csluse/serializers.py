@@ -25,6 +25,8 @@ from .models import (
     Room,
     Schedule,
     Software,
+    SuratBebasLab,
+    SuratBebasLabBookingHistory,
 )
 
 
@@ -1370,6 +1372,7 @@ class AnnouncementListSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "content",
+            "created_by",
             "created_at",
         ]
 
@@ -1392,7 +1395,6 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 class ScheduleSerializer(serializers.ModelSerializer):
     room_detail = RoomListSerializer(source="room", read_only=True)
-    created_by_detail = ProfileSerializer(source="created_by", read_only=True)
 
     class Meta:
         model = Schedule
@@ -1406,16 +1408,12 @@ class ScheduleSerializer(serializers.ModelSerializer):
             "category",
             "room",
             "room_detail",
-            "created_by",
-            "created_by_detail",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_by"]
 
 
 class FAQSerializer(serializers.ModelSerializer):
-    created_by_detail = ProfileSerializer(source="created_by", read_only=True)
     image_detail = ImageSerializer(source="image", read_only=True)
 
     class Meta:
@@ -1426,8 +1424,6 @@ class FAQSerializer(serializers.ModelSerializer):
             "answer",
             "image",
             "image_detail",
-            "created_by",
-            "created_by_detail",
             "created_at",
             "updated_at",
         ]
@@ -1688,6 +1684,132 @@ def _apply_requester_mentor_rules(serializer_instance, attrs):
         or None
     )
     return attrs
+
+
+# region Surat Bebas Lab Serializers
+
+
+class SuratBebasLabBookingHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SuratBebasLabBookingHistory
+        fields = ["id", "lab_room_name", "start_date", "end_date"]
+
+
+class BookingSuggestionSerializer(serializers.ModelSerializer):
+    lab_room_name = serializers.CharField(source="room.name", read_only=True)
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
+
+    def get_start_date(self, obj):
+        return obj.start_time.date().isoformat() if obj.start_time else None
+
+    def get_end_date(self, obj):
+        return obj.end_time.date().isoformat() if obj.end_time else None
+
+    class Meta:
+        model = Booking
+        fields = ["id", "code", "lab_room_name", "start_date", "end_date", "status"]
+
+
+class SuratBebasLabDocumentSerializer(serializers.ModelSerializer):
+    document_url = serializers.SerializerMethodField()
+
+    def get_document_url(self, obj):
+        request = self.context.get("request")
+        if obj.document and request:
+            return request.build_absolute_uri(obj.document.url)
+        return None
+
+    class Meta:
+        model = Document
+        fields = [
+            "id",
+            "document_type",
+            "original_name",
+            "mime_type",
+            "size",
+            "document_url",
+            "created_at",
+        ]
+
+
+class SuratBebasLabSerializer(serializers.ModelSerializer):
+    requested_by_detail = ProfileSerializer(source="requested_by", read_only=True)
+    reviewed_by_detail = ProfileSerializer(source="reviewed_by", read_only=True)
+    documents = SuratBebasLabDocumentSerializer(many=True, read_only=True)
+    booking_histories = SuratBebasLabBookingHistorySerializer(many=True, read_only=True)
+
+    def validate(self, attrs):
+        instance = getattr(self, "instance", None)
+        if instance is None:
+            if attrs.get("status") not in (None, "Pending"):
+                raise serializers.ValidationError(
+                    {"status": "Status hanya boleh diubah melalui action approve/reject."}
+                )
+        elif "status" in attrs and not self.context.get("allow_status_transition"):
+            raise serializers.ValidationError(
+                {"status": "Gunakan action approve atau reject untuk mengubah status."}
+            )
+        return attrs
+
+    class Meta:
+        model = SuratBebasLab
+        fields = "__all__"
+        read_only_fields = ["requested_by", "code", "reviewed_by", "reviewed_at"]
+
+
+class SuratBebasLabListSerializer(serializers.ModelSerializer):
+    requested_by_detail = serializers.SerializerMethodField()
+    reviewed_by_detail = serializers.SerializerMethodField()
+    document_count = serializers.SerializerMethodField()
+    documents = SuratBebasLabDocumentSerializer(many=True, read_only=True)
+    booking_histories = SuratBebasLabBookingHistorySerializer(many=True, read_only=True)
+
+    def get_requested_by_detail(self, obj):
+        p = obj.requested_by
+        if not p:
+            return None
+        return {
+            "id": str(p.id),
+            "full_name": p.full_name or "",
+            "id_number": p.id_number or "",
+            "email": p.user.email if p.user else "",
+            "department": p.department or "",
+            "batch": p.batch or "",
+        }
+
+    def get_reviewed_by_detail(self, obj):
+        p = obj.reviewed_by
+        if not p:
+            return None
+        return {
+            "id": str(p.id),
+            "full_name": p.full_name or "",
+            "email": p.user.email if p.user else "",
+        }
+
+    def get_document_count(self, obj):
+        return obj.documents.count()
+
+    class Meta:
+        model = SuratBebasLab
+        fields = [
+            "id",
+            "code",
+            "status",
+            "note",
+            "requested_by_detail",
+            "reviewed_by_detail",
+            "document_count",
+            "documents",
+            "booking_histories",
+            "reviewed_at",
+            "created_at",
+            "updated_at",
+        ]
+
+
+# endregion Surat Bebas Lab Serializers
 
 
 # endregion Utilities
