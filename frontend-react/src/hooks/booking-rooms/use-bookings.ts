@@ -73,6 +73,8 @@ export type BookingRow = {
 type ApiBooking = {
   id?: string | number | null;
   code?: string | null;
+  requester_name?: string | null;
+  room_name?: string | null;
   status?: string | null;
   purpose?: string | null;
   note?: string | null;
@@ -163,6 +165,7 @@ export function mapBooking(item: ApiBooking): BookingRow {
   const requesterName =
     item.requested_by_detail?.full_name ||
     item.requested_by_detail?.email ||
+    item.requester_name ||
     "-";
   const approvedByName =
     item.approved_by_detail?.full_name ||
@@ -201,7 +204,7 @@ export function mapBooking(item: ApiBooking): BookingRow {
     id: item.id ?? `booking-${Math.random().toString(36).slice(2, 8)}`,
     code: String(item.code ?? "-"),
     roomId: String(item.room_detail?.id ?? item.room ?? ""),
-    roomName: String(item.room_detail?.name ?? "-"),
+    roomName: String(item.room_detail?.name ?? item.room_name ?? "-"),
     roomNumber: String(item.room_detail?.number ?? "-"),
     roomPicName,
     roomPicIds,

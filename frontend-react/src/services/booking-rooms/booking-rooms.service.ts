@@ -2,6 +2,7 @@ import {
   API_BOOKINGS,
   API_BOOKINGS_ALL,
   API_BOOKINGS_MY,
+  API_BOOKINGS_LEGACY_BULK_IMPORT,
   API_BOOKING_APPROVE,
   API_BOOKING_CANCEL,
   API_BOOKING_COMPLETE,
@@ -47,6 +48,39 @@ export type CreateBookingRoomPayload = {
 };
 
 export type BookingStatusActionType = "approve" | "reject" | "complete" | "cancel";
+
+export type LegacyBookingImportRow = {
+  index: number;
+  code?: string;
+  requesterName?: string;
+  roomId?: string;
+  roomNumber?: string;
+  roomName?: string;
+  startTime: string;
+  endTime: string;
+  status?: string;
+  purpose?: string;
+  attendeeCount?: number;
+  attendeeNames?: string;
+  requestedById?: string;
+  requestedByEmail?: string;
+  requesterPhone?: string;
+  requesterMentor?: string;
+  institution?: string;
+  institutionAddress?: string;
+  workshopTitle?: string;
+  workshopPic?: string;
+  workshopInstitution?: string;
+  approvedById?: string;
+  approvedByEmail?: string;
+  createdAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectionNote?: string;
+  expiredAt?: string;
+  completedAt?: string;
+  note?: string;
+};
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -179,6 +213,51 @@ export const bookingRoomsService = {
         ),
       },
     );
+
+    return parseMutationResponse(response);
+  },
+
+  async legacyBulkImport(rows: LegacyBookingImportRow[]) {
+    const body = {
+      rows: rows.map((row) => ({
+        index: row.index,
+        code: row.code?.trim() || undefined,
+        requester_name: row.requesterName?.trim() || undefined,
+        room: row.roomId?.trim() || undefined,
+        room_number: row.roomNumber?.trim() || undefined,
+        room_name: row.roomName?.trim() || undefined,
+        start_time: row.startTime,
+        end_time: row.endTime,
+        status: row.status?.trim() || undefined,
+        purpose: row.purpose?.trim() || undefined,
+        attendee_count: row.attendeeCount,
+        attendee_names: row.attendeeNames?.trim() || undefined,
+        requested_by: row.requestedById?.trim() || undefined,
+        requested_by_email: row.requestedByEmail?.trim() || undefined,
+        requester_phone: row.requesterPhone?.trim() || undefined,
+        requester_mentor: row.requesterMentor?.trim() || undefined,
+        institution: row.institution?.trim() || undefined,
+        institution_address: row.institutionAddress?.trim() || undefined,
+        workshop_title: row.workshopTitle?.trim() || undefined,
+        workshop_pic: row.workshopPic?.trim() || undefined,
+        workshop_institution: row.workshopInstitution?.trim() || undefined,
+        approved_by: row.approvedById?.trim() || undefined,
+        approved_by_email: row.approvedByEmail?.trim() || undefined,
+        created_at: row.createdAt || undefined,
+        approved_at: row.approvedAt || undefined,
+        rejected_at: row.rejectedAt || undefined,
+        rejection_note: row.rejectionNote?.trim() || undefined,
+        expired_at: row.expiredAt || undefined,
+        completed_at: row.completedAt || undefined,
+        note: row.note?.trim() || undefined,
+      })),
+    };
+
+    const response = await authFetch(API_BOOKINGS_LEGACY_BULK_IMPORT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
     return parseMutationResponse(response);
   },

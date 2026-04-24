@@ -172,6 +172,66 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("H+2", response.data["start_time"][0])
 
+    def test_admin_can_bulk_import_legacy_booking_history(self):
+        self.client.force_authenticate(user=self.admin_user)
+        start = timezone.now() - timedelta(days=30)
+        end = start + timedelta(hours=2)
+
+        response = self.client.post(
+            "/api/bookings/legacy-bulk-import/",
+            {
+                "rows": [
+                    {
+                        "index": 2,
+                        "requester_name": "Peminjam Legacy",
+                        "room_name": "Lab Legacy",
+                        "start_time": start.isoformat(),
+                        "end_time": end.isoformat(),
+                        "status": "Completed",
+                        "attendee_count": 12,
+                        "purpose": "Penelitian",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["success_count"], 1)
+        booking = Booking.objects.get()
+        self.assertIsNone(booking.room_id)
+        self.assertEqual(booking.room_name, "Lab Legacy")
+        self.assertEqual(booking.status, "Completed")
+        self.assertEqual(booking.attendee_count, 12)
+        self.assertEqual(booking.requester_name, "Peminjam Legacy")
+        self.assertTrue(booking.code.startswith("CSLUSE020"))
+
+    def test_admin_can_bulk_import_legacy_sample_testing_history(self):
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.post(
+            "/api/pengujians/legacy-bulk-import/",
+            {
+                "rows": [
+                    {
+                        "index": 2,
+                        "name": "Legacy Requester",
+                        "email": "legacy@example.com",
+                        "sample_type": "Air",
+                        "status": "Completed",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["success_count"], 1)
+        pengujian = Pengujian.objects.get()
+        self.assertEqual(pengujian.name, "Legacy Requester")
+        self.assertEqual(pengujian.status, "Completed")
+        self.assertTrue(pengujian.code.startswith("CSLUSE020"))
+
     def test_booking_request_can_cross_weekend_when_within_three_months(self):
         start, end = self.future_weekday_window(
             4,
@@ -796,6 +856,34 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Pengujian.objects.filter(id=pengujian.id).exists())
+
+    def test_admin_can_bulk_delete_sample_testing_history(self):
+        pengujian = self.create_pengujian(self.student_profile, status="Completed")
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.post(
+            "/api/pengujians/bulk-delete/",
+            {"ids": [str(pengujian.id)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["deleted_count"], 1)
+        self.assertFalse(Pengujian.objects.filter(id=pengujian.id).exists())
+
+    def test_admin_can_bulk_delete_borrow_history(self):
+        borrow = self.create_borrow(self.student_profile, status="Borrowed")
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.post(
+            "/api/borrows/bulk-delete/",
+            {"ids": [str(borrow.id)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["deleted_count"], 1)
+        self.assertFalse(Borrow.objects.filter(id=borrow.id).exists())
 
     def test_requester_can_cancel_own_approved_pengujian(self):
         pengujian = self.create_pengujian(self.student_profile, status="Approved")
