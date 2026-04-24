@@ -8,6 +8,7 @@ import {
   API_PENGUJIAN_UPLOAD_DOCUMENT,
   API_PENGUJIANS,
   API_PENGUJIANS_ALL,
+  API_PENGUJIANS_LEGACY_BULK_IMPORT,
   API_PENGUJIANS_MY,
 } from "@/constants/api";
 import { authFetch } from "@/lib/auth";
@@ -41,6 +42,34 @@ export type CreateSampleTestingPayload = {
 };
 
 export type SampleTestingStatusActionType = "approve" | "reject" | "cancel" | "complete";
+
+export type LegacySampleTestingImportRow = {
+  index: number;
+  code?: string;
+  name: string;
+  institution?: string;
+  institutionAddress?: string;
+  email: string;
+  phoneNumber?: string;
+  sampleName?: string;
+  sampleType: string;
+  sampleBrand?: string;
+  samplePackaging?: string;
+  sampleWeight?: string;
+  sampleQuantity?: string;
+  sampleTestingServing?: string;
+  sampleTestingMethod?: string;
+  sampleTestingType?: string;
+  status?: string;
+  requestedById?: string;
+  requestedByEmail?: string;
+  approvedById?: string;
+  approvedByEmail?: string;
+  createdAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  completedAt?: string;
+};
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -190,6 +219,46 @@ export const sampleTestingService = {
       API_PENGUJIAN_DELETE_DOCUMENT(sampleTestingId, documentType),
       { method: "DELETE" },
     );
+
+    return parseMutationResponse(response);
+  },
+
+  async legacyBulkImport(rows: LegacySampleTestingImportRow[]) {
+    const body = {
+      rows: rows.map((row) => ({
+        index: row.index,
+        code: row.code?.trim() || undefined,
+        name: row.name.trim(),
+        institution: row.institution?.trim() || undefined,
+        institution_address: row.institutionAddress?.trim() || undefined,
+        email: row.email.trim(),
+        phone_number: row.phoneNumber?.trim() || undefined,
+        sample_name: row.sampleName?.trim() || undefined,
+        sample_type: row.sampleType.trim(),
+        sample_brand: row.sampleBrand?.trim() || undefined,
+        sample_packaging: row.samplePackaging?.trim() || undefined,
+        sample_weight: row.sampleWeight?.trim() || undefined,
+        sample_quantity: row.sampleQuantity?.trim() || undefined,
+        sample_testing_serving: row.sampleTestingServing?.trim() || undefined,
+        sample_testing_method: row.sampleTestingMethod?.trim() || undefined,
+        sample_testing_type: row.sampleTestingType?.trim() || undefined,
+        status: row.status?.trim() || undefined,
+        requested_by: row.requestedById?.trim() || undefined,
+        requested_by_email: row.requestedByEmail?.trim() || undefined,
+        approved_by: row.approvedById?.trim() || undefined,
+        approved_by_email: row.approvedByEmail?.trim() || undefined,
+        created_at: row.createdAt || undefined,
+        approved_at: row.approvedAt || undefined,
+        rejected_at: row.rejectedAt || undefined,
+        completed_at: row.completedAt || undefined,
+      })),
+    };
+
+    const response = await authFetch(API_PENGUJIANS_LEGACY_BULK_IMPORT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
     return parseMutationResponse(response);
   },

@@ -8,6 +8,7 @@ import type { DateRange } from "react-day-picker";
 import {
   ClipboardCheck,
   Eye,
+  History,
   Trash2,
 } from "lucide-react";
 
@@ -21,6 +22,7 @@ import {
   AdminHistoryExportActions,
   AdminHistorySummaryCards,
   AdminHistoryTable,
+  BookingHistoryLegacyImportDialog,
   RelatedUserDetailDialog,
 } from "@/components/admin/history";
 
@@ -130,6 +132,7 @@ export default function AdminRoomBookingHistoryPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isExportingSelectedPdf, setIsExportingSelectedPdf] = useState(false);
   const [isExportingSelectedExcel, setIsExportingSelectedExcel] = useState(false);
+  const [isLegacyImportOpen, setIsLegacyImportOpen] = useState(false);
   const createdAfter = createdRange?.from ? formatDateKey(createdRange.from) : "";
   const createdBefore = createdRange?.to
     ? formatDateKey(createdRange.to)
@@ -556,6 +559,15 @@ export default function AdminRoomBookingHistoryPage() {
               <p className="text-xs text-slate-500 sm:text-right">
                 Export mengikuti filter dan pencarian yang sedang aktif.
               </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setIsLegacyImportOpen(true)}
+              >
+                <History className="h-4 w-4" />
+                Import Legacy
+              </Button>
               <AdminHistoryExportActions
                 onExportExcel={exportExcel}
                 onExportPdf={exportPdf}
@@ -770,6 +782,12 @@ export default function AdminRoomBookingHistoryPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <BookingHistoryLegacyImportDialog
+            open={isLegacyImportOpen}
+            onOpenChange={setIsLegacyImportOpen}
+            onCompleted={() => setReloadKey((prev) => prev + 1)}
+          />
 
           <RelatedRoomDetailDialog
             open={Boolean(relatedRoomId)}

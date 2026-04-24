@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from django.db import transaction
 from django.db.models import Prefetch, Q, Sum
 from rest_framework import viewsets, status
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
@@ -119,6 +120,119 @@ PENGUJIAN_APPROVER_DOCUMENT_TYPES = {
     "receipt",
     "test_result_letter",
 }
+
+LEGACY_IMPORT_CODE_PREFIX = "CSLUSE020"
+
+
+def _resolve_legacy_row_index(row, default_index):
+    if not isinstance(row, dict):
+        return default_index
+    try:
+        return int(row.get("index") or default_index)
+    except (TypeError, ValueError):
+        return default_index
+
+
+def _coerce_legacy_string(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _coerce_legacy_positive_int(value, default=1):
+    text = _coerce_legacy_string(value)
+    if not text:
+        return default
+    try:
+        parsed = int(float(text))
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _parse_legacy_datetime_field(value, field_name, *, required=False):
+    if value in (None, ""):
+        if required:
+            raise ValidationError({field_name: f"{field_name} wajib diisi."})
+        return None
+
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        raw = _coerce_legacy_string(value)
+        parsed = parse_datetime(raw)
+        if parsed is None and " " in raw and "T" not in raw:
+            parsed = parse_datetime(raw.replace(" ", "T", 1))
+
+    if parsed is None:
+        raise ValidationError({field_name: f"Format {field_name} tidak valid."})
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_default_timezone())
+    return parsed
+
+
+def _normalize_legacy_status(raw_value, allowed_statuses, default_status):
+    text = _coerce_legacy_string(raw_value)
+    if not text:
+        return default_status
+    normalized = normalize_status_value(text)
+    if normalized in allowed_statuses:
+        return normalized
+    return default_status
+
+
+def _validate_legacy_code(candidate, used_codes):
+    code = _coerce_legacy_string(candidate).upper().replace(" ", "")
+    if not code:
+        return ""
+    if len(code) > 12:
+        raise ValidationError({"code": "Kode maksimal 12 karakter."})
+    if code in used_codes:
+        raise ValidationError({"code": "Kode duplikat di file import."})
+    used_codes.add(code)
+    return code
+
+
+def _generate_legacy_code(model_cls, used_codes, prefix=LEGACY_IMPORT_CODE_PREFIX):
+    normalized_prefix = _coerce_legacy_string(prefix).upper().replace(" ", "")
+    if not normalized_prefix:
+        raise ValidationError({"code": "Prefix kode legacy tidak valid."})
+    if len(normalized_prefix) > 9:
+        raise ValidationError({"code": "Prefix kode legacy maksimal 9 karakter."})
+
+    last = (
+        model_cls.objects.filter(code__startswith=normalized_prefix)
+        .order_by("-code")
+        .first()
+    )
+    next_seq = 1
+    if last and last.code:
+        suffix = last.code[len(normalized_prefix):]
+        if suffix.isdigit():
+            next_seq = int(suffix) + 1
+
+    while next_seq <= 999:
+        candidate = f"{normalized_prefix}{next_seq:03d}"
+        if candidate not in used_codes:
+            used_codes.add(candidate)
+            return candidate
+        next_seq += 1
+
+    raise ValidationError({"code": "Kode legacy sudah mencapai batas maksimum."})
+
+
+def _resolve_profile_reference(row, id_key, email_key):
+    profile_id = _coerce_legacy_string(row.get(id_key))
+    if profile_id:
+        return Profile.objects.filter(id=profile_id).first()
+
+    email = _coerce_legacy_string(row.get(email_key)).lower()
+    if email:
+        return Profile.objects.select_related("user").filter(user__email__iexact=email).first()
+
+    return None
+
+
 PENGUJIAN_REQUESTER_DOCUMENT_TYPES = {
     "signed_testing_agreement",
     "payment_proof",
@@ -1103,6 +1217,11 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 }
             )
 
+    def _ensure_delete_permission(self, booking):
+        if self._can_access_booking_approval_scope():
+            return
+        self._ensure_requester_mutation_permission(booking)
+
     def _ensure_requester_cancel_permission(self, booking):
         profile = self._current_profile()
         if profile is None or booking.requested_by_id != profile.id:
@@ -1197,6 +1316,11 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         if self.action == "by_month":
             return BookingListSerializer
         return BookingSerializer
+
+    def get_permissions(self):
+        if self.action == "legacy_bulk_import":
+            return [IsAuthenticated(), IsAdministratorOrAbove()]
+        return super().get_permissions()
 
     def _append_aggregates(self, response, aggregates):
         response.data["aggregates"] = aggregates
@@ -1353,7 +1477,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
-        self._ensure_requester_mutation_permission(instance)
+        self._ensure_delete_permission(instance)
         self._delete_booking_instance(instance)
 
     bulk_delete_success_message = "Semua record peminjaman lab terpilih berhasil dihapus."
@@ -1447,6 +1571,206 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         )
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='legacy-bulk-import')
+    def legacy_bulk_import(self, request):
+        rows = request.data.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return Response(
+                {"detail": "rows wajib berupa array dan tidak boleh kosong."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        results = []
+        instances = []
+        success_count = 0
+        used_codes = set()
+        existing_codes = set(Booking.objects.values_list("code", flat=True))
+
+        for index, row in enumerate(rows, start=1):
+            row_number = _resolve_legacy_row_index(row, index)
+            try:
+                if not isinstance(row, dict):
+                    raise ValidationError({"detail": "Setiap row harus berupa object."})
+
+                room_name = (
+                    _coerce_legacy_string(row.get("room_name"))
+                    or _coerce_legacy_string(row.get("room_number"))
+                    or _coerce_legacy_string(row.get("room"))
+                )
+                if not room_name:
+                    raise ValidationError(
+                        {"room_name": "room_name wajib diisi untuk import legacy booking."}
+                    )
+                start_time = _parse_legacy_datetime_field(
+                    row.get("start_time"),
+                    "start_time",
+                    required=True,
+                )
+                end_time = _parse_legacy_datetime_field(
+                    row.get("end_time"),
+                    "end_time",
+                    required=True,
+                )
+                if end_time <= start_time:
+                    raise ValidationError(
+                        {"end_time": "end_time harus setelah start_time."}
+                    )
+
+                code = _validate_legacy_code(row.get("code"), used_codes)
+                if not code:
+                    code = _generate_legacy_code(Booking, used_codes)
+                if code in existing_codes:
+                    raise ValidationError({"code": "Kode sudah digunakan."})
+                existing_codes.add(code)
+
+                requested_by = _resolve_profile_reference(
+                    row,
+                    "requested_by",
+                    "requested_by_email",
+                )
+                requester_name = _coerce_legacy_string(row.get("requester_name"))
+                approved_by = _resolve_profile_reference(
+                    row,
+                    "approved_by",
+                    "approved_by_email",
+                )
+
+                status_value = _normalize_legacy_status(
+                    row.get("status"),
+                    {choice for choice, _label in Booking.STATUS_CHOICES},
+                    "Completed",
+                )
+                attendee_count = _coerce_legacy_positive_int(
+                    row.get("attendee_count"),
+                    default=1,
+                )
+                purpose = _coerce_legacy_string(row.get("purpose")) or "Other"
+
+                created_at = _parse_legacy_datetime_field(
+                    row.get("created_at"),
+                    "created_at",
+                ) or start_time
+                approved_at = _parse_legacy_datetime_field(
+                    row.get("approved_at"),
+                    "approved_at",
+                )
+                rejected_at = _parse_legacy_datetime_field(
+                    row.get("rejected_at"),
+                    "rejected_at",
+                )
+                expired_at = _parse_legacy_datetime_field(
+                    row.get("expired_at"),
+                    "expired_at",
+                )
+                completed_at = _parse_legacy_datetime_field(
+                    row.get("completed_at"),
+                    "completed_at",
+                )
+
+                if status_value == "Approved" and approved_at is None:
+                    approved_at = end_time
+                if status_value == "Rejected" and rejected_at is None:
+                    rejected_at = end_time
+                if status_value == "Expired" and expired_at is None:
+                    expired_at = end_time
+                if status_value == "Completed":
+                    if approved_at is None:
+                        approved_at = start_time
+                    if completed_at is None:
+                        completed_at = end_time
+
+                updated_at = (
+                    completed_at
+                    or rejected_at
+                    or expired_at
+                    or approved_at
+                    or end_time
+                )
+
+                instance = Booking(
+                    code=code,
+                    requested_by=requested_by,
+                    requester_name=(
+                        requester_name
+                        or (requested_by.full_name if requested_by else None)
+                        or (
+                            requested_by.user.email
+                            if requested_by and getattr(requested_by, "user", None)
+                            else None
+                        )
+                    ),
+                    requester_phone=_coerce_legacy_string(row.get("requester_phone")) or None,
+                    requester_mentor=_coerce_legacy_string(row.get("requester_mentor")) or None,
+                    institution=_coerce_legacy_string(row.get("institution")) or None,
+                    institution_address=_coerce_legacy_string(row.get("institution_address")) or None,
+                    workshop_title=_coerce_legacy_string(row.get("workshop_title")) or None,
+                    workshop_pic=_coerce_legacy_string(row.get("workshop_pic")) or None,
+                    workshop_institution=_coerce_legacy_string(row.get("workshop_institution")) or None,
+                    room=None,
+                    room_name=room_name,
+                    start_time=start_time,
+                    end_time=end_time,
+                    attendee_count=attendee_count,
+                    attendee_names=_coerce_legacy_string(row.get("attendee_names")) or None,
+                    purpose=purpose,
+                    note=_coerce_legacy_string(row.get("note")) or None,
+                    status=status_value,
+                    approved_by=approved_by,
+                    approved_at=approved_at,
+                    rejected_at=rejected_at,
+                    rejection_note=_coerce_legacy_string(row.get("rejection_note")) or None,
+                    expired_at=expired_at,
+                    completed_at=completed_at,
+                    created_at=created_at,
+                    updated_at=updated_at,
+                )
+                instances.append((row_number, instance))
+            except ValidationError as exc:
+                results.append(
+                    {
+                        "index": row_number,
+                        "status": "error",
+                        "message": getattr(exc, "detail", {"detail": "Data tidak valid."}),
+                    }
+                )
+
+        if instances:
+            with transaction.atomic():
+                created_instances = [instance for _row_number, instance in instances]
+                Booking.objects.bulk_create(created_instances)
+                for row_number, instance in instances:
+                    log_admin_action(
+                        self.request.user,
+                        instance,
+                        ADDITION,
+                        "Created booking via CSL Admin legacy bulk import.",
+                    )
+                    results.append(
+                        {
+                            "index": row_number,
+                            "status": "success",
+                            "message": "Sukses",
+                            "id": str(instance.id),
+                        }
+                    )
+                    success_count += 1
+
+        results.sort(key=lambda item: item.get("index", 0))
+        failed_count = len(results) - success_count
+        response_status = (
+            status.HTTP_201_CREATED
+            if failed_count == 0
+            else status.HTTP_207_MULTI_STATUS
+        )
+        return Response(
+            {
+                "results": results,
+                "success_count": success_count,
+                "failed_count": failed_count,
+            },
+            status=response_status,
+        )
 
     @action(detail=True, methods=['get'], url_path='review-check')
     def review_check(self, request, pk=None):
@@ -1628,6 +1952,11 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                     )
                 }
             )
+
+    def _ensure_delete_permission(self, borrow):
+        if self._can_manage_all_borrows():
+            return
+        self._ensure_requester_mutation_permission(borrow)
 
     def _ensure_review_permission(self, borrow):
         if self._can_review_borrow(borrow):
@@ -1896,7 +2225,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
-        self._ensure_requester_mutation_permission(instance)
+        self._ensure_delete_permission(instance)
         self._delete_borrow_instance(instance)
 
     bulk_delete_success_message = "Semua record peminjaman alat terpilih berhasil dihapus."
@@ -2992,6 +3321,11 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             return PengujianListSerializer
         return PengujianSerializer
 
+    def get_permissions(self):
+        if self.action == "legacy_bulk_import":
+            return [IsAuthenticated(), IsAdministratorOrAbove()]
+        return super().get_permissions()
+
     def _append_aggregates(self, response, aggregates):
         response.data["aggregates"] = aggregates
         return response
@@ -3028,6 +3362,11 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                     )
                 }
             )
+
+    def _ensure_delete_permission(self, pengujian):
+        if self._can_manage_sample_testing_approval():
+            return
+        self._ensure_requester_mutation_permission(pengujian)
 
     def _ensure_review_permission(self, pengujian):
         if not self._can_manage_sample_testing_approval():
@@ -3291,7 +3630,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
-        self._ensure_requester_mutation_permission(instance)
+        self._ensure_delete_permission(instance)
         self._delete_pengujian_instance(instance)
 
     bulk_delete_success_message = "Semua record pengujian sampel terpilih berhasil dihapus."
@@ -3327,6 +3666,161 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         if page is not None:
             return self._append_aggregates(self.get_paginated_response(serializer.data), aggregates)
         return Response({"results": serializer.data, "aggregates": aggregates})
+
+    @action(detail=False, methods=['post'], url_path='legacy-bulk-import')
+    def legacy_bulk_import(self, request):
+        rows = request.data.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return Response(
+                {"detail": "rows wajib berupa array dan tidak boleh kosong."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        results = []
+        instances = []
+        success_count = 0
+        used_codes = set()
+        existing_codes = set(Pengujian.objects.values_list("code", flat=True))
+
+        for index, row in enumerate(rows, start=1):
+            row_number = _resolve_legacy_row_index(row, index)
+            try:
+                if not isinstance(row, dict):
+                    raise ValidationError({"detail": "Setiap row harus berupa object."})
+
+                name = _coerce_legacy_string(row.get("name"))
+                email = _coerce_legacy_string(row.get("email"))
+                sample_type = _coerce_legacy_string(row.get("sample_type"))
+                if not name:
+                    raise ValidationError({"name": "name wajib diisi."})
+                if not email:
+                    raise ValidationError({"email": "email wajib diisi."})
+                if not sample_type:
+                    raise ValidationError({"sample_type": "sample_type wajib diisi."})
+
+                code = _validate_legacy_code(row.get("code"), used_codes)
+                if not code:
+                    code = _generate_legacy_code(Pengujian, used_codes)
+                if code in existing_codes:
+                    raise ValidationError({"code": "Kode sudah digunakan."})
+                existing_codes.add(code)
+
+                requested_by = _resolve_profile_reference(
+                    row,
+                    "requested_by",
+                    "requested_by_email",
+                )
+                approved_by = _resolve_profile_reference(
+                    row,
+                    "approved_by",
+                    "approved_by_email",
+                )
+                status_value = _normalize_legacy_status(
+                    row.get("status"),
+                    {choice for choice, _label in Pengujian.STATUS_CHOICES},
+                    "Completed",
+                )
+
+                created_at = _parse_legacy_datetime_field(
+                    row.get("created_at"),
+                    "created_at",
+                ) or timezone.now()
+                approved_at = _parse_legacy_datetime_field(
+                    row.get("approved_at"),
+                    "approved_at",
+                )
+                rejected_at = _parse_legacy_datetime_field(
+                    row.get("rejected_at"),
+                    "rejected_at",
+                )
+                completed_at = _parse_legacy_datetime_field(
+                    row.get("completed_at"),
+                    "completed_at",
+                )
+
+                if status_value == "Approved" and approved_at is None:
+                    approved_at = created_at
+                if status_value == "Rejected" and rejected_at is None:
+                    rejected_at = created_at
+                if status_value == "Completed":
+                    if approved_at is None:
+                        approved_at = created_at
+                    if completed_at is None:
+                        completed_at = created_at
+
+                updated_at = completed_at or rejected_at or approved_at or created_at
+
+                instance = Pengujian(
+                    code=code,
+                    name=name,
+                    institution=_coerce_legacy_string(row.get("institution")) or None,
+                    institution_address=_coerce_legacy_string(row.get("institution_address")) or None,
+                    email=email,
+                    phone_number=_coerce_legacy_string(row.get("phone_number")) or None,
+                    sample_name=_coerce_legacy_string(row.get("sample_name")) or None,
+                    sample_type=sample_type,
+                    sample_brand=_coerce_legacy_string(row.get("sample_brand")) or None,
+                    sample_packaging=_coerce_legacy_string(row.get("sample_packaging")) or None,
+                    sample_weight=_coerce_legacy_string(row.get("sample_weight")) or None,
+                    sample_quantity=_coerce_legacy_string(row.get("sample_quantity")) or None,
+                    sample_testing_serving=_coerce_legacy_string(row.get("sample_testing_serving")) or None,
+                    sample_testing_method=_coerce_legacy_string(row.get("sample_testing_method")) or None,
+                    sample_testing_type=_coerce_legacy_string(row.get("sample_testing_type")) or None,
+                    requested_by=requested_by,
+                    approved_by=approved_by,
+                    status=status_value,
+                    approved_at=approved_at,
+                    rejected_at=rejected_at,
+                    completed_at=completed_at,
+                    created_at=created_at,
+                    updated_at=updated_at,
+                )
+                instances.append((row_number, instance))
+            except ValidationError as exc:
+                results.append(
+                    {
+                        "index": row_number,
+                        "status": "error",
+                        "message": getattr(exc, "detail", {"detail": "Data tidak valid."}),
+                    }
+                )
+
+        if instances:
+            with transaction.atomic():
+                created_instances = [instance for _row_number, instance in instances]
+                Pengujian.objects.bulk_create(created_instances)
+                for row_number, instance in instances:
+                    log_admin_action(
+                        self.request.user,
+                        instance,
+                        ADDITION,
+                        "Created sample testing via CSL Admin legacy bulk import.",
+                    )
+                    results.append(
+                        {
+                            "index": row_number,
+                            "status": "success",
+                            "message": "Sukses",
+                            "id": str(instance.id),
+                        }
+                    )
+                    success_count += 1
+
+        results.sort(key=lambda item: item.get("index", 0))
+        failed_count = len(results) - success_count
+        response_status = (
+            status.HTTP_201_CREATED
+            if failed_count == 0
+            else status.HTTP_207_MULTI_STATUS
+        )
+        return Response(
+            {
+                "results": results,
+                "success_count": success_count,
+                "failed_count": failed_count,
+            },
+            status=response_status,
+        )
 
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

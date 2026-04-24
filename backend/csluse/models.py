@@ -170,6 +170,7 @@ class Booking(BaseModel):
         blank=True,
         related_name="bookings",
     )
+    requester_name = models.CharField(max_length=255, blank=True, null=True)
     requester_phone = models.CharField(max_length=20, blank=True, null=True)
     requester_mentor = models.CharField(max_length=255, blank=True, null=True)
     requester_mentor_profile = models.ForeignKey(
@@ -198,6 +199,7 @@ class Booking(BaseModel):
         blank=True,
         related_name="bookings",
     )
+    room_name = models.CharField(max_length=255, blank=True, null=True)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     attendee_count = models.PositiveIntegerField(default=1)
@@ -231,7 +233,13 @@ class Booking(BaseModel):
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.code} - {self.requested_by.user.email} - {self.room.name} - {self.status}"
+        requester_label = (
+            (self.requested_by.full_name or self.requested_by.user.email)
+            if self.requested_by and getattr(self.requested_by, "user", None)
+            else (self.requester_name or "-")
+        )
+        room_label = self.room.name if self.room else (self.room_name or "-")
+        return f"{self.code} - {requester_label} - {room_label} - {self.status}"
 
 
 class BookingEquipmentItem(models.Model):

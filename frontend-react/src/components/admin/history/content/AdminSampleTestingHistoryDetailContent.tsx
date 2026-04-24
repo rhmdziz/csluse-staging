@@ -141,12 +141,15 @@ export default function AdminSampleTestingRecordDetailContent({
             <AdminRecordDetailGrid>
               <AdminRecordDetailItem label="Nama Sampel" value={item.sampleName} />
               <AdminRecordDetailItem label="Jenis Sampel" value={item.sampleType} />
-              <AdminRecordDetailItem label="Merk Sampel" value={item.sampleBrand} />
+              <AdminRecordDetailItem label="Merek Sampel" value={item.sampleBrand} />
               <AdminRecordDetailItem
                 label="Kemasan Sampel"
                 value={item.samplePackaging}
               />
-              <AdminRecordDetailItem label="Berat Sampel" value={item.sampleWeight} />
+              <AdminRecordDetailItem
+                label="Berat Netto / Dimensi Sampel"
+                value={item.sampleWeight}
+              />
               <AdminRecordDetailItem label="Jumlah Sampel" value={item.sampleQuantity} />
             </AdminRecordDetailGrid>
           </AdminRecordDetailSection>
@@ -157,7 +160,7 @@ export default function AdminSampleTestingRecordDetailContent({
           >
             <AdminRecordDetailGrid>
               <AdminRecordDetailItem
-                label="Penyajian Sampel"
+                label="Cara Penyajian / Penanganan"
                 value={item.sampleTestingServing}
               />
               <AdminRecordDetailItem

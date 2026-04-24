@@ -87,22 +87,24 @@ export async function exportAdminRecordPdf<TRow>({
     startY: 62,
     head: [columns.map((column) => column.header)],
     body: rows.map((row) => columns.map((column) => column.cell(row))),
+    theme: "grid",
     styles: {
       fontSize: 6.5,
       cellPadding: 4,
       valign: "middle",
+      textColor: [15, 23, 42],
+      lineColor: [15, 23, 42],
+      lineWidth: 0.5,
+      fillColor: false,
     },
     headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: [248, 250, 252],
+      fillColor: false,
+      textColor: [15, 23, 42],
       fontStyle: "bold",
       fontSize: 7,
     },
     bodyStyles: {
-      textColor: [30, 41, 59],
-    },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252],
+      textColor: [15, 23, 42],
     },
     margin: {
       left: 24,

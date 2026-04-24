@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DateRange } from "react-day-picker";
 
-import { Eye, FileText, Trash2 } from "lucide-react";
+import { Eye, FileText, History, Trash2 } from "lucide-react";
 
 import { useSearchParams } from "next/navigation";
 
@@ -21,6 +21,7 @@ import {
   AdminHistorySummaryCards,
   AdminHistoryTable,
   RelatedUserDetailDialog,
+  SampleTestingHistoryLegacyImportDialog,
 } from "@/components/admin/history";
 
 import { SampleTestingDocumentsDialog } from "@/components/dashboard/sample-testing";
@@ -117,6 +118,7 @@ export default function AdminSampleTestingHistoryPage() {
   const [isExportingSelectedPdf, setIsExportingSelectedPdf] = useState(false);
   const [isExportingSelectedExcel, setIsExportingSelectedExcel] =
     useState(false);
+  const [isLegacyImportOpen, setIsLegacyImportOpen] = useState(false);
   const createdAfter = createdRange?.from ? formatDateKey(createdRange.from) : "";
   const createdBefore = createdRange?.to
     ? formatDateKey(createdRange.to)
@@ -517,6 +519,15 @@ export default function AdminSampleTestingHistoryPage() {
               <p className="text-xs text-slate-500 sm:text-right">
                 Export mengikuti filter dan pencarian yang sedang aktif.
               </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setIsLegacyImportOpen(true)}
+              >
+                <History className="h-4 w-4" />
+                Import Legacy
+              </Button>
               <AdminHistoryExportActions
                 onExportExcel={exportExcel}
                 onExportPdf={exportPdf}
@@ -680,6 +691,12 @@ export default function AdminSampleTestingHistoryPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <SampleTestingHistoryLegacyImportDialog
+            open={isLegacyImportOpen}
+            onOpenChange={setIsLegacyImportOpen}
+            onCompleted={() => setReloadKey((prev) => prev + 1)}
+          />
 
           <SampleTestingDocumentsDialog
             open={Boolean(documentsTarget)}
