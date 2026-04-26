@@ -46,7 +46,7 @@ import { useHistoryRequesterOptions } from "@/hooks/admin/history";
 
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
-import { formatDateKey, parseDateKey } from "@/lib/date";
+import { formatDateKey, getEventDateKeys, parseDateKey } from "@/lib/date";
 
 import {
   BORROW_STATUS_OPTIONS,
@@ -291,18 +291,17 @@ export function DashboardActionPanel({
     const normalizedScheduleQuery = scheduleKeyword.trim().toLowerCase();
 
     return new Set(
-      scheduleCalendarEvents
-        .filter((item) => {
-          if (scheduleCategory && item.source !== scheduleCategory) return false;
-          if (normalizedScheduleQuery) {
-            const haystack = `${item.title} ${item.room_name ?? ""} ${item.requested_by_name ?? ""}`
-              .trim()
-              .toLowerCase();
-            if (!haystack.includes(normalizedScheduleQuery)) return false;
-          }
-          return true;
-        })
-        .map((item) => formatDateKey(new Date(item.start_time))),
+      scheduleCalendarEvents.flatMap((item) => {
+        if (scheduleCategory && item.source !== scheduleCategory) return [];
+        if (normalizedScheduleQuery) {
+          const haystack = `${item.title} ${item.room_name ?? ""} ${item.requested_by_name ?? ""}`
+            .trim()
+            .toLowerCase();
+          if (!haystack.includes(normalizedScheduleQuery)) return [];
+        }
+
+        return getEventDateKeys(item.start_time, item.end_time);
+      }),
     );
   }, [
     isScheduleMenu,

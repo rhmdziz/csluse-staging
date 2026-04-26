@@ -52,14 +52,42 @@ export default function LoginPage({ className, ...props }: LoginFormProps) {
       {...props}
     >
       <FieldGroup>
-        <div className="mb-4 flex flex-col items-center gap-2 text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="text-2xl font-semibold">Login ke akun Anda</h1>
           <div>
             <p className="text-sm text-muted-foreground">
-              Enter your email below to login to your account
+              Masuk dengan akun Universitas Prasetiya Mulya
             </p>
           </div>
         </div>
+
+        <Field>
+          <Button
+            type="button"
+            disabled={microsoftStatus === "submitting"}
+            onClick={handleMicrosoftLogin}
+            className="h-auto justify-center rounded-none border border-solid border-[#8a8a8a] bg-white px-6 py-2 text-left text-[14px] font-normal text-[#5e5e5e] shadow-none hover:bg-[#f7f7f7] hover:text-[#4f4f4f] disabled:bg-white disabled:text-[#5e5e5e]"
+          >
+            {microsoftStatus === "submitting" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <span className="mr-5 grid h-5 w-5 grid-cols-2 gap-[2px] shrink-0">
+                  <span className="bg-[#f25022]" />
+                  <span className="bg-[#7fba00]" />
+                  <span className="bg-[#00a4ef]" />
+                  <span className="bg-[#ffb900]" />
+                </span>
+                <span>Sign in with Microsoft</span>
+              </>
+            )}
+          </Button>
+        </Field>
+
+        <FieldSeparator>Atau</FieldSeparator>
 
         <Field>
           <FieldLabel htmlFor="username">Email</FieldLabel>
@@ -131,33 +159,8 @@ export default function LoginPage({ className, ...props }: LoginFormProps) {
           </Button>
         </Field>
 
-        <FieldSeparator>Atau gunakan SSO kampus</FieldSeparator>
 
-        <Field>
-          <Button
-            type="button"
-            disabled={microsoftStatus === "submitting"}
-            onClick={handleMicrosoftLogin}
-            className="h-auto justify-center rounded-none border border-solid border-[#8a8a8a] bg-white px-6 py-2 text-left text-[14px] font-normal text-[#5e5e5e] shadow-none hover:bg-[#f7f7f7] hover:text-[#4f4f4f] disabled:bg-white disabled:text-[#5e5e5e]"
-          >
-            {microsoftStatus === "submitting" ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Redirecting...
-              </>
-            ) : (
-              <>
-                <span className="mr-5 grid h-5 w-5 grid-cols-2 gap-[2px] shrink-0">
-                  <span className="bg-[#f25022]" />
-                  <span className="bg-[#7fba00]" />
-                  <span className="bg-[#00a4ef]" />
-                  <span className="bg-[#ffb900]" />
-                </span>
-                <span>Sign in with Microsoft</span>
-              </>
-            )}
-          </Button>
-        </Field>
+        
         <Field>
           <FieldDescription className="rounded-md border border-muted bg-muted/40 px-3 py-2 text-center">
             Don&apos;t have an account?{" "}

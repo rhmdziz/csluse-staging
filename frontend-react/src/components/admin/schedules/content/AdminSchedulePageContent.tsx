@@ -53,7 +53,12 @@ import { useUpdateSchedule } from "@/hooks/shared/schedules";
 
 import { normalizeText } from "@/lib/text";
 
-import { toEndOfDay, toStartOfDay } from "@/lib/date";
+import {
+  eventCoversDate,
+  eventOverlapsDateRange,
+  toEndOfDay,
+  toStartOfDay,
+} from "@/lib/date";
 
 import { toast } from "sonner";
 
@@ -90,15 +95,6 @@ function isWeekend(date: Date) {
   return day === 0 || day === 6;
 }
 
-function eventCoversDay(event: { start_time: string; end_time?: string | null }, date: Date) {
-  const start = new Date(event.start_time);
-  const end = event.end_time ? new Date(event.end_time) : new Date(event.start_time);
-  const sel = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-  return sel >= startDay && sel <= endDay;
-}
-
 const wibDateFormatter = new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Jakarta",
   year: "numeric",
@@ -127,26 +123,6 @@ function isSameMonth(left: Date, right: Date) {
     left.getFullYear() === right.getFullYear() &&
     left.getMonth() === right.getMonth()
   );
-}
-
-function isWithinRange(dateValue: string, range?: DateRange) {
-  if (!range?.from && !range?.to) return true;
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return false;
-
-  if (range.from) {
-    const start = new Date(range.from);
-    start.setHours(0, 0, 0, 0);
-    if (date < start) return false;
-  }
-
-  if (range.to) {
-    const end = new Date(range.to);
-    end.setHours(23, 59, 59, 999);
-    if (date > end) return false;
-  }
-
-  return true;
 }
 
 export default function AdminSchedulePage() {
@@ -250,7 +226,9 @@ export default function AdminSchedulePage() {
     return events.filter((item) => {
       if (calendarRoomFilter && item.room_id !== calendarRoomFilter) return false;
       if (calendarSourceFilter && item.source !== calendarSourceFilter) return false;
-      if (!isWithinRange(item.start_time, calendarDateRange)) return false;
+      if (!eventOverlapsDateRange(item.start_time, item.end_time, calendarDateRange)) {
+        return false;
+      }
       if (!normalizedQuery) return true;
       return normalizeText(
         `${item.title} ${item.room_name ?? ""} ${item.requested_by_name ?? ""}`,
@@ -283,7 +261,7 @@ export default function AdminSchedulePage() {
         tone: "from-emerald-500/15 to-emerald-100",
       },
       {
-        label: "Booking",
+        label: "Peminjaman lab",
         value: String(bookingCount),
         tone: "from-amber-500/15 to-amber-100",
       },
@@ -298,7 +276,7 @@ export default function AdminSchedulePage() {
   const selectedDayEvents = useMemo(() => {
     if (isWeekend(selectedDate)) return [];
     return filteredEvents
-      .filter((item) => eventCoversDay(item, selectedDate))
+      .filter((item) => eventCoversDate(item.start_time, item.end_time, selectedDate))
       .map((item) => adjustEventForDay(item, selectedDate))
       .sort(
         (left, right) =>

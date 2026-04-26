@@ -287,38 +287,44 @@ export default function Page() {
           roleBreakdown={isLoadingKpis ? undefined : kpis.usersByRole}
           className="h-full"
         />
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 *:h-full">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-12 lg:*:h-full">
           <KpiCard
             label="Ruangan"
             value={isLoadingKpis ? "0" : String(kpis.totalRooms)}
             tone="rooms"
+            className="lg:col-span-3"
           />
           <KpiCard
             label="Peralatan"
             value={isLoadingKpis ? "0" : String(kpis.totalEquipments)}
             tone="equipments"
+            className="lg:col-span-3"
           />
           <KpiCard
             label="Bahan"
             value={isLoadingKpis ? "0" : String(kpis.totalMaterials)}
             tone="materials"
+            className="lg:col-span-3"
           />
           <KpiCard
             label="Software"
             value={isLoadingKpis ? "0" : String(kpis.totalSoftware)}
             tone="software"
+            className="lg:col-span-3"
           />
           <KpiCard
             label="Peminjaman Lab"
             value={isLoadingKpis ? "0" : String(kpis.totalBookings)}
             tone="bookings"
             statusBreakdown={isLoadingKpis ? undefined : kpis.bookingsByStatus}
+            className="lg:col-span-4"
           />
           <KpiCard
             label="Peminjaman Alat"
             value={isLoadingKpis ? "0" : String(kpis.totalBorrows)}
             tone="borrows"
             statusBreakdown={isLoadingKpis ? undefined : kpis.borrowsByStatus}
+            className="lg:col-span-4"
           />
           <KpiCard
             label="Pengujian Sampel"
@@ -327,6 +333,7 @@ export default function Page() {
             statusBreakdown={
               isLoadingKpis ? undefined : kpis.pengujiansByStatus
             }
+            className="lg:col-span-4"
           />
         </div>
       </div>
@@ -372,11 +379,11 @@ function HomePageSkeleton() {
           </div>
         </div>
         {/* Inventaris + Layanan 4×2 */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-12">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={`kpi-sk-inv-${index}`}
-              className="relative overflow-hidden rounded-lg border bg-white p-4"
+              className="relative overflow-hidden rounded-lg border bg-white p-4 lg:col-span-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <Skeleton className="h-3 w-24" />
@@ -385,10 +392,10 @@ function HomePageSkeleton() {
               <Skeleton className="mt-3 h-8 w-14" />
             </div>
           ))}
-          {Array.from({ length: 4 }).map((_, index) => (
+          {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={`kpi-sk-svc-${index}`}
-              className="rounded-lg border bg-white p-4"
+              className="rounded-lg border bg-white p-4 lg:col-span-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <Skeleton className="h-3 w-24" />

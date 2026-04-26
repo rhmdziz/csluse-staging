@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { HourlyScheduleTable, InlineErrorAlert } from "@/components/shared";
 import { useCalendarEvents } from "@/hooks/shared/calendar";
 import type { CalendarEvent } from "@/hooks/shared/calendar";
-import { parseDateKey } from "@/lib/date";
+import { eventCoversDate, parseDateKey } from "@/lib/date";
 import { normalizeText } from "@/lib/text";
 
 function isSameDay(left: Date, right: Date) {
@@ -20,15 +20,6 @@ function isSameDay(left: Date, right: Date) {
 function isWeekend(date: Date) {
   const day = date.getDay();
   return day === 0 || day === 6;
-}
-
-function eventCoversDay(event: { start_time: string; end_time?: string | null }, date: Date) {
-  const start = new Date(event.start_time);
-  const end = event.end_time ? new Date(event.end_time) : new Date(event.start_time);
-  const sel = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-  return sel >= startDay && sel <= endDay;
 }
 
 const wibDateFormatter = new Intl.DateTimeFormat("sv-SE", {
@@ -76,7 +67,7 @@ export default function SchedulePage() {
   const selectedDayEvents = useMemo(() => {
     if (isWeekend(selectedDate)) return [];
     return filteredEvents
-      .filter((item) => eventCoversDay(item, selectedDate))
+      .filter((item) => eventCoversDate(item.start_time, item.end_time, selectedDate))
       .map((item) => adjustEventForDay(item, selectedDate))
       .sort(
         (left, right) =>

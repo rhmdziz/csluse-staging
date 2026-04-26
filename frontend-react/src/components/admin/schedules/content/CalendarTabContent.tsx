@@ -67,7 +67,7 @@ export default function CalendarTabContent({
         sourceOptions={[
           { value: "", label: "Semua Sumber" },
           { value: "schedule", label: "Jadwal Praktikum" },
-          { value: "booking", label: "Booking" },
+          { value: "booking", label: "Peminjaman lab" },
         ]}
         dateRange={dateRange}
         rooms={rooms}

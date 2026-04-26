@@ -153,7 +153,7 @@ export function SchedulesTable({
                         : "bg-emerald-100 text-emerald-700"
                     }`}
                   >
-                    {item.source === "schedule" ? "Jadwal Praktikum" : "Booking"}
+                    {item.source === "schedule" ? "Jadwal Praktikum" : "Peminjaman lab"}
                   </span>
                 </td>
                 <td className="px-3 py-2 align-middle text-muted-foreground">
@@ -200,7 +200,7 @@ export function SchedulesTable({
                   ) : (
                     <div className="flex justify-center">
                       <TableActionIconButton
-                        label="Lihat booking"
+                        label="Lihat peminjaman lab"
                         type="button"
                         variant="outline"
                         size="icon-sm"

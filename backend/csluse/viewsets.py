@@ -3213,6 +3213,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 ),
                 "expired": (
                     status_count(bookings, "Expired")
+                    + status_count(borrows, "Expired")
                 ),
             },
             "upcoming_approved": upcoming_approved,

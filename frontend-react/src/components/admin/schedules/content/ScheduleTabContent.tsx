@@ -106,7 +106,7 @@ export default function ScheduleTabContent({
         sourceOptions={[
           { value: "", label: "Semua Sumber" },
           { value: "schedule", label: "Jadwal Praktikum" },
-          { value: "booking", label: "Booking" },
+          { value: "booking", label: "Peminjaman lab" },
         ]}
         dateRange={dateRange}
         sortOrder={sortOrder}
