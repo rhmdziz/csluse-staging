@@ -18,6 +18,11 @@ from .models import Image, Booking, BookingEquipmentItem, Borrow, Room, Pengujia
 def is_loaddata():
     return 'loaddata' in sys.argv
 
+
+def should_skip_signal(kwargs):
+    return kwargs.get("raw", False) or is_loaddata()
+
+
 def validate_start_not_in_past(start_time, label="start time"):
     if not start_time:
         return
@@ -100,6 +105,9 @@ def delete_image(sender, instance, **kwargs):
 
 @receiver(pre_save, sender=Booking)
 def validate_booking(sender, instance, **kwargs):
+    if should_skip_signal(kwargs):
+        return
+
     previous_instance = None
     if instance.pk:
         previous_instance = Booking.objects.filter(pk=instance.pk).only(
@@ -130,6 +138,9 @@ def validate_booking(sender, instance, **kwargs):
 
 @receiver(pre_save, sender=BookingEquipmentItem)
 def validate_booking_equipment_item(sender, instance, **kwargs):
+    if should_skip_signal(kwargs):
+        return
+
     if instance.quantity <= 0:
         raise ValidationError("Quantity equipment must be at least 1.")
 
@@ -146,6 +157,9 @@ def validate_booking_equipment_item(sender, instance, **kwargs):
 
 @receiver(pre_save, sender=Borrow)
 def validate_borrow(sender, instance, **kwargs):
+    if should_skip_signal(kwargs):
+        return
+
     """
     Borrow rules:
     - Quantity > 0 and <= equipment stock.
@@ -200,6 +214,9 @@ def validate_room_pics(profiles):
 
 @receiver(m2m_changed, sender=Room.pics.through)
 def validate_room_pic_members(sender, instance, action, pk_set, **kwargs):
+    if should_skip_signal(kwargs):
+        return
+
     """
     Ensure every Room PIC has an allowed role.
     """
@@ -212,6 +229,9 @@ def validate_room_pic_members(sender, instance, action, pk_set, **kwargs):
 
 @receiver(pre_save, sender=Pengujian)
 def validate_pengujians(sender, instance, **kwargs):
+    if should_skip_signal(kwargs):
+        return
+
     """
     Pengujian rules:
     - Rejected/completed requests are locked.
