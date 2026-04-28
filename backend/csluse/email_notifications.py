@@ -13,12 +13,14 @@ REQUEST_DETAIL_PATHS = {
     "booking": "/booking-rooms/{id}",
     "borrow": "/borrow-equipment/{id}",
     "pengujian": "/sample-testing",
+    "lab_clearance": "/lab-clearance",
 }
 
 REQUEST_APPROVAL_PATHS = {
     "booking": "/booking-rooms/approval/{id}",
     "borrow": "/borrow-equipment/approval/{id}",
     "pengujian": "/sample-testing/approval/{id}",
+    "lab_clearance": "/admin/documents/lab-clearance",
 }
 
 
@@ -75,6 +77,8 @@ def notification_cta_url(kind, instance, audience="requester"):
 def notification_cta_label(kind):
     if kind == "pengujian":
         return "Lihat Daftar Pengujian"
+    if kind == "lab_clearance":
+        return "Lihat Surat Bebas Lab"
     return "Lihat Detail Request"
 
 

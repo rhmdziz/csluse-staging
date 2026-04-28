@@ -18,6 +18,7 @@ REQUEST_LABELS = {
     "booking": "peminjaman lab",
     "borrow": "peminjaman alat",
     "pengujian": "pengujian sampel",
+    "lab_clearance": "surat bebas laboratorium",
 }
 
 
@@ -355,6 +356,65 @@ def notify_request_status(instance, *, kind, status_value, actor_profile=None, r
         title=title,
         message=message,
         status_value=status_value,
+    )
+
+
+def notify_lab_clearance_status(instance, *, status_value, actor_profile=None, request=None):
+    recipient = getattr(instance, "requested_by", None)
+    if recipient is None:
+        return
+
+    request_identifier = _request_identifier(instance, "Surat Bebas Lab")
+    actor_name = _profile_display_name(actor_profile) or "tim laboratorium"
+    if status_value == "Approved":
+        category = "Approved"
+        action_label = "disetujui"
+    else:
+        category = "Rejected"
+        action_label = "ditolak"
+
+    title = f"Surat bebas laboratorium {request_identifier} {action_label}"
+    message = (
+        f"Pengajuan surat bebas laboratorium Anda ({request_identifier}) telah "
+        f"{action_label} oleh {actor_name}."
+    )
+
+    note = str(getattr(instance, "note", "") or "").strip()
+    if status_value == "Rejected" and note:
+        message = f"{message} Catatan: {note}"
+
+    _create_notification(
+        recipient,
+        title=title,
+        category=category,
+        message=message,
+    )
+
+    requester_email = _requester_email(instance)
+    if not requester_email:
+        return
+
+    cta_url = notification_cta_url("lab_clearance", instance)
+    cta_label = notification_cta_label("lab_clearance")
+    context = build_email_context(
+        request=request,
+        extra_context={
+            **_notification_email_extra_context(
+                instance,
+                recipient=recipient,
+                kind="lab_clearance",
+                title=title,
+                message=message,
+                cta_url=cta_url,
+                cta_label=cta_label,
+            ),
+            "status_label": "disetujui" if status_value == "Approved" else "ditolak",
+        },
+    )
+    send_notification_email(
+        requester_email,
+        template_base="csluse/email/request_status",
+        context=context,
     )
 
 

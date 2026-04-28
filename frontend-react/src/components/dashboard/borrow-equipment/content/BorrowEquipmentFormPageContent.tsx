@@ -78,6 +78,8 @@ const initialFormData: FormData = {
   institutionAddress: "",
 };
 
+const GLASSWARE_BORROW_REQUEST_LIMIT = 5;
+
 type BorrowFormParams = {
   id?: string;
 };
@@ -155,6 +157,17 @@ export default function BorrowEquipmentFormPage() {
       null,
     [equipments, formData.equipmentId],
   );
+  const maxQuantityPerRequest = useMemo(() => {
+    if (!selectedEquipment) return undefined;
+    if (selectedEquipment.category.trim() !== "Glassware") {
+      return selectedEquipment.quantity;
+    }
+
+    return Math.min(
+      selectedEquipment.quantity,
+      GLASSWARE_BORROW_REQUEST_LIMIT,
+    );
+  }, [selectedEquipment]);
   const selectedPurposeLabel = useMemo(
     () =>
       availablePurposeOptions.find((option) => option.value === formData.purpose)?.label ?? "-",
@@ -332,6 +345,13 @@ export default function BorrowEquipmentFormPage() {
       return "Jumlah alat minimal 1.";
     }
 
+    if (
+      selectedEquipment?.category === "Glassware" &&
+      quantityValue > GLASSWARE_BORROW_REQUEST_LIMIT
+    ) {
+      return `Peralatan kategori Glassware hanya boleh dipinjam maksimal ${GLASSWARE_BORROW_REQUEST_LIMIT} unit dalam 1 request.`;
+    }
+
     if (selectedEquipment && quantityValue > selectedEquipment.quantity) {
       return `Jumlah melebihi stok tersedia (${selectedEquipment.quantity}).`;
     }
@@ -476,12 +496,17 @@ export default function BorrowEquipmentFormPage() {
               name="quantity"
               type="number"
               min="1"
-              max={selectedEquipment?.quantity || undefined}
+              max={maxQuantityPerRequest}
               value={formData.quantity}
               onChange={handleChange}
               disabled={isSubmitting}
               className="h-11 border-slate-300 bg-white"
             />
+            {selectedEquipment?.category === "Glassware" ? (
+              <p className="text-xs text-slate-500">
+                Glassware hanya dapat dipinjam maksimal {GLASSWARE_BORROW_REQUEST_LIMIT} unit per request.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">

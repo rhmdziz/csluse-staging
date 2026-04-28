@@ -87,6 +87,7 @@ from csluse_auth.permissions import (
 )
 from .notification_service import (
     notify_borrow_overdue,
+    notify_lab_clearance_status,
     notify_new_request_submission,
     notify_post_mentor_approval,
     notify_request_status,
@@ -5070,7 +5071,14 @@ class SuratBebasLabViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             context={**self.get_serializer_context(), "allow_status_transition": True},
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save(reviewed_by=self._current_profile(), reviewed_at=now)
+        actor_profile = self._current_profile()
+        serializer.save(reviewed_by=actor_profile, reviewed_at=now)
+        notify_lab_clearance_status(
+            instance,
+            status_value="Rejected",
+            actor_profile=actor_profile,
+            request=request,
+        )
         return self._build_mutation_response(
             instance,
             action="rejected",

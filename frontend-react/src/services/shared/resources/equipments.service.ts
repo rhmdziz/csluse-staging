@@ -103,12 +103,14 @@ export type BulkEquipmentResult = {
 export type EquipmentOption = {
   id: string;
   label: string;
+  category: string;
   quantity: number;
 };
 
 type ApiEquipmentOption = {
   id?: string | number | null;
   name?: string | null;
+  category?: string | null;
   quantity?: number | null;
   room_detail?: {
     id?: string | number | null;
@@ -371,6 +373,7 @@ export const equipmentsService = {
         label: item.room_detail?.name
           ? `${String(item.name ?? "-")} (${String(item.room_detail.name)})`
           : String(item.name ?? "-"),
+        category: String(item.category ?? ""),
         quantity: Number(item.quantity ?? 0),
       }))
       .filter((item) => item.id);

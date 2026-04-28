@@ -9,7 +9,17 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from unittest.mock import patch
 
-from csluse.models import Borrow, Booking, BookingEquipmentItem, Document, Equipment, Notification, Pengujian, Room
+from csluse.models import (
+    Borrow,
+    Booking,
+    BookingEquipmentItem,
+    Document,
+    Equipment,
+    Notification,
+    Pengujian,
+    Room,
+    SuratBebasLab,
+)
 from csluse_auth.models import Profile
 
 User = get_user_model()
@@ -359,6 +369,36 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("maksimal 3 bulan", response.data["end_time"][0])
 
+    def test_borrow_request_glassware_is_limited_to_five_units(self):
+        glassware = Equipment.objects.create(
+            name="Beaker Set",
+            quantity=12,
+            category="Glassware",
+            room=self.room,
+            is_moveable=True,
+            is_borrowable=True,
+        )
+        start, end = self.future_window(days=3, start_hour=11)
+        self.client.force_authenticate(user=self.lecturer_user)
+
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(glassware.id),
+                "quantity": 6,
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "Glassware hanya boleh dipinjam maksimal 5 unit",
+            response.data["quantity"][0],
+        )
+
     def future_window(self, *, days=1, start_hour=9, duration_hours=2):
         local_now = timezone.localtime(timezone.now()) + timedelta(days=days)
         start = local_now.replace(
@@ -455,6 +495,13 @@ class CsluseWorkflowRegressionTests(APITestCase):
             sample_testing_method="Metode A",
             sample_testing_type="Kimia",
             status=status,
+        )
+
+    def create_surat_bebas_lab(self, requested_by, *, status="Pending", note=""):
+        return SuratBebasLab.objects.create(
+            requested_by=requested_by,
+            status=status,
+            note=note,
         )
 
     def test_staff_cannot_access_booking_approval_scope(self):
@@ -582,6 +629,31 @@ class CsluseWorkflowRegressionTests(APITestCase):
         )
         self.assertIn(f"https://frontend.example.com/booking-rooms/{booking.id}", mail.outbox[0].body)
         self.assertIn("disetujui", mail.outbox[0].body)
+
+    def test_lab_clearance_rejection_creates_notification_for_requester(self):
+        request_item = self.create_surat_bebas_lab(self.student_profile)
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.post(
+            f"/api/surat-bebas-lab/{request_item.id}/reject/",
+            {"note": "Masih ada tanggungan alat."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        request_item.refresh_from_db()
+        self.assertEqual(request_item.status, "Rejected")
+        self.assertEqual(request_item.note, "Masih ada tanggungan alat.")
+
+        notification = Notification.objects.get(recipient=self.student_profile, category="Rejected")
+        self.assertIn(request_item.code, notification.message)
+        self.assertIn("Masih ada tanggungan alat.", notification.message)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
+        self.assertIn("ditolak", mail.outbox[0].body)
+        self.assertIn("Masih ada tanggungan alat.", mail.outbox[0].body)
+        self.assertIn("https://frontend.example.com/lab-clearance", mail.outbox[0].body)
 
     def test_overdue_borrow_creates_reminder_notification(self):
         borrow = self.create_borrow(
@@ -768,6 +840,30 @@ class CsluseWorkflowRegressionTests(APITestCase):
         borrow.refresh_from_db()
         self.assertEqual(borrow.quantity, 2)
         self.assertEqual(borrow.note, "Dipakai untuk riset")
+
+    def test_requester_cannot_update_pending_glassware_borrow_above_five_units(self):
+        glassware = Equipment.objects.create(
+            name="Volumetric Flask",
+            quantity=10,
+            category="Glassware",
+            room=self.room,
+            is_moveable=True,
+            is_borrowable=True,
+        )
+        borrow = self.create_borrow_for_equipment(self.student_profile, glassware)
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.patch(
+            f"/api/borrows/{borrow.id}/",
+            {"quantity": 6},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "Glassware hanya boleh dipinjam maksimal 5 unit",
+            response.data["quantity"][0],
+        )
 
     def test_requester_cannot_update_non_pending_borrow(self):
         borrow = self.create_borrow(self.student_profile, status="Approved")

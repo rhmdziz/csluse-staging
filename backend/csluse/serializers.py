@@ -358,6 +358,7 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "category",
             "quantity",
             "room_detail",
             "is_borrowable",
@@ -1134,6 +1135,27 @@ class BookingUserListSerializer(serializers.ModelSerializer):
 # region Borrow Main Serializers
 
 
+GLASSWARE_BORROW_REQUEST_LIMIT = 5
+
+
+def _validate_glassware_borrow_quantity(equipment, quantity):
+    if equipment is None:
+        return
+    if str(getattr(equipment, "category", "")).strip() != "Glassware":
+        return
+    if quantity <= GLASSWARE_BORROW_REQUEST_LIMIT:
+        return
+
+    raise serializers.ValidationError(
+        {
+            "quantity": (
+                "Peralatan kategori Glassware hanya boleh dipinjam maksimal "
+                f"{GLASSWARE_BORROW_REQUEST_LIMIT} unit dalam 1 request."
+            )
+        }
+    )
+
+
 class BorrowSerializer(serializers.ModelSerializer):
     requested_by_detail = ProfileSerializer(source="requested_by", read_only=True)
     approved_by_detail = ProfileSerializer(source="approved_by", read_only=True)
@@ -1264,6 +1286,7 @@ class BorrowSerializer(serializers.ModelSerializer):
         equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
         quantity = attrs.get("quantity", getattr(instance, "quantity", 0))
         if equipment is not None and start_time and end_time:
+            _validate_glassware_borrow_quantity(equipment, quantity)
             if quantity > equipment.quantity:
                 raise serializers.ValidationError(
                     {"quantity": f"Jumlah melebihi stok tersedia ({equipment.quantity})."}
