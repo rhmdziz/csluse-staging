@@ -7,6 +7,7 @@ import {
   API_BORROW_MARK_DAMAGED,
   API_BORROW_MARK_LOST,
   API_BORROW_RECEIVE_RETURN,
+  API_BORROW_RESTORE_REPAIRED,
   API_BORROW_REJECT,
   API_BORROWS,
   API_BORROWS_ALL,
@@ -50,7 +51,8 @@ export type BorrowStatusActionType =
   | "receive_return"
   | "finalize_return"
   | "mark_damaged"
-  | "mark_lost";
+  | "mark_lost"
+  | "restore_repaired";
 
 type MutationResult =
   | { ok: true; data: unknown }
@@ -176,12 +178,14 @@ export const borrowEquipmentService = {
           : type === "handover"
             ? API_BORROW_HANDOVER(borrowId)
             : type === "receive_return"
-              ? API_BORROW_RECEIVE_RETURN(borrowId)
-              : type === "finalize_return"
-                ? API_BORROW_FINALIZE_RETURN(borrowId)
-                : type === "mark_damaged"
-                  ? API_BORROW_MARK_DAMAGED(borrowId)
-                  : API_BORROW_MARK_LOST(borrowId);
+            ? API_BORROW_RECEIVE_RETURN(borrowId)
+            : type === "finalize_return"
+              ? API_BORROW_FINALIZE_RETURN(borrowId)
+              : type === "mark_damaged"
+                ? API_BORROW_MARK_DAMAGED(borrowId)
+                : type === "mark_lost"
+                  ? API_BORROW_MARK_LOST(borrowId)
+                  : API_BORROW_RESTORE_REPAIRED(borrowId);
 
     const body: Record<string, string> = {};
     if (type === "receive_return" && payload?.endTimeActual) {

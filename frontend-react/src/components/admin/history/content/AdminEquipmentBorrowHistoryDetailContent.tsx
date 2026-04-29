@@ -329,8 +329,14 @@ export default function AdminEquipmentBorrowRecordDetailContent({
                 borderless
               />
               <AdminRecordDetailItem
-                label="Waktu Lost/Damaged"
+                label="Waktu Hilang/Rusak"
                 value={formatDateTimeWib(item.lostDamagedAt)}
+                compact
+                borderless
+              />
+              <AdminRecordDetailItem
+                label="Waktu Stok Dipulihkan"
+                value={formatDateTimeWib(item.repairedAt)}
                 compact
                 borderless
               />

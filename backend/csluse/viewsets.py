@@ -797,7 +797,13 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             )
 
         booking_block = ['Pending', 'Approved']
-        borrow_block = ['Pending', 'Approved', 'Borrowed', 'Overdue', 'Lost/Damaged']
+        borrow_block = [
+            'Pending',
+            'Approved',
+            'Borrowed',
+            'Returned Pending Inspection',
+            'Overdue',
+        ]
 
         bookings = (
             Booking.objects
@@ -2030,7 +2036,15 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 }
             )
 
-    def _transition_serializer(self, instance, data, *, allow_end_time_actual=False):
+    def _transition_serializer(
+        self,
+        instance,
+        data,
+        *,
+        allow_end_time_actual=False,
+        allow_inspection_note=False,
+        allow_stock_validation=True,
+    ):
         return self.get_serializer(
             instance,
             data=data,
@@ -2040,8 +2054,34 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 "allow_status_transition": True,
                 "allowed_next_status": data.get("status"),
                 "allow_end_time_actual": allow_end_time_actual,
+                "allow_inspection_note": allow_inspection_note,
+                "allow_stock_validation": allow_stock_validation,
             },
         )
+
+    def _adjust_equipment_quantity(self, equipment_id, delta, *, updated_at):
+        equipment = Equipment.objects.select_for_update().filter(pk=equipment_id).first()
+        if equipment is None:
+            raise ValidationError({"equipment": "Data alat tidak ditemukan."})
+
+        current_quantity = equipment.quantity or 0
+        next_quantity = current_quantity + delta
+        if next_quantity < 0:
+            raise ValidationError(
+                {
+                    "quantity": (
+                        f"Stok alat {equipment.name} tidak mencukupi untuk penyesuaian ini. "
+                        f"Stok saat ini {current_quantity}, butuh {abs(delta)} unit."
+                    )
+                }
+            )
+
+        Equipment.objects.filter(pk=equipment.pk).update(
+            quantity=next_quantity,
+            updated_at=updated_at,
+        )
+        equipment.quantity = next_quantity
+        return equipment
 
     def _append_aggregates(self, response, aggregates):
         response.data["aggregates"] = aggregates
@@ -2376,6 +2416,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer = self._transition_serializer(
             instance,
             data={'status': 'Rejected', **request.data},
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
@@ -2396,6 +2437,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer = self._transition_serializer(
             instance,
             data={'status': 'Borrowed', **request.data},
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
@@ -2410,6 +2452,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         serializer = self._transition_serializer(
             instance,
             data={"status": "Canceled", **request.data},
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -2445,6 +2488,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 **request.data,
             },
             allow_end_time_actual=True,
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
@@ -2473,6 +2517,7 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             instance,
             data=payload,
             allow_end_time_actual='end_time_actual' in payload,
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
@@ -2504,10 +2549,26 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 'status': 'Lost/Damaged',
                 'inspection_note': inspection_note,
             },
+            allow_inspection_note=True,
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
-        serializer.save(inspected_at=now, lost_damaged_at=now)
+        with transaction.atomic():
+            self._adjust_equipment_quantity(
+                instance.equipment_id,
+                -(instance.quantity or 0),
+                updated_at=now,
+            )
+            Borrow.objects.filter(pk=instance.pk).update(
+                status="Lost/Damaged",
+                inspection_note=inspection_note,
+                inspected_at=now,
+                lost_damaged_at=now,
+                repaired_at=None,
+                updated_at=now,
+            )
+        instance.refresh_from_db()
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='mark-lost')
@@ -2535,10 +2596,59 @@ class BorrowViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 'status': 'Lost/Damaged',
                 'inspection_note': inspection_note,
             },
+            allow_inspection_note=True,
+            allow_stock_validation=False,
         )
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
-        serializer.save(inspected_at=now, lost_damaged_at=now)
+        with transaction.atomic():
+            self._adjust_equipment_quantity(
+                instance.equipment_id,
+                -(instance.quantity or 0),
+                updated_at=now,
+            )
+            Borrow.objects.filter(pk=instance.pk).update(
+                status="Lost/Damaged",
+                inspection_note=inspection_note,
+                inspected_at=now,
+                lost_damaged_at=now,
+                repaired_at=None,
+                updated_at=now,
+            )
+        instance.refresh_from_db()
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='restore-repaired')
+    def restore_repaired(self, request, pk=None):
+        instance = self.get_object()
+        self._ensure_review_permission(instance)
+        if not self._can_finalize_borrow_review(instance):
+            raise PermissionDenied(
+                "Hanya PIC ruangan terkait atau laboran/admin yang dapat mengembalikan stok alat setelah perbaikan."
+            )
+        self._ensure_transition(
+            instance,
+            ["Lost/Damaged"],
+            "Lost/Damaged",
+        )
+        if instance.repaired_at:
+            raise ValidationError(
+                {"status": "Stok untuk borrow ini sudah pernah dikembalikan setelah perbaikan."}
+            )
+
+        now = timezone.now()
+        with transaction.atomic():
+            self._adjust_equipment_quantity(
+                instance.equipment_id,
+                instance.quantity or 0,
+                updated_at=now,
+            )
+            Borrow.objects.filter(pk=instance.pk).update(
+                repaired_at=now,
+                updated_at=now,
+            )
+        instance.refresh_from_db()
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='return')
@@ -4370,7 +4480,12 @@ def _equipment_review_overlap_issues(
 
     borrow_qs = Borrow.objects.filter(
         equipment_id=equipment_id,
-        status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+        status__in=[
+            "Approved",
+            "Borrowed",
+            "Returned Pending Inspection",
+            "Overdue",
+        ],
         start_time__lt=end_time,
         end_time__gt=start_time,
     )

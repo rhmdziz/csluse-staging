@@ -113,7 +113,7 @@ export function getStatusBadgeClass(
       ? "border-zinc-200 bg-zinc-50 text-zinc-700"
       : "bg-zinc-200 text-zinc-700";
   }
-  if (normalized === "lost_damaged") {
+  if (normalized === "lost_damaged" || normalized === "lost/damaged") {
     return bordered
       ? "border-red-200 bg-red-50 text-red-700"
       : "bg-red-100 text-red-700";
@@ -132,16 +132,48 @@ export function getStatusBadgeClass(
 export function getStatusSummaryTone(status?: string | null): StatusSummaryTone {
   const normalized = normalizeStatus(status);
 
-  if (normalized === "approved") return "emerald";
+  if (normalized === "approved" || normalized === "disetujui") return "emerald";
   if (normalized === "diproses") return "blue";
-  if (normalized === "pending") return "amber";
-  if (normalized === "canceled" || normalized === "cancelled") return "slate";
-  if (normalized === "returned pending inspection" || normalized === "returned_pending_inspection") {
+  if (normalized === "pending" || normalized === "menunggu") return "amber";
+  if (
+    normalized === "canceled" ||
+    normalized === "cancelled" ||
+    normalized === "dibatalkan"
+  ) {
+    return "slate";
+  }
+  if (
+    normalized === "returned pending inspection" ||
+    normalized === "returned_pending_inspection" ||
+    normalized === "dikembalikan menunggu inspeksi"
+  ) {
     return "blue";
   }
-  if (normalized === "completed" || normalized === "returned") return "sky";
-  if (normalized === "rejected" || normalized === "lost_damaged") return "rose";
-  if (normalized === "expired" || normalized === "overdue") return "slate";
+  if (
+    normalized === "completed" ||
+    normalized === "returned" ||
+    normalized === "selesai" ||
+    normalized === "dikembalikan"
+  ) {
+    return "sky";
+  }
+  if (
+    normalized === "rejected" ||
+    normalized === "lost_damaged" ||
+    normalized === "lost/damaged" ||
+    normalized === "ditolak" ||
+    normalized === "hilang/rusak"
+  ) {
+    return "rose";
+  }
+  if (
+    normalized === "expired" ||
+    normalized === "overdue" ||
+    normalized === "kedaluwarsa" ||
+    normalized === "terlambat"
+  ) {
+    return "slate";
+  }
 
   return "blue";
 }
@@ -149,20 +181,22 @@ export function getStatusSummaryTone(status?: string | null): StatusSummaryTone 
 export function getStatusDisplayLabel(status?: string | null) {
   const normalized = normalizeStatus(status);
 
-  if (normalized === "pending") return "Pending";
-  if (normalized === "approved") return "Approved";
-  if (normalized === "canceled" || normalized === "cancelled") return "Canceled";
+  if (normalized === "pending") return "Menunggu";
+  if (normalized === "approved") return "Disetujui";
+  if (normalized === "canceled" || normalized === "cancelled") return "Dibatalkan";
   if (normalized === "diproses") return "Diproses";
-  if (normalized === "completed") return "Completed";
-  if (normalized === "rejected") return "Rejected";
-  if (normalized === "expired") return "Expired";
-  if (normalized === "borrowed") return "Borrowed";
+  if (normalized === "completed") return "Selesai";
+  if (normalized === "rejected") return "Ditolak";
+  if (normalized === "expired") return "Kedaluwarsa";
+  if (normalized === "borrowed") return "Dipinjam";
   if (normalized === "returned pending inspection" || normalized === "returned_pending_inspection") {
-    return "Returned Pending Inspection";
+    return "Dikembalikan Menunggu Inspeksi";
   }
-  if (normalized === "returned") return "Returned";
-  if (normalized === "overdue") return "Overdue";
-  if (normalized === "lost_damaged") return "Lost/Damaged";
+  if (normalized === "returned") return "Dikembalikan";
+  if (normalized === "overdue") return "Terlambat";
+  if (normalized === "lost_damaged" || normalized === "lost/damaged") {
+    return "Hilang/Rusak";
+  }
 
   return String(status ?? "").trim() || "-";
 }
@@ -199,7 +233,9 @@ export function getBorrowStatusDisplayLabel(status?: string | null) {
   }
   if (normalized === "returned") return "Dikembalikan";
   if (normalized === "overdue") return "Terlambat";
-  if (normalized === "lost_damaged") return "Hilang/Rusak";
+  if (normalized === "lost_damaged" || normalized === "lost/damaged") {
+    return "Hilang/Rusak";
+  }
 
   return getStatusDisplayLabel(status);
 }

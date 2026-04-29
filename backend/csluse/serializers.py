@@ -915,7 +915,12 @@ class BookingSerializer(serializers.ModelSerializer):
                 borrow_allocated = (
                     Borrow.objects.filter(
                         equipment_id=equipment.id,
-                        status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+                        status__in=[
+                            "Approved",
+                            "Borrowed",
+                            "Returned Pending Inspection",
+                            "Overdue",
+                        ],
                         start_time__lt=end_time,
                         end_time__gt=start_time,
                     )
@@ -1270,7 +1275,7 @@ class BorrowSerializer(serializers.ModelSerializer):
                     else:
                         attrs.pop("mentor_approved_at")
 
-            if "inspection_note" in attrs:
+            if "inspection_note" in attrs and not self.context.get("allow_inspection_note"):
                 raise serializers.ValidationError(
                     {"inspection_note": "Gunakan action inspeksi borrow untuk mengisi inspection_note."}
                 )
@@ -1285,7 +1290,8 @@ class BorrowSerializer(serializers.ModelSerializer):
 
         equipment = attrs.get("equipment") or getattr(instance, "equipment", None)
         quantity = attrs.get("quantity", getattr(instance, "quantity", 0))
-        if equipment is not None and start_time and end_time:
+        should_validate_stock = self.context.get("allow_stock_validation", True)
+        if should_validate_stock and equipment is not None and start_time and end_time:
             _validate_glassware_borrow_quantity(equipment, quantity)
             if quantity > equipment.quantity:
                 raise serializers.ValidationError(
@@ -1302,7 +1308,12 @@ class BorrowSerializer(serializers.ModelSerializer):
             borrow_allocated = (
                 Borrow.objects.filter(
                     equipment_id=equipment.id,
-                    status__in=["Approved", "Borrowed", "Overdue", "Lost/Damaged"],
+                    status__in=[
+                        "Approved",
+                        "Borrowed",
+                        "Returned Pending Inspection",
+                        "Overdue",
+                    ],
                     start_time__lt=end_time,
                     end_time__gt=start_time,
                 ).exclude(pk=instance.pk if instance else None)
@@ -1332,6 +1343,7 @@ class BorrowSerializer(serializers.ModelSerializer):
             "approved_by",
             "is_approved_by_mentor",
             "mentor_approved_at",
+            "repaired_at",
         ]
 
 
@@ -1375,6 +1387,7 @@ class BorrowListSerializer(serializers.ModelSerializer):
             "returned_at",
             "overdue_at",
             "lost_damaged_at",
+            "repaired_at",
             "requester_mentor",
             "requester_mentor_profile_detail",
             "is_approved_by_mentor",

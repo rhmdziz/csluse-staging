@@ -762,6 +762,7 @@ export default function BorrowEquipmentListContent({
           setReviewBorrowId(null);
         }}
         context={reviewBorrowId ? { kind: "borrow", id: reviewBorrowId } : null}
+        borrowActionMode="approval-only"
       />
       <DeleteRequestConfirmDialog
         open={Boolean(deleteTarget)}

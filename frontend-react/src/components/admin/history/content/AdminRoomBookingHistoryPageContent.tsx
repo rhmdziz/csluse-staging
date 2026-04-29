@@ -372,11 +372,11 @@ export default function AdminRoomBookingHistoryPage() {
           <AdminHistorySummaryCards
             items={[
               { label: "Total", value: aggregates.total, tone: "blue" },
-              { label: "Pending", value: aggregates.pending },
-              { label: "Approved", value: aggregates.approved },
-              { label: "Completed", value: aggregates.completed },
-              { label: "Rejected", value: aggregates.rejected },
-              { label: "Expired", value: aggregates.expired },
+              { label: "Menunggu", value: aggregates.pending },
+              { label: "Disetujui", value: aggregates.approved },
+              { label: "Selesai", value: aggregates.completed },
+              { label: "Ditolak", value: aggregates.rejected },
+              { label: "Kedaluwarsa", value: aggregates.expired },
             ]}
           />
 

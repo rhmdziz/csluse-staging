@@ -1347,3 +1347,161 @@ class CsluseWorkflowRegressionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_returned_pending_inspection_borrow_still_counts_toward_equipment_stock_validation(self):
+        pending_inspection_borrow = self.create_borrow(
+            self.student_profile,
+            status="Returned Pending Inspection",
+        )
+        pending_inspection_borrow.quantity = 5
+        pending_inspection_borrow.save(update_fields=["quantity", "updated_at"])
+
+        other_student_user, _ = self.create_user_with_profile(
+            "returned-pending-student@example.com",
+            "Student",
+            "Returned Pending Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 1,
+                "start_time": pending_inspection_borrow.start_time.isoformat(),
+                "end_time": pending_inspection_borrow.end_time.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Stok", response.data["quantity"][0])
+
+    def test_returned_borrow_no_longer_counts_toward_equipment_stock_validation(self):
+        returned_borrow = self.create_borrow(
+            self.student_profile,
+            status="Returned",
+        )
+        returned_borrow.quantity = 5
+        returned_borrow.save(update_fields=["quantity", "updated_at"])
+
+        other_student_user, _ = self.create_user_with_profile(
+            "returned-student@example.com",
+            "Student",
+            "Returned Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 5,
+                "start_time": returned_borrow.start_time.isoformat(),
+                "end_time": returned_borrow.end_time.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_mark_damaged_reduces_equipment_quantity_and_updates_borrow_status(self):
+        borrow = self.create_borrow(
+            self.student_profile,
+            status="Returned Pending Inspection",
+            approved_by=self.admin_profile,
+        )
+        borrow.quantity = 2
+        borrow.save(update_fields=["quantity", "updated_at"])
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.post(
+            f"/api/borrows/{borrow.id}/mark-damaged/",
+            {"inspection_note": "Perlu perbaikan modul daya."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        borrow.refresh_from_db()
+        self.equipment.refresh_from_db()
+        self.assertEqual(borrow.status, "Lost/Damaged")
+        self.assertEqual(self.equipment.quantity, 3)
+        self.assertIsNotNone(borrow.lost_damaged_at)
+        self.assertIsNone(borrow.repaired_at)
+
+    def test_lost_damaged_borrow_uses_reduced_equipment_quantity_without_double_counting(self):
+        borrow = self.create_borrow(
+            self.student_profile,
+            status="Returned Pending Inspection",
+            approved_by=self.admin_profile,
+        )
+        borrow.quantity = 1
+        borrow.save(update_fields=["quantity", "updated_at"])
+
+        self.client.force_authenticate(self.admin_user)
+        damage_response = self.client.post(
+            f"/api/borrows/{borrow.id}/mark-damaged/",
+            {"inspection_note": "Probe rusak saat inspeksi."},
+            format="json",
+        )
+        self.assertEqual(damage_response.status_code, status.HTTP_200_OK)
+
+        other_student_user, _ = self.create_user_with_profile(
+            "post-damage-student@example.com",
+            "Student",
+            "Post Damage Student",
+        )
+
+        self.client.force_authenticate(other_student_user)
+        response = self.client.post(
+            "/api/borrows/",
+            {
+                "equipment": str(self.equipment.id),
+                "quantity": 4,
+                "start_time": borrow.start_time.isoformat(),
+                "end_time": borrow.end_time.isoformat(),
+                "purpose": "Penelitian",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_restore_repaired_returns_equipment_quantity_and_blocks_second_restore(self):
+        borrow = self.create_borrow(
+            self.student_profile,
+            status="Returned Pending Inspection",
+            approved_by=self.admin_profile,
+        )
+        borrow.quantity = 2
+        borrow.save(update_fields=["quantity", "updated_at"])
+
+        self.client.force_authenticate(self.admin_user)
+        damage_response = self.client.post(
+            f"/api/borrows/{borrow.id}/mark-damaged/",
+            {"inspection_note": "Perlu ganti komponen."},
+            format="json",
+        )
+        self.assertEqual(damage_response.status_code, status.HTTP_200_OK)
+
+        restore_response = self.client.post(
+            f"/api/borrows/{borrow.id}/restore-repaired/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(restore_response.status_code, status.HTTP_200_OK)
+        borrow.refresh_from_db()
+        self.equipment.refresh_from_db()
+        self.assertEqual(borrow.status, "Lost/Damaged")
+        self.assertIsNotNone(borrow.repaired_at)
+        self.assertEqual(self.equipment.quantity, 5)
+
+        second_restore_response = self.client.post(
+            f"/api/borrows/{borrow.id}/restore-repaired/",
+            {},
+            format="json",
+        )
+        self.assertEqual(second_restore_response.status_code, status.HTTP_400_BAD_REQUEST)

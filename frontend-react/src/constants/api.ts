@@ -94,6 +94,8 @@ const API_BORROW_MARK_DAMAGED = (id: string | number) =>
   `${API_BORROWS}${id}/mark-damaged/`;
 const API_BORROW_MARK_LOST = (id: string | number) =>
   `${API_BORROWS}${id}/mark-lost/`;
+const API_BORROW_RESTORE_REPAIRED = (id: string | number) =>
+  `${API_BORROWS}${id}/restore-repaired/`;
 const API_BORROW_RETURN = (id: string | number) =>
   `${API_BORROWS}${id}/return/`;
 const API_BORROW_REVIEW_CHECK = (id: string | number) =>
@@ -261,6 +263,7 @@ export {
   API_BORROW_FINALIZE_RETURN,
   API_BORROW_MARK_DAMAGED,
   API_BORROW_MARK_LOST,
+  API_BORROW_RESTORE_REPAIRED,
   API_BORROW_RETURN,
   API_BORROW_REVIEW_CHECK,
   API_BORROWS_BY_MONTH,

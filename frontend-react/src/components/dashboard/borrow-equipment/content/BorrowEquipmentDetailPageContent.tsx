@@ -344,6 +344,7 @@ export default function BorrowEquipmentDetailPage() {
                 <DashboardDetailReviewPanel
                   context={{ kind: "borrow", id: borrowId }}
                   initialBorrow={item}
+                  borrowActionMode="approval-only"
                   onActionComplete={() => setReloadKey((prev) => prev + 1)}
                 />
               ) : null}

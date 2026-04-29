@@ -372,11 +372,11 @@ export default function AdminSampleTestingHistoryPage() {
           <AdminHistorySummaryCards
             items={[
               { label: "Total", value: aggregates.total, tone: "blue" },
-              { label: "Pending", value: aggregates.pending },
-              { label: "Approved", value: aggregates.approved },
+              { label: "Menunggu", value: aggregates.pending },
+              { label: "Disetujui", value: aggregates.approved },
               { label: "Diproses", value: aggregates.diproses },
-              { label: "Completed", value: aggregates.completed },
-              { label: "Rejected", value: aggregates.rejected },
+              { label: "Selesai", value: aggregates.completed },
+              { label: "Ditolak", value: aggregates.rejected },
             ]}
           />
 

@@ -27,6 +27,7 @@ type BorrowProgressInput = BasicProgressInput & {
   returnedAt?: string;
   overdueAt?: string;
   lostDamagedAt?: string;
+  repairedAt?: string;
 };
 
 function normalizeStatus(value: string) {
@@ -381,6 +382,17 @@ export function getBorrowProgressFlow(
       time: pickTime(item.lostDamagedAt, item.inspectedAt, item.updatedAt),
       state: "error",
     };
+    if (item.repairedAt && item.repairedAt !== "-") {
+      return [
+        ...baseSteps.slice(0, lostDamagedIndex + 1),
+        {
+          key: "repaired",
+          label: "Stok Dipulihkan",
+          time: pickTime(item.repairedAt, item.updatedAt),
+          state: "finish",
+        },
+      ];
+    }
     return baseSteps.slice(0, lostDamagedIndex + 1);
   }
 

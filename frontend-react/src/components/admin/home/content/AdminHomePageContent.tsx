@@ -28,6 +28,7 @@ import {
   formatDateTimeIdWithZone,
   formatTimeIdWithZone,
 } from "@/lib/date";
+import { getStatusDisplayLabel, normalizeStatus } from "@/lib/request";
 
 type AdminKpis = {
   totalUsers: number;
@@ -477,40 +478,60 @@ function getKpiIconToneClass(tone: KpiTone) {
   return "bg-cyan-100 text-cyan-700";
 }
 
-const STATUS_COLOR_MAP: Record<string, string> = {
-  Pending: "bg-amber-400",
-  Approved: "bg-emerald-500",
-  Rejected: "bg-rose-500",
-  Expired: "bg-slate-400",
-  Completed: "bg-sky-500",
-  Borrowed: "bg-blue-500",
-  "Returned Pending Inspection": "bg-violet-400",
-  Returned: "bg-teal-500",
-  Overdue: "bg-orange-500",
-  "Lost/Damaged": "bg-red-700",
-  Diproses: "bg-cyan-500",
-};
-
-const STATUS_LABEL_ID: Record<string, string> = {
-  Pending: "Menunggu",
-  Approved: "Disetujui",
-  Rejected: "Ditolak",
-  Expired: "Kedaluwarsa",
-  Completed: "Selesai",
-  Borrowed: "Dipinjam",
-  "Returned Pending Inspection": "Dikembalikan (Cek)",
-  Returned: "Dikembalikan",
-  Overdue: "Terlambat",
-  "Lost/Damaged": "Hilang/Rusak",
-  Diproses: "Diproses",
-};
-
 function getStatusColor(status: string): string {
-  return STATUS_COLOR_MAP[status] ?? "bg-slate-300";
+  const normalized = normalizeStatus(status).replace(/[\s/]+/g, "_");
+
+  if (normalized === "pending" || normalized === "menunggu") {
+    return "bg-amber-400";
+  }
+  if (normalized === "approved" || normalized === "disetujui") {
+    return "bg-emerald-500";
+  }
+  if (normalized === "rejected" || normalized === "ditolak") {
+    return "bg-rose-500";
+  }
+  if (
+    normalized === "expired" ||
+    normalized === "kedaluwarsa" ||
+    normalized === "canceled" ||
+    normalized === "cancelled" ||
+    normalized === "dibatalkan"
+  ) {
+    return "bg-slate-400";
+  }
+  if (normalized === "completed" || normalized === "selesai") {
+    return "bg-sky-500";
+  }
+  if (normalized === "borrowed" || normalized === "dipinjam") {
+    return "bg-indigo-500";
+  }
+  if (
+    normalized === "returned_pending_inspection" ||
+    normalized === "dikembalikan_menunggu_inspeksi"
+  ) {
+    return "bg-cyan-500";
+  }
+  if (normalized === "returned" || normalized === "dikembalikan") {
+    return "bg-teal-500";
+  }
+  if (normalized === "overdue" || normalized === "terlambat") {
+    return "bg-orange-500";
+  }
+  if (
+    normalized === "lost_damaged" ||
+    normalized === "hilang_rusak"
+  ) {
+    return "bg-red-700";
+  }
+  if (normalized === "diproses") {
+    return "bg-blue-500";
+  }
+
+  return "bg-slate-300";
 }
 
 function getStatusLabel(status: string): string {
-  return STATUS_LABEL_ID[status] ?? status;
+  return getStatusDisplayLabel(status);
 }
 
 const ROLE_COLOR_MAP: Record<string, string> = {

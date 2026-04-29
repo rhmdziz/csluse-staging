@@ -340,6 +340,7 @@ class Borrow(BaseModel):
     returned_at = models.DateTimeField(blank=True, null=True)
     overdue_at = models.DateTimeField(blank=True, null=True)
     lost_damaged_at = models.DateTimeField(blank=True, null=True)
+    repaired_at = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.code:

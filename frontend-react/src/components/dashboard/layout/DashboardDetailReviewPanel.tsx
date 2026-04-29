@@ -102,6 +102,11 @@ function isInspectionPendingStatus(value: string) {
   );
 }
 
+function isLostDamagedStatus(value: string) {
+  const normalized = normalizeStatus(value);
+  return normalized === "lost/damaged" || normalized === "lost_damaged";
+}
+
 function isGuestRole(role?: string | null) {
   return String(role ?? "").trim().toLowerCase() === "guest";
 }
@@ -109,6 +114,7 @@ function isGuestRole(role?: string | null) {
 function getBorrowStatusHint(
   status: string,
   reviewer: boolean,
+  actionMode: "full" | "approval-only" = "full",
 ): {
   title: string;
   message: string;
@@ -118,16 +124,25 @@ function getBorrowStatusHint(
   textClassName?: string;
 } | null {
   if (isApprovedStatus(status)) {
+    const adminOnly = actionMode === "approval-only";
     return {
       title: "Status sudah disetujui",
       message: reviewer
-        ? "Pengajuan sudah lolos review dan siap masuk proses serah terima alat."
-        : "Pengajuan sudah lolos review dan sedang menunggu proses serah terima alat.",
+        ? adminOnly
+          ? "Pengajuan sudah lolos review. Tahap serah terima alat berikutnya ditangani admin dari halaman admin."
+          : "Pengajuan sudah lolos review dan siap masuk proses serah terima alat."
+        : adminOnly
+          ? "Pengajuan sudah lolos review. Tahap serah terima alat berikutnya ditangani admin."
+          : "Pengajuan sudah lolos review dan sedang menunggu proses serah terima alat.",
       indicators: reviewer
-        ? [
-            "Gunakan aksi Serah Terima setelah alat benar-benar diserahkan ke peminjam.",
-          ]
-        : ["PIC akan melanjutkan ke proses serah terima alat."],
+        ? adminOnly
+          ? ["Aksi lanjutan setelah approval hanya tersedia di halaman admin."]
+          : [
+              "Gunakan aksi Serah Terima setelah alat benar-benar diserahkan ke peminjam.",
+            ]
+        : adminOnly
+          ? ["Admin akan melanjutkan proses serah terima alat."]
+          : ["PIC akan melanjutkan ke proses serah terima alat."],
       className: "border-sky-200 bg-sky-50/80",
       titleClassName: "text-sky-800",
       textClassName: "text-sky-900",
@@ -135,18 +150,27 @@ function getBorrowStatusHint(
   }
 
   if (canReturnStatus(status)) {
+    const adminOnly = actionMode === "approval-only";
     return {
       title: "Alat sedang dipinjam",
       message: reviewer
-        ? "Tahap review selesai. Langkah berikutnya adalah menerima alat kembali dari peminjam."
-        : "Alat sedang dipinjam dan menunggu proses pengembalian.",
+        ? adminOnly
+          ? "Tahap review sudah selesai. Proses pengembalian alat dipantau dan ditangani admin dari halaman admin."
+          : "Tahap review selesai. Langkah berikutnya adalah menerima alat kembali dari peminjam."
+        : adminOnly
+          ? "Alat sedang dipinjam dan proses lanjutannya ditangani admin."
+          : "Alat sedang dipinjam dan menunggu proses pengembalian.",
       indicators: reviewer
-        ? [
-            "Gunakan aksi Konfirmasi Pengembalian saat alat sudah diterima kembali.",
-          ]
-        : [
-            "Setelah alat dikembalikan, PIC akan melakukan konfirmasi pengembalian.",
-          ],
+        ? adminOnly
+          ? ["Halaman dashboard approval hanya menampilkan status untuk tahap ini."]
+          : [
+              "Gunakan aksi Konfirmasi Pengembalian saat alat sudah diterima kembali.",
+            ]
+        : adminOnly
+          ? ["Admin akan melakukan konfirmasi pengembalian setelah alat diterima."]
+          : [
+              "Setelah alat dikembalikan, PIC akan melakukan konfirmasi pengembalian.",
+            ],
       className: "border-sky-200 bg-sky-50/80",
       titleClassName: "text-sky-800",
       textClassName: "text-sky-900",
@@ -154,22 +178,53 @@ function getBorrowStatusHint(
   }
 
   if (isInspectionPendingStatus(status)) {
+    const adminOnly = actionMode === "approval-only";
     return {
       title: "Menunggu inspeksi akhir",
       message: reviewer
-        ? "Pengembalian sudah diterima. Lanjutkan dengan pemeriksaan kondisi alat sebelum status diselesaikan."
-        : "Pengembalian sudah diterima dan sedang menunggu hasil inspeksi akhir.",
+        ? adminOnly
+          ? "Pengembalian sudah diterima. Pemeriksaan kondisi alat dan finalisasi status berikutnya ditangani admin."
+          : "Pengembalian sudah diterima. Lanjutkan dengan pemeriksaan kondisi alat sebelum status diselesaikan."
+        : adminOnly
+          ? "Pengembalian sudah diterima dan sedang diproses admin untuk inspeksi akhir."
+          : "Pengembalian sudah diterima dan sedang menunggu hasil inspeksi akhir.",
       indicators: reviewer
-        ? [
-            "Gunakan Finalisasi Return jika alat kembali dengan baik.",
-            "Gunakan Tandai Rusak atau Tandai Hilang jika ada temuan pada inspeksi.",
-          ]
-        : [
-            "PIC akan memfinalisasi return atau menandai hasil inspeksi bila ada kendala.",
-          ],
+        ? adminOnly
+          ? ["Aksi finalisasi return, tandai rusak, dan tandai hilang hanya tersedia di halaman admin."]
+          : [
+              "Gunakan Finalisasi Return jika alat kembali dengan baik.",
+              "Gunakan Tandai Rusak atau Tandai Hilang jika ada temuan pada inspeksi.",
+            ]
+        : adminOnly
+          ? ["Admin akan memfinalisasi hasil inspeksi alat."]
+          : [
+              "PIC akan memfinalisasi return atau menandai hasil inspeksi bila ada kendala.",
+            ],
       className: "border-emerald-200 bg-emerald-50/80",
       titleClassName: "text-emerald-800",
       textClassName: "text-emerald-900",
+    };
+  }
+
+  if (isLostDamagedStatus(status)) {
+    const adminOnly = actionMode === "approval-only";
+    return {
+      title: "Alat tercatat hilang atau rusak",
+      message: reviewer
+        ? adminOnly
+          ? "Catatan inspeksi sudah final. Tindak lanjut perbaikan stok ditangani admin dari halaman admin."
+          : "Borrow sudah ditutup sebagai hilang atau rusak. Jika unit yang rusak sudah selesai diperbaiki, kembalikan stok alat melalui aksi restore repaired."
+        : adminOnly
+          ? "Catatan hilang atau rusak sudah final dan tindak lanjut stok ditangani admin."
+          : "Borrow sudah ditutup sebagai hilang atau rusak. Stok alat akan dikembalikan oleh PIC atau admin jika unit selesai diperbaiki.",
+      indicators: reviewer
+        ? adminOnly
+          ? ["Pemulihan stok alat setelah perbaikan hanya tersedia di halaman admin."]
+          : ["Gunakan aksi Restore Repaired hanya setelah unit yang rusak benar-benar selesai diperbaiki."]
+        : ["Status ini tetap tersimpan sebagai histori inspeksi akhir."],
+      className: "border-amber-200 bg-amber-50/80",
+      titleClassName: "text-amber-800",
+      textClassName: "text-amber-900",
     };
   }
 
@@ -709,10 +764,12 @@ function BorrowReviewPanel({
   id,
   onActionComplete,
   initialBorrow,
+  actionMode = "full",
 }: {
   id: string;
   onActionComplete?: () => void;
   initialBorrow?: BorrowRow | null;
+  actionMode?: "full" | "approval-only";
 }) {
   const { profile } = useLoadProfile();
   const { borrow, setBorrow, isLoading, error } = useBorrowDetail(id, 0, {
@@ -724,7 +781,7 @@ function BorrowReviewPanel({
   const [passedIndicators, setPassedIndicators] = useState<string[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
   const [confirmType, setConfirmType] = useState<
-    "approve" | "reject" | "handover" | "finalize_return" | null
+    "approve" | "reject" | "handover" | "finalize_return" | "restore_repaired" | null
   >(null);
   const [isReturnConfirmOpen, setIsReturnConfirmOpen] = useState(false);
   const [inspectionAction, setInspectionAction] = useState<
@@ -809,16 +866,30 @@ function BorrowReviewPanel({
     profile?.id,
     profile?.role,
   );
-  const canHandoverBorrow = canFinalizeBorrow && isApprovedStatus(borrow.status);
-  const canConfirmReturn = canFinalizeBorrow && canReturnStatus(borrow.status);
+  const isApprovalOnlyMode = actionMode === "approval-only";
+  const canHandoverBorrow =
+    !isApprovalOnlyMode && canFinalizeBorrow && isApprovedStatus(borrow.status);
+  const canConfirmReturn =
+    !isApprovalOnlyMode && canFinalizeBorrow && canReturnStatus(borrow.status);
   const canFinalizeInspection =
-    canFinalizeBorrow && isInspectionPendingStatus(borrow.status);
+    !isApprovalOnlyMode &&
+    canFinalizeBorrow &&
+    isInspectionPendingStatus(borrow.status);
+  const canRestoreRepaired =
+    !isApprovalOnlyMode &&
+    canFinalizeBorrow &&
+    isLostDamagedStatus(borrow.status) &&
+    (!borrow.repairedAt || borrow.repairedAt === "-");
   const mentorHint = getMentorApprovalHint(
     waitingForMentorApproval,
     String(profile?.id ?? "") === borrow.requesterMentorProfileId,
   );
   const isGuestRequester = isGuestRole(borrow.requesterRole);
-  const borrowStatusHint = getBorrowStatusHint(borrow.status, reviewer);
+  const borrowStatusHint = getBorrowStatusHint(
+    borrow.status,
+    reviewer,
+    actionMode,
+  );
   const borrowStatusActionClass = getBorrowStatusActionClass(borrow.status);
 
   const handleBorrowAction = async (rejectionNote?: string) => {
@@ -847,7 +918,9 @@ function BorrowReviewPanel({
                   ? "Rejected"
                   : type === "handover"
                     ? "Borrowed"
-                    : "Returned",
+                    : type === "finalize_return"
+                      ? "Returned"
+                      : current.status,
             updatedAt: now,
             rejectionNote:
               type === "reject"
@@ -861,6 +934,8 @@ function BorrowReviewPanel({
               type === "approve"
                 ? profile?.name || current.approvedByName
                 : current.approvedByName,
+            repairedAt:
+              type === "restore_repaired" ? now : current.repairedAt,
           }
         : current,
     );
@@ -873,7 +948,9 @@ function BorrowReviewPanel({
           ? "Pengajuan peminjaman alat berhasil ditolak."
           : type === "handover"
             ? "Serah-terima alat berhasil dikonfirmasi."
-            : "Pengembalian alat berhasil difinalisasi.",
+            : type === "finalize_return"
+              ? "Pengembalian alat berhasil difinalisasi."
+              : "Stok alat berhasil dikembalikan setelah perbaikan.",
     );
     onActionComplete?.();
   };
@@ -980,6 +1057,26 @@ function BorrowReviewPanel({
           },
         ]
       : []),
+    ...(isLostDamagedStatus(borrow.status)
+      ? [
+          {
+            label: "Waktu Hilang/Rusak",
+            value: formatDateTimeWib(borrow.lostDamagedAt),
+          },
+          {
+            label: "Catatan Inspeksi",
+            value: borrow.inspectionNote || "-",
+          },
+          ...(borrow.repairedAt && borrow.repairedAt !== "-"
+            ? [
+                {
+                  label: "Stok Dipulihkan",
+                  value: formatDateTimeWib(borrow.repairedAt),
+                },
+              ]
+            : []),
+        ]
+      : []),
   ];
 
   return (
@@ -1081,6 +1178,17 @@ function BorrowReviewPanel({
             </Button>
           </>
         ) : null}
+        {canRestoreRepaired ? (
+          <Button
+            type="button"
+            className="h-10 rounded-md border border-emerald-600 bg-emerald-600 px-4 text-white shadow-sm hover:bg-emerald-700"
+            onClick={() => setConfirmType("restore_repaired")}
+            disabled={pendingAction.borrowId === borrow.id}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Pulihkan Stok
+          </Button>
+        ) : null}
       </RequestReviewCard>
 
       <StatusConfirmDialog
@@ -1098,7 +1206,9 @@ function BorrowReviewPanel({
             ? "serah-terima alat ini"
             : confirmType === "finalize_return"
               ? "finalisasi pengembalian alat ini"
-              : "pengajuan peminjaman alat ini"
+              : confirmType === "restore_repaired"
+                ? "pemulihan stok alat hasil perbaikan ini"
+                : "pengajuan peminjaman alat ini"
         }
         requireReasonOnReject={confirmType === "reject"}
       />
@@ -1397,12 +1507,14 @@ export function DashboardDetailReviewPanel({
   initialBooking,
   initialBorrow,
   initialSampleTesting,
+  borrowActionMode = "full",
 }: {
   context: Exclude<ReviewContext, null>;
   onActionComplete?: () => void;
   initialBooking?: BookingRow | null;
   initialBorrow?: BorrowRow | null;
   initialSampleTesting?: SampleTestingRow | null;
+  borrowActionMode?: "full" | "approval-only";
 }) {
   if (context.kind === "booking") {
     return (
@@ -1429,6 +1541,7 @@ export function DashboardDetailReviewPanel({
       id={context.id}
       onActionComplete={onActionComplete}
       initialBorrow={initialBorrow}
+      actionMode={borrowActionMode}
     />
   );
 }

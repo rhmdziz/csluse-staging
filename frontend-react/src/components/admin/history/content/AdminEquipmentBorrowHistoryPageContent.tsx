@@ -370,18 +370,18 @@ export default function AdminEquipmentBorrowHistoryPage() {
           <AdminHistorySummaryCards
             items={[
               { label: "Total", value: aggregates.total, tone: "blue" },
-              { label: "Pending", value: aggregates.pending },
-              { label: "Approved", value: aggregates.approved },
-              { label: "Rejected", value: aggregates.rejected },
-              { label: "Expired", value: aggregates.expired },
-              { label: "Borrowed", value: aggregates.borrowed, tone: "blue" },
+              { label: "Menunggu", value: aggregates.pending },
+              { label: "Disetujui", value: aggregates.approved },
+              { label: "Ditolak", value: aggregates.rejected },
+              { label: "Kedaluwarsa", value: aggregates.expired },
+              { label: "Dipinjam", value: aggregates.borrowed, tone: "blue" },
               {
-                label: "Returned Pending Inspection",
+                label: "Dikembalikan Menunggu Inspeksi",
                 value: aggregates.returned_pending_inspection,
               },
-              { label: "Returned", value: aggregates.returned },
-              { label: "Overdue", value: aggregates.overdue },
-              { label: "Lost/Damaged", value: aggregates.lost_damaged },
+              { label: "Dikembalikan", value: aggregates.returned },
+              { label: "Terlambat", value: aggregates.overdue },
+              { label: "Hilang/Rusak", value: aggregates.lost_damaged },
             ]}
           />
 

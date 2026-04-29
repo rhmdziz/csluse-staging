@@ -50,6 +50,7 @@ export type BorrowRow = {
   returnedAt: string;
   overdueAt: string;
   lostDamagedAt: string;
+  repairedAt: string;
   note: string;
   inspectionNote: string;
   requesterPhone: string;
@@ -96,6 +97,7 @@ type ApiBorrow = {
   returned_at?: string | null;
   overdue_at?: string | null;
   lost_damaged_at?: string | null;
+  repaired_at?: string | null;
   equipment?: string | number | null;
   equipment_detail?: {
     id?: string | number | null;
@@ -209,6 +211,7 @@ export function mapBorrow(item: ApiBorrow): BorrowRow {
     returnedAt: String(item.returned_at ?? "-"),
     overdueAt: String(item.overdue_at ?? "-"),
     lostDamagedAt: String(item.lost_damaged_at ?? "-"),
+    repairedAt: String(item.repaired_at ?? "-"),
     note: String(item.note ?? ""),
     inspectionNote: String(item.inspection_note ?? ""),
     requesterPhone: String(item.requester_phone ?? "-"),

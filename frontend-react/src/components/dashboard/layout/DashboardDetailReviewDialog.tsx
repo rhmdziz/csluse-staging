@@ -27,6 +27,7 @@ type DashboardDetailReviewDialogProps = {
   onOpenChange: (open: boolean) => void;
   context: ReviewContext;
   onActionComplete?: () => void;
+  borrowActionMode?: "full" | "approval-only";
 };
 
 export function DashboardDetailReviewDialog({
@@ -34,6 +35,7 @@ export function DashboardDetailReviewDialog({
   onOpenChange,
   context,
   onActionComplete,
+  borrowActionMode = "full",
 }: DashboardDetailReviewDialogProps) {
   if (!context) return null;
 
@@ -47,6 +49,7 @@ export function DashboardDetailReviewDialog({
         <DashboardDetailReviewPanel
           context={context}
           onActionComplete={onActionComplete}
+          borrowActionMode={borrowActionMode}
         />
       </DialogContent>
     </Dialog>
