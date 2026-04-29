@@ -71,7 +71,6 @@ const MENU_ACCESS_RULES: Record<string, readonly string[]> = {
   ],
   "borrow-equipment": [
     ROLE_VALUES.STUDENT,
-    ROLE_VALUES.GUEST,
     ROLE_VALUES.LECTURER,
     ROLE_VALUES.STAFF,
     ROLE_VALUES.ADMIN,

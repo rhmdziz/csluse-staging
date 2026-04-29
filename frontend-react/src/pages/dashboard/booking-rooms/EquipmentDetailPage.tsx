@@ -4,7 +4,9 @@ import { ArrowLeft, ClipboardPlus, Loader2, Package2, Settings2 } from "lucide-r
 import { useParams, useRouter } from "next/navigation";
 
 import { Button, Skeleton } from "@/components/ui";
+import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 import { useEquipmentDetail } from "@/hooks/shared/resources/equipments";
+import { useLoadProfile } from "@/hooks/shared/profile";
 import { useSoftwares } from "@/hooks/shared/resources/softwares";
 
 type EquipmentDetailParams = {
@@ -112,8 +114,10 @@ export default function EquipmentDetailPage() {
   const router = useRouter();
   const params = useParams<EquipmentDetailParams>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const { profile } = useLoadProfile();
 
   const { equipment, isLoading, error } = useEquipmentDetail(id);
+  const isGuestUser = normalizeRoleValue(profile.role) === ROLE_VALUES.GUEST;
   const isComputerCategory = String(equipment?.category ?? "").trim().toLowerCase() === "computer";
   const {
     softwares,
@@ -162,7 +166,7 @@ export default function EquipmentDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {equipment.isBorrowable && (
+          {equipment.isBorrowable && !isGuestUser && (
             <Button type="button" onClick={() => router.push(`/borrow-equipment/form?equipment=${id}`)}>
               <ClipboardPlus className="h-4 w-4" />
               Ajukan Peminjaman Alat
@@ -203,7 +207,9 @@ export default function EquipmentDetailPage() {
               label="Peminjaman"
               value={
                 equipment.isBorrowable
-                  ? "Gunakan tombol Ajukan Peminjaman Alat untuk melanjutkan pengajuan dari peralatan ini."
+                  ? isGuestUser
+                    ? "Akun Guest tidak memiliki akses ke fitur peminjaman alat."
+                    : "Gunakan tombol Ajukan Peminjaman Alat untuk melanjutkan pengajuan dari peralatan ini."
                   : "Peralatan ini tidak tersedia untuk dipinjam."
               }
             />
