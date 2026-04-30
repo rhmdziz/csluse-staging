@@ -22,20 +22,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def get_env_list(name, default=None):
+    value = os.getenv(name)
+    if value is None:
+        return default[:] if default else []
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 # region Core Settings
 
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-default-key")
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = [
-    "localhost",
-    ".azizrahmad.com",
-    ".onrender.com",
-    "127.0.0.1",
-    "108.136.248.15",
-    "csl-test.azizrahmad.com",
-]
+ALLOWED_HOSTS = get_env_list(
+    "ALLOWED_HOSTS",
+    default=[
+        "localhost",
+        "127.0.0.1",
+    ],
+)
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -212,8 +219,8 @@ SOCIALACCOUNT_AUTO_SIGNUP = True
 # region Session And Security Settings
 
 
-SESSION_COOKIE_DOMAIN = ".azizrahmad.com"
-CSRF_COOKIE_DOMAIN = ".azizrahmad.com"
+SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN")
+CSRF_COOKIE_DOMAIN = os.getenv("CSRF_COOKIE_DOMAIN")
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
@@ -239,13 +246,13 @@ SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False") == "True"
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False") == "True"
 CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False") == "True"
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://csl.azizrahmad.com",
-    "http://108.136.248.15",
-    "https://csl-test.azizrahmad.com",
-]
+CORS_ALLOWED_ORIGINS = get_env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -261,13 +268,13 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://csl.azizrahmad.com",
-    "https://csl-test.azizrahmad.com",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://108.136.248.15",
-]
+CSRF_TRUSTED_ORIGINS = get_env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+)
 
 
 # endregion Session And Security Settings
