@@ -158,6 +158,7 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             role="Student",
             batch="2024",
         )
+        deletable_profile_id = deletable_user.profile.pk
         protected_user = self.create_user(
             email="superadmin@example.com",
             full_name="Protected User",
@@ -177,6 +178,7 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["deleted_ids"], [deletable_user.pk])
         self.assertCountEqual(response.data["failed_ids"], [protected_user.pk, 999999])
         self.assertFalse(User.objects.filter(pk=deletable_user.pk).exists())
+        self.assertFalse(Profile.objects.filter(pk=deletable_profile_id).exists())
         self.assertTrue(User.objects.filter(pk=protected_user.pk).exists())
         self.assertEqual(
             LogEntry.objects.filter(
@@ -186,6 +188,28 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             ).count(),
             1,
         )
+        self.assertEqual(
+            LogEntry.objects.filter(
+                user=self.admin,
+                object_id=str(deletable_profile_id),
+                action_flag=DELETION,
+            ).count(),
+            1,
+        )
+
+    def test_destroy_deletes_user_and_linked_profile(self):
+        target_user = self.create_user(
+            email="destroy-target@example.com",
+            full_name="Destroy Target",
+            role="Guest",
+        )
+        profile_id = target_user.profile.pk
+
+        response = self.client.delete(f"/api/admin/users/{profile_id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(pk=target_user.pk).exists())
+        self.assertFalse(Profile.objects.filter(pk=profile_id).exists())
 
     def test_list_aggregates_follow_role_filter(self):
         self.create_user(
@@ -213,6 +237,26 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["aggregates"]["total"], 1)
         self.assertEqual(response.data["aggregates"]["guest"], 1)
         self.assertEqual(response.data["aggregates"]["student"], 0)
+
+    def test_admin_profile_confirm_user_marks_email_as_verified(self):
+        target_user = self.create_user(
+            email="confirm-target@example.com",
+            full_name="Confirm Target",
+            role="Guest",
+        )
+        profile_id = target_user.profile.pk
+
+        response = self.client.post(f"/api/admin/profile/{profile_id}/confirm-user/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_verified"])
+        self.assertTrue(
+            EmailAddress.objects.filter(
+                user=target_user,
+                email="confirm-target@example.com",
+                verified=True,
+            ).exists()
+        )
 
 
 class AdminActionViewSetTests(AuthBaseTestMixin, APITestCase):

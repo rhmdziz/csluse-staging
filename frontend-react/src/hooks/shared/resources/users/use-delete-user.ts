@@ -7,15 +7,16 @@ export function useDeleteUser() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const deleteUser = async (user: Pick<UserRow, "id" | "profileId" | "hasUser">) => {
+  const deleteUser = async (user: Pick<UserRow, "id" | "userId" | "profileId" | "hasUser">) => {
     if (!user?.id) return { ok: false, message: "ID kosong" };
 
     setIsDeleting(true);
     setErrorMessage("");
 
     try {
+      const activeUserId = user.userId ?? user.id;
       const result = user.hasUser
-        ? await usersService.remove(user.id)
+        ? await usersService.remove(activeUserId)
         : user.profileId
           ? await usersService.removeProfile(user.profileId)
           : { ok: false as const, status: 400, data: { detail: "Profile ID kosong" } };
@@ -24,7 +25,7 @@ export function useDeleteUser() {
         return { ok: true };
       }
 
-      let message = `Gagal menghapus ${user.hasUser ? "user" : "profile"} (${result.status})`;
+      let message = `Gagal menghapus ${user.hasUser ? "akun dan profile" : "profile"} (${result.status})`;
       const data = (result.data ?? {}) as { detail?: string };
       if (typeof data.detail === "string" && data.detail.trim()) {
         message = data.detail;
@@ -41,7 +42,9 @@ export function useDeleteUser() {
     }
   };
 
-  const deleteUsers = async (users: Array<Pick<UserRow, "id" | "profileId" | "hasUser">>) => {
+  const deleteUsers = async (
+    users: Array<Pick<UserRow, "id" | "userId" | "profileId" | "hasUser">>,
+  ) => {
     if (!users.length) {
       return { ok: false, message: "Data kosong", deletedIds: [], failedIds: [] };
     }
@@ -58,7 +61,7 @@ export function useDeleteUser() {
 
       if (activeUsers.length) {
         const normalizedIds = activeUsers
-          .map((user) => Number(user.id))
+          .map((user) => Number(user.userId ?? user.id))
           .filter((id) => Number.isInteger(id) && id > 0);
 
         if (normalizedIds.length) {
@@ -72,13 +75,24 @@ export function useDeleteUser() {
           if (!result.ok) {
             const message =
               (typeof data.detail === "string" && data.detail.trim()) ||
-              `Gagal menghapus user (${result.status})`;
+              `Gagal menghapus akun dan profile (${result.status})`;
             setErrorMessage(message);
             return { ok: false, message, deletedIds: [], failedIds: [] };
           }
 
-          deletedIds.push(...(Array.isArray(data.deleted_ids) ? data.deleted_ids : []));
-          failedIds.push(...(Array.isArray(data.failed_ids) ? data.failed_ids : []));
+          const deletedUserIds = Array.isArray(data.deleted_ids) ? data.deleted_ids : [];
+          const failedUserIds = Array.isArray(data.failed_ids) ? data.failed_ids : [];
+          const deletedUserIdSet = new Set(deletedUserIds.map((id) => String(id)));
+          const failedUserIdSet = new Set(failedUserIds.map((id) => String(id)));
+
+          for (const user of activeUsers) {
+            const currentUserId = String(user.userId ?? user.id);
+            if (deletedUserIdSet.has(currentUserId)) {
+              deletedIds.push(user.id);
+            } else if (failedUserIdSet.has(currentUserId)) {
+              failedIds.push(user.id);
+            }
+          }
         }
       }
 

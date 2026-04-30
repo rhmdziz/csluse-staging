@@ -69,7 +69,10 @@ class CustomLoginSerializer(BaseLoginSerializer):
 
             if not EmailAddress.objects.filter(user=user, verified=True).exists():
                 raise serializers.ValidationError(
-                    {"detail": "Email belum diverifikasi", "code": "email_not_verified"}
+                    {
+                        "detail": "Email belum diverifikasi. Harap cek inbox atau folder spam email Anda. Jika masih bermasalah, hubungi admin.",
+                        "code": "email_not_verified",
+                    }
                 )
 
             user.backend = "django.contrib.auth.backends.ModelBackend"
@@ -365,12 +368,13 @@ class UserBulkDeleteSerializer(serializers.Serializer):
 class AdminProfileSerializer(ProfileSerializer):
     email = serializers.EmailField()
     user_id = serializers.IntegerField(read_only=True, allow_null=True)
+    is_verified = serializers.BooleanField(read_only=True)
     has_user = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
     class Meta(ProfileSerializer.Meta):
-        fields = ProfileSerializer.Meta.fields + ("user_id", "has_user", "status")
-        read_only_fields = ("id", "user_id", "has_user", "status")
+        fields = ProfileSerializer.Meta.fields + ("user_id", "is_verified", "has_user", "status")
+        read_only_fields = ("id", "user_id", "is_verified", "has_user", "status")
 
     def validate_email(self, value):
         normalized = str(value or "").strip().lower()

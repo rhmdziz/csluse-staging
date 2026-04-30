@@ -3,12 +3,12 @@ import uuid
 from allauth.account.models import EmailAddress
 from django.contrib.admin.models import CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Exists, OuterRef, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotAuthenticated, PermissionDenied
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied, ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -108,7 +108,11 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         request = self.request
-        queryset = Profile.objects.select_related("user").all()
+        queryset = Profile.objects.select_related("user").annotate(
+            is_verified=Exists(
+                EmailAddress.objects.filter(user=OuterRef("user_id"), verified=True)
+            )
+        )
 
         filters = {
             "department__iexact": request.query_params.get("department"),
@@ -188,6 +192,38 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
         )
         instance.delete()
 
+    @action(detail=True, methods=["post"], url_path="confirm-user")
+    def confirm_user(self, request, pk=None):
+        profile = self.get_object()
+        user = getattr(profile, "user", None)
+
+        if user is None:
+            raise ValidationError({"detail": "Profile belum terhubung ke akun user."})
+
+        email = str(getattr(user, "email", "") or getattr(profile, "email", "") or "").strip().lower()
+        if not email:
+            raise ValidationError({"detail": "Email user tidak ditemukan."})
+
+        email_address, _ = EmailAddress.objects.get_or_create(
+            user=user,
+            email=email,
+            defaults={"primary": True},
+        )
+        email_address.verified = True
+        if not email_address.primary:
+            email_address.primary = True
+        email_address.save(update_fields=["verified", "primary"])
+
+        setattr(profile, "is_verified", True)
+        log_admin_action(
+            self.request.user,
+            profile,
+            CHANGE,
+            "Confirmed linked user email via CSL Admin (profile management).",
+        )
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 # endregion Profile Viewsets
 
@@ -237,13 +273,25 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Tidak bisa menghapus SuperAdministrator.")
 
     def _delete_user_instance(self, target):
-        log_admin_action(
-            self.request.user,
-            target,
-            DELETION,
-            "Deleted user via CSL Admin (user management).",
-        )
-        target.delete()
+        profile = getattr(target, "profile", None)
+
+        with transaction.atomic():
+            log_admin_action(
+                self.request.user,
+                target,
+                DELETION,
+                "Deleted user via CSL Admin (user management).",
+            )
+            target.delete()
+
+            if profile is not None:
+                log_admin_action(
+                    self.request.user,
+                    profile,
+                    DELETION,
+                    "Deleted linked profile via CSL Admin (user management).",
+                )
+                profile.delete()
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())

@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useState } from "react";
 
 import { CheckCircle2, UserRound, XCircle } from "lucide-react";
@@ -9,7 +8,18 @@ import { toast } from "sonner";
 
 import { AdminDetailActions, AdminDetailDialogShell } from "@/components/shared";
 
-import { Input } from "@/components/ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  Input,
+} from "@/components/ui";
 
 import { BATCH_VALUES } from "@/constants/batches";
 
@@ -22,6 +32,7 @@ import { USER_TYPE_LABELS } from "@/constants/user-types";
 import { useUpdateUserProfile } from "@/hooks/shared/resources/users";
 
 import { getUserInitials, type UserRow } from "@/hooks/shared/resources/users";
+import { usersService } from "@/services/shared/resources";
 
 import {
   applyUpdatedUser,
@@ -32,6 +43,32 @@ import {
   type UserDetailMode,
   USER_MODAL_WIDTH_CLASS,
 } from "@/components/admin/user-management";
+
+function getUserStatusPresentation(user: UserRow) {
+  const isGuest = String(user.role).trim().toLowerCase() === "guest";
+
+  if (isGuest && !user.isVerified) {
+    return {
+      label: "Belum dikonfirmasi",
+      className: "bg-amber-500/10 text-amber-700",
+      icon: <XCircle className="h-4 w-4" />,
+    };
+  }
+
+  if (user.lastLogin) {
+    return {
+      label: "Sudah Login",
+      className: "bg-emerald-500/10 text-emerald-700",
+      icon: <CheckCircle2 className="h-4 w-4" />,
+    };
+  }
+
+  return {
+    label: "Belum Login",
+    className: "bg-slate-500/10 text-slate-700",
+    icon: <XCircle className="h-4 w-4" />,
+  };
+}
 
 type UserDetailDialogProps = {
   open: boolean;
@@ -56,6 +93,8 @@ export default function UserDetailDialog({
 }: UserDetailDialogProps) {
   const { updateUserProfile, isSubmitting, message, setMessage } = useUpdateUserProfile();
   const [isEditing, setIsEditing] = useState(false);
+  const [isConfirmingUser, setIsConfirmingUser] = useState(false);
+  const [confirmUserOpen, setConfirmUserOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [form, setForm] = useState(createEmptyUserForm());
 
@@ -70,6 +109,9 @@ export default function UserDetailDialog({
   const visibleFields = getVisibleUserFields(form.role || user?.role || "");
   const openedInEditMode = mode === "edit";
   const showDeleteAction = canManageUsers && !openedInEditMode && !isEditing;
+  const status = user ? getUserStatusPresentation(user) : null;
+  const showConfirmUserAction =
+    canManageUsers && !openedInEditMode && !isEditing && Boolean(user?.hasUser && !user.isVerified);
 
   const handleSave = async () => {
     if (!user?.profileId) {
@@ -87,6 +129,37 @@ export default function UserDetailDialog({
       setErrorMessage(
         saveError instanceof Error ? saveError.message : "Gagal update user.",
       );
+    }
+  };
+
+  const handleConfirmUser = async () => {
+    if (!user?.profileId) {
+      setErrorMessage("Profile ID tidak ditemukan.");
+      return;
+    }
+
+    setIsConfirmingUser(true);
+    setErrorMessage("");
+
+    try {
+      const result = await usersService.confirmUser(user.profileId);
+      if (!result.ok) {
+        const detail =
+          typeof (result.data as { detail?: unknown } | undefined)?.detail === "string"
+            ? String((result.data as { detail?: string }).detail)
+            : `Gagal mengonfirmasi user (${result.status})`;
+        throw new Error(detail);
+      }
+
+      onUserUpdated({ ...user, isVerified: true });
+      setConfirmUserOpen(false);
+      toast.success("User berhasil dikonfirmasi.");
+    } catch (confirmError) {
+      setErrorMessage(
+        confirmError instanceof Error ? confirmError.message : "Gagal mengonfirmasi user.",
+      );
+    } finally {
+      setIsConfirmingUser(false);
     }
   };
 
@@ -127,18 +200,10 @@ export default function UserDetailDialog({
               </div>
 
               <span
-                className={`inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-sm ${
-                  user.isVerified
-                    ? "bg-emerald-500/10 text-emerald-700"
-                    : "bg-red-500/10 text-red-700"
-                }`}
+                className={`inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-sm ${status?.className ?? "bg-slate-500/10 text-slate-700"}`}
               >
-                {user.hasUser ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <XCircle className="h-4 w-4" />
-                )}
-                {user.hasUser ? "Sudah Login" : "Belum Login"}
+                {status?.icon}
+                {status?.label ?? "-"}
               </span>
             </div>
 
@@ -152,7 +217,7 @@ export default function UserDetailDialog({
               <DetailField label="Email" value={user.email} editable={false} onChange={() => undefined} />
               <DetailField
                 label="Status"
-                value={user.hasUser ? "Sudah Login" : "Belum Login"}
+                value={status?.label ?? "-"}
                 editable={false}
                 onChange={() => undefined}
               />
@@ -244,9 +309,20 @@ export default function UserDetailDialog({
             {canManageUsers ? (
               <AdminDetailActions
                 isEditing={isEditing}
-                isSubmitting={isSubmitting}
+                isSubmitting={isSubmitting || isConfirmingUser}
                 showDeleteAction={showDeleteAction}
                 deleteLabel="Hapus User"
+                extraActions={
+                  showConfirmUserAction ? (
+                    <Button
+                      type="button"
+                      onClick={() => setConfirmUserOpen(true)}
+                      disabled={isSubmitting || isConfirmingUser}
+                    >
+                      Konfirmasi User
+                    </Button>
+                  ) : null
+                }
                 onEdit={() => setIsEditing(true)}
                 onCancelEdit={() => {
                   setIsEditing(false);
@@ -260,6 +336,27 @@ export default function UserDetailDialog({
             </div>
           ) : null}
         </div>
+      <AlertDialog open={confirmUserOpen} onOpenChange={setConfirmUserOpen}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi user ini?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {user
+                ? `Email untuk ${user.name || user.email} akan ditandai sebagai sudah terkonfirmasi.`
+                : "Email user akan ditandai sebagai sudah terkonfirmasi."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isConfirmingUser}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleConfirmUser()}
+              disabled={isConfirmingUser}
+            >
+              {isConfirmingUser ? "Mengonfirmasi..." : "Konfirmasi User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminDetailDialogShell>
   );
 }

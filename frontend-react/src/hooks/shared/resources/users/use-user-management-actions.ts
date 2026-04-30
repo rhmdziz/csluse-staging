@@ -111,7 +111,7 @@ export function useUserManagementActions({
     onDataChanged();
     toast.success(
       deleteCandidate.hasUser
-        ? "Akun berhasil dihapus."
+        ? "Akun dan profile berhasil dihapus."
         : "Profile pre-provisioned berhasil dihapus.",
     );
   };

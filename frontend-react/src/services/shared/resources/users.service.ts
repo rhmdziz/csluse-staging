@@ -1,6 +1,7 @@
 import {
   API_AUTH_ASSIGNED_PIC_USERS_DROPDOWN,
   API_AUTH_ADMIN_PROFILE_DETAIL,
+  API_AUTH_ADMIN_PROFILE_CONFIRM_USER,
   API_AUTH_ADMIN_PROFILE,
   API_AUTH_PIC_USERS,
   API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS,
@@ -63,6 +64,7 @@ type ApiUsersResponse = {
 type ApiAdminProfile = {
   id?: number | string | null;
   user_id?: number | string | null;
+  is_verified?: boolean | null;
   email?: string | null;
   full_name?: string | null;
   initials?: string | null;
@@ -265,7 +267,7 @@ export function mapProfile(item: ApiAdminProfile): UserRow {
     department: String(item.department ?? "-"),
     idNumber: String(item.id_number ?? "-"),
     institution: String(item.institution ?? "-"),
-    isVerified: hasUser,
+    isVerified: Boolean(item.is_verified),
     hasUser,
     status: hasUser ? "active" : "pre_provisioned",
     lastLogin: String(item.last_login ?? ""),
@@ -400,6 +402,13 @@ export const usersService = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+    });
+    return parseMutationResponse(response);
+  },
+
+  async confirmUser(profileId: string | number) {
+    const response = await authFetch(API_AUTH_ADMIN_PROFILE_CONFIRM_USER(profileId), {
+      method: "POST",
     });
     return parseMutationResponse(response);
   },

@@ -1,6 +1,8 @@
 "use client";
 
 
+import type { ReactNode } from "react";
+
 import { Button, DialogFooter } from "@/components/ui";
 
 type AdminDetailActionsProps = {
@@ -10,6 +12,7 @@ type AdminDetailActionsProps = {
   deleteLabel?: string;
   saveLabel?: string;
   savingLabel?: string;
+  extraActions?: ReactNode;
   onEdit: () => void;
   onCancelEdit: () => void;
   onSave: () => void;
@@ -23,6 +26,7 @@ export default function AdminDetailActions({
   deleteLabel = "Hapus",
   saveLabel = "Simpan",
   savingLabel = "Menyimpan...",
+  extraActions,
   onEdit,
   onCancelEdit,
   onSave,
@@ -49,6 +53,8 @@ export default function AdminDetailActions({
       >
         {isEditing ? (isSubmitting ? savingLabel : saveLabel) : "Edit"}
       </Button>
+
+      {!isEditing ? extraActions : null}
 
       {!isEditing && showDeleteAction ? (
         <Button

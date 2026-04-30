@@ -415,11 +415,11 @@ export default function UserManagementContent({
       />
       <ConfirmDeleteDialog
         open={Boolean(actions.deleteCandidate)}
-        title={actions.deleteCandidate?.hasUser ? "Hapus user?" : "Hapus profile?"}
+        title={actions.deleteCandidate?.hasUser ? "Hapus akun dan profile?" : "Hapus profile?"}
         description={
           actions.deleteCandidate
             ? actions.deleteCandidate.hasUser
-              ? `User ${actions.deleteCandidate.name || actions.deleteCandidate.email} akan dihapus.`
+              ? `Akun dan profile ${actions.deleteCandidate.name || actions.deleteCandidate.email} akan dihapus.`
               : `Profile pre-provisioned ${actions.deleteCandidate.name || actions.deleteCandidate.email} akan dihapus.`
             : "Data yang dihapus tidak bisa dikembalikan."
         }
