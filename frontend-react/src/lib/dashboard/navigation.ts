@@ -66,6 +66,7 @@ const ADMIN_APPROVAL_DEFAULT_MENU_IDS = new Set([
   "booking-rooms",
   "borrow-equipment",
   "sample-testing",
+  "bebas-laboratorium",
 ]);
 
 export function getHeaderIcon(menuId: string, actionId: string | null) {

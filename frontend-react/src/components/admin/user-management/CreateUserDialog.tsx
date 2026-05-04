@@ -119,7 +119,7 @@ export default function CreateUserDialog({
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="nim@student.prasetiyamulya.ac.id"
+                placeholder="Masukkan email"
                 className="border-sky-300 bg-sky-50/60 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
                 required
               />

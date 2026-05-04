@@ -857,6 +857,8 @@ export function DashboardActionPanel({
                   value={scheduleDate ? (parseDateKey(scheduleDate) ?? new Date()) : new Date()}
                   onSelect={(value) => updateScheduleFilter("date", formatDateKey(value))}
                   renderMarker={(date, { isToday }) =>
+                    date.getDay() !== 0 &&
+                    date.getDay() !== 6 &&
                     visibleScheduleCalendarDates.has(formatDateKey(date)) ? (
                       <span
                         className={`block h-2 w-2 rounded-full ${isToday ? "bg-slate-900" : "bg-sky-500"}`}
