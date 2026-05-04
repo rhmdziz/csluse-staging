@@ -19,6 +19,8 @@ import { hasMenuAccess, normalizeRoleValue } from "@/constants/roles";
 import {
   APPROVAL_ACCESS_ROLES,
   CATALOG_ACCESS_ROLES,
+  LAB_CLEARANCE_APPROVAL_ACCESS_ROLES,
+  LAB_CLEARANCE_REQUESTER_ACCESS_ROLES,
   REQUESTER_ACCESS_ROLES,
   SAMPLE_TESTING_APPROVAL_ACCESS_ROLES,
   SAMPLE_TESTING_REQUESTER_ACCESS_ROLES,
@@ -290,7 +292,22 @@ export const SIDEBAR_SHORTCUTS: SidebarShortcut[] = [
     description: "Ajukan permohonan surat bebas laboratorium untuk mahasiswa tugas akhir.",
     href: "/lab-clearance",
     icon: Stamp,
-    actions: [],
+    actions: [
+      {
+        id: "request-list",
+        label: "Pengajuan Saya",
+        description: "Lihat daftar permohonan surat bebas laboratorium Anda.",
+        href: "/lab-clearance",
+        allowedRoles: LAB_CLEARANCE_REQUESTER_ACCESS_ROLES,
+      },
+      {
+        id: "all-requests",
+        label: "Approval Surat Bebas Lab",
+        description: "Lihat seluruh permohonan surat bebas laboratorium untuk diproses.",
+        href: "/lab-clearance/approval",
+        allowedRoles: LAB_CLEARANCE_APPROVAL_ACCESS_ROLES,
+      },
+    ],
   },
   {
     id: "notifications",
@@ -468,7 +485,10 @@ export function parseDashboardPath(pathname: string) {
     return { menu: "borrow-equipment", action: "request-list" };
   }
   if (parts[0] === "lab-clearance") {
-    return { menu: "bebas-laboratorium", action: null };
+    if (parts[1] === "approval") {
+      return { menu: "bebas-laboratorium", action: "all-requests" };
+    }
+    return { menu: "bebas-laboratorium", action: "request-list" };
   }
   if (parts[0] === "notifications") {
     return { menu: "notifications", action: null };

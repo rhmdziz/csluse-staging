@@ -10,6 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
+import {
+  downloadDocumentFile,
+  isImageDocumentFile,
+  isPdfDocumentFile,
+} from "@/lib/core";
 
 type PreviewDocument = {
   id: string;
@@ -25,26 +30,6 @@ type PreviewDocument = {
   updatedAt: string;
 };
 
-function isImageDocument(document: PreviewDocument) {
-  const mimeType = String(document.mimeType || "").toLowerCase();
-  const fileName = String(document.originalName || "").toLowerCase();
-
-  return (
-    mimeType.startsWith("image/") ||
-    fileName.endsWith(".png") ||
-    fileName.endsWith(".jpg") ||
-    fileName.endsWith(".jpeg") ||
-    fileName.endsWith(".webp")
-  );
-}
-
-function isPdfDocument(document: PreviewDocument) {
-  const mimeType = String(document.mimeType || "").toLowerCase();
-  const fileName = String(document.originalName || "").toLowerCase();
-
-  return mimeType === "application/pdf" || fileName.endsWith(".pdf");
-}
-
 export default function DocumentPreviewDialog({
   open,
   onOpenChange,
@@ -54,20 +39,12 @@ export default function DocumentPreviewDialog({
   onOpenChange: (open: boolean) => void;
   document: PreviewDocument | null;
 }) {
-  const canRenderImage = document ? isImageDocument(document) : false;
-  const canRenderPdf = document ? isPdfDocument(document) : false;
+  const canRenderImage = document ? isImageDocumentFile(document) : false;
+  const canRenderPdf = document ? isPdfDocumentFile(document) : false;
 
   const handleDownload = () => {
     if (!document) return;
-
-    const link = window.document.createElement("a");
-    link.href = document.url;
-    link.target = "_blank";
-    link.rel = "noreferrer";
-    link.download = document.originalName || "document";
-    window.document.body.appendChild(link);
-    link.click();
-    link.remove();
+    downloadDocumentFile(document);
   };
 
   return (

@@ -115,6 +115,7 @@ const adminMenuConfig: MenuConfig[] = [
       { label: "Peminjaman Lab", href: "/admin/history/room-bookings" },
       { label: "Peminjaman Alat", href: "/admin/history/equipment-borrows" },
       { label: "Pengujian Sampel", href: "/admin/history/sample-testing" },
+      { label: "Surat Bebas Lab", href: "/admin/history/lab-clearance" },
     ],
   },
   {
@@ -128,10 +129,6 @@ const adminMenuConfig: MenuConfig[] = [
       {
         label: "Pengujian Sampel",
         href: "/admin/documents/sample-testing",
-      },
-      {
-        label: "Surat Bebas Lab",
-        href: "/admin/documents/lab-clearance",
       },
     ],
   },

@@ -33,6 +33,7 @@ import { API_PENGUJIANS_ALL_REQUESTERS } from "@/constants/api";
 import { formatDateKey, toEndOfDay, toStartOfDay } from "@/lib/date";
 
 import { formatDateTimeWib } from "@/lib/date";
+import { downloadDocumentFile, isPreviewableDocumentFile } from "@/lib/core";
 
 import { getStatusBadgeClass, getStatusDisplayLabel } from "@/lib/request";
 
@@ -510,8 +511,15 @@ export default function AdminSampleTestingDocumentsContent({
                                         variant="outline"
                                         size="icon-sm"
                                         className="border-sky-200 text-sky-600 hover:bg-sky-50 hover:text-sky-700"
-                                        onClick={() => setPreviewDocument(item)}
-                                        aria-label={`Preview dokumen ${item.originalName}`}
+                                        onClick={() => {
+                                          if (isPreviewableDocumentFile(item)) {
+                                            setPreviewDocument(item);
+                                            return;
+                                          }
+
+                                          downloadDocumentFile(item);
+                                        }}
+                                        aria-label={`${isPreviewableDocumentFile(item) ? "Preview" : "Download"} dokumen ${item.originalName}`}
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>

@@ -30,6 +30,7 @@ import {
   EQUIPMENT_CATEGORY_OPTIONS,
   EQUIPMENT_STATUS_OPTIONS,
 } from "@/constants/equipments";
+import { BATCH_OPTIONS } from "@/constants/batches";
 
 import {
   MATERIAL_CATEGORY_OPTIONS,
@@ -53,6 +54,18 @@ import {
   REQUEST_STATUS_OPTIONS,
   SAMPLE_TESTING_STATUS_OPTIONS,
 } from "@/lib/request";
+
+const LAB_CLEARANCE_STATUS_OPTIONS = [
+  { value: "", label: "Semua Status" },
+  { value: "Pending", label: "Menunggu" },
+  { value: "Approved", label: "Disetujui" },
+  { value: "Rejected", label: "Ditolak" },
+] as const;
+
+const LAB_CLEARANCE_ORDERING_OPTIONS = [
+  { value: "newest", label: "Terbaru" },
+  { value: "oldest", label: "Terlama" },
+] as const;
 
 type DashboardActionPanelProps = {
   width: string;
@@ -272,6 +285,12 @@ export function DashboardActionPanel({
   const borrowRequester = searchParams.get("requested_by") ?? "";
   const borrowCreatedAfter = searchParams.get("created_after") ?? "";
   const borrowCreatedBefore = searchParams.get("created_before") ?? "";
+  const labClearanceKeyword = searchParams.get("q") ?? "";
+  const labClearanceStatus = searchParams.get("status") ?? "";
+  const labClearanceBatch = searchParams.get("batch") ?? "";
+  const labClearanceOrdering = searchParams.get("ordering") ?? "newest";
+  const labClearanceCreatedAfter = searchParams.get("created_after") ?? "";
+  const labClearanceCreatedBefore = searchParams.get("created_before") ?? "";
   const bookingCreatedRange: DateRange | undefined =
     bookingCreatedAfter || bookingCreatedBefore
       ? {
@@ -284,6 +303,13 @@ export function DashboardActionPanel({
       ? {
           from: borrowCreatedAfter ? parseDateKey(borrowCreatedAfter) : undefined,
           to: borrowCreatedBefore ? parseDateKey(borrowCreatedBefore) : undefined,
+        }
+      : undefined;
+  const labClearanceCreatedRange: DateRange | undefined =
+    labClearanceCreatedAfter || labClearanceCreatedBefore
+      ? {
+          from: labClearanceCreatedAfter ? parseDateKey(labClearanceCreatedAfter) : undefined,
+          to: labClearanceCreatedBefore ? parseDateKey(labClearanceCreatedBefore) : undefined,
         }
       : undefined;
   const visibleScheduleCalendarDates = useMemo(() => {
@@ -332,6 +358,8 @@ export function DashboardActionPanel({
   const isBorrowEquipmentListPage = pathname === "/borrow-equipment/equipment";
   const isSampleTestingRequestListPage = pathname === "/sample-testing";
   const isSampleTestingAllRequestsPage = pathname === "/sample-testing/approval";
+  const isLabClearanceRequestListPage = pathname === "/lab-clearance";
+  const isLabClearanceAllRequestsPage = pathname === "/lab-clearance/approval";
   const { requesters: bookingRequesters } = useHistoryRequesterOptions(
     API_BOOKINGS_ALL_REQUESTERS,
     isBookingAllRequestsPage,
@@ -416,8 +444,21 @@ export function DashboardActionPanel({
     replaceCurrentPath(params);
   };
 
+  const updateLabClearanceFilter = (
+    key: "q" | "status" | "batch" | "ordering",
+    value: string,
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    replaceCurrentPath(params);
+  };
+
   const updateDateRangeFilter = (
-    type: "booking" | "borrow",
+    type: "booking" | "borrow" | "lab-clearance",
     value: DateRange | undefined,
   ) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -427,6 +468,11 @@ export function DashboardActionPanel({
             keyword: bookingKeyword,
             status: bookingStatus,
           })
+        : type === "lab-clearance"
+          ? ({
+              keyword: labClearanceKeyword,
+              status: labClearanceStatus,
+            })
         : ({
             keyword: borrowKeyword,
             status: borrowStatus,
@@ -925,6 +971,11 @@ export function DashboardActionPanel({
                     isSampleTestingRequestListPage,
                     isSampleTestingAllRequestsPage,
                   );
+                const showLabClearanceFilters =
+                  menu.id === "bebas-laboratorium" &&
+                  actionIsActive &&
+                  action.id === "all-requests" &&
+                  isLabClearanceAllRequestsPage;
                 return (
                   <div key={action.id}>
                     <Link
@@ -948,15 +999,31 @@ export function DashboardActionPanel({
                       <ChevronRight className="h-4 w-4 opacity-70" />
                     </Link>
 
-                    <AnimatedFilterSection show={showBookingFilters || showSampleTestingFilters}>
+                    <AnimatedFilterSection
+                      show={
+                        showBookingFilters ||
+                        showSampleTestingFilters ||
+                        showLabClearanceFilters
+                      }
+                    >
                       {renderRequestFilters({
-                          keyword: bookingKeyword,
-                          status: bookingStatus,
-                          dateRange: bookingCreatedRange,
-                          placeholder: "Cari pengajuan...",
-                          statusOptions: showSampleTestingFilters
-                            ? SAMPLE_TESTING_STATUS_OPTIONS
-                            : REQUEST_STATUS_OPTIONS,
+                          keyword: showLabClearanceFilters
+                            ? labClearanceKeyword
+                            : bookingKeyword,
+                          status: showLabClearanceFilters
+                            ? labClearanceStatus
+                            : bookingStatus,
+                          dateRange: showLabClearanceFilters
+                            ? labClearanceCreatedRange
+                            : bookingCreatedRange,
+                          placeholder: showLabClearanceFilters
+                            ? "Cari pemohon..."
+                            : "Cari pengajuan...",
+                          statusOptions: showLabClearanceFilters
+                            ? [...LAB_CLEARANCE_STATUS_OPTIONS]
+                            : showSampleTestingFilters
+                              ? SAMPLE_TESTING_STATUS_OPTIONS
+                              : REQUEST_STATUS_OPTIONS,
                           extraFields: showBookingFilters ? (
                             <>
                               <FilterField label="Ruangan">
@@ -994,22 +1061,74 @@ export function DashboardActionPanel({
                                 </FilterField>
                               ) : null}
                             </>
+                          ) : showLabClearanceFilters ? (
+                            <>
+                              <FilterField label="Angkatan">
+                                <select
+                                  value={labClearanceBatch}
+                                  onChange={(event) =>
+                                    updateLabClearanceFilter("batch", event.target.value)
+                                  }
+                                  className={FILTER_CONTROL_CLASS}
+                                >
+                                  <option value="">Semua Angkatan</option>
+                                  {BATCH_OPTIONS.map((batchOption) => (
+                                    <option key={batchOption} value={batchOption}>
+                                      {batchOption}
+                                    </option>
+                                  ))}
+                                </select>
+                              </FilterField>
+                              <FilterField label="Urutkan">
+                                <select
+                                  value={labClearanceOrdering}
+                                  onChange={(event) =>
+                                    updateLabClearanceFilter("ordering", event.target.value)
+                                  }
+                                  className={FILTER_CONTROL_CLASS}
+                                >
+                                  {LAB_CLEARANCE_ORDERING_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </FilterField>
+                            </>
                           ) : undefined,
                           onKeywordChange: (value) =>
-                            updateBookingFilter("q", value),
+                            showLabClearanceFilters
+                              ? updateLabClearanceFilter("q", value)
+                              : updateBookingFilter("q", value),
                           onStatusChange: (value) =>
-                            updateBookingFilter("status", value),
+                            showLabClearanceFilters
+                              ? updateLabClearanceFilter("status", value)
+                              : updateBookingFilter("status", value),
                           onDateRangeChange: (value) =>
-                            updateDateRangeFilter("booking", value),
+                            updateDateRangeFilter(
+                              showLabClearanceFilters ? "lab-clearance" : "booking",
+                              value,
+                            ),
                           onReset: () =>
-                            resetFilters([
-                              "q",
-                              "status",
-                              "room",
-                              "requested_by",
-                              "created_after",
-                              "created_before",
-                            ]),
+                            resetFilters(
+                              showLabClearanceFilters
+                                ? [
+                                    "q",
+                                    "status",
+                                    "batch",
+                                    "ordering",
+                                    "created_after",
+                                    "created_before",
+                                  ]
+                                : [
+                                    "q",
+                                    "status",
+                                    "room",
+                                    "requested_by",
+                                    "created_after",
+                                    "created_before",
+                                  ],
+                            ),
                         })}
                     </AnimatedFilterSection>
 

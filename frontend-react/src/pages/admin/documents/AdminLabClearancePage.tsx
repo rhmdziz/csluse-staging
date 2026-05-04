@@ -1,5 +1,5 @@
-import { AdminLabClearanceContent } from "@/components/admin/documents/content";
+import { Navigate } from "react-router-dom";
 
 export default function AdminLabClearancePage() {
-  return <AdminLabClearanceContent />;
+  return <Navigate to="/lab-clearance/approval" replace />;
 }

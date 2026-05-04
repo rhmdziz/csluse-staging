@@ -686,7 +686,12 @@ class LabClearanceViewSet(viewsets.ViewSet):
 
         profile = get_object_or_404(Profile, id=profile_id)
 
-        ACTIVE_BORROW_STATUSES = ["Pending", "Approved", "Borrowed", "Returned Pending Inspection", "Overdue"]
+        ACTIVE_BORROW_STATUSES = [
+            "Borrowed",
+            "Returned Pending Inspection",
+            "Overdue",
+            "Lost/Damaged",
+        ]
         active_services = []
 
         for b in Borrow.objects.select_related("equipment").filter(

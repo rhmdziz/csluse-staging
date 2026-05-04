@@ -9,6 +9,8 @@ import {
 } from "@/constants/roles";
 import {
   APPROVAL_ACCESS_ROLES,
+  LAB_CLEARANCE_APPROVAL_ACCESS_ROLES,
+  LAB_CLEARANCE_REQUESTER_ACCESS_ROLES,
   REQUESTER_ACCESS_ROLES,
   SAMPLE_TESTING_APPROVAL_ACCESS_ROLES,
   SAMPLE_TESTING_REQUESTER_ACCESS_ROLES,
@@ -174,19 +176,24 @@ export function RequireFeatureScope({
   featurePath:
     | "/booking-rooms"
     | "/borrow-equipment"
-    | "/sample-testing";
+    | "/sample-testing"
+    | "/lab-clearance";
   scope: "requester" | "approval";
 }) {
   const profile = getProfile();
   const normalizedRole = normalizeRoleValue(profile.role);
   const requesterAccessRoles =
-    featurePath === "/sample-testing"
-      ? SAMPLE_TESTING_REQUESTER_ACCESS_ROLES
-      : REQUESTER_ACCESS_ROLES;
+    featurePath === "/lab-clearance"
+      ? LAB_CLEARANCE_REQUESTER_ACCESS_ROLES
+      : featurePath === "/sample-testing"
+        ? SAMPLE_TESTING_REQUESTER_ACCESS_ROLES
+        : REQUESTER_ACCESS_ROLES;
   const approvalAccessRoles =
-    featurePath === "/sample-testing"
-      ? SAMPLE_TESTING_APPROVAL_ACCESS_ROLES
-      : APPROVAL_ACCESS_ROLES;
+    featurePath === "/lab-clearance"
+      ? LAB_CLEARANCE_APPROVAL_ACCESS_ROLES
+      : featurePath === "/sample-testing"
+        ? SAMPLE_TESTING_APPROVAL_ACCESS_ROLES
+        : APPROVAL_ACCESS_ROLES;
   const canAccessRequesterScope = requesterAccessRoles.some((role) => role === normalizedRole);
   const canAccessApprovalScope = approvalAccessRoles.some((role) => role === normalizedRole);
 

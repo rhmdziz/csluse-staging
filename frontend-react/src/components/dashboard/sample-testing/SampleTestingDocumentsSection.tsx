@@ -20,6 +20,7 @@ import {
   useDeleteSampleTestingDocument,
   useUploadSampleTestingDocument,
 } from "@/hooks/sample-testing";
+import { downloadDocumentFile, isPreviewableDocumentFile } from "@/lib/core";
 import { formatDateTimeWib } from "@/lib/date";
 
 import { SampleTestingSectionCard } from "./content/SampleTestingDetailContent";
@@ -66,21 +67,6 @@ const DOCUMENT_DEFINITIONS: DocumentDefinition[] = [
 ];
 const DOCUMENT_DEFINITIONS_DISPLAY = [...DOCUMENT_DEFINITIONS].reverse();
 const MAX_DOCUMENT_SIZE = 5 * 1024 * 1024;
-
-function isPreviewableDocument(document: SampleTestingDocument) {
-  const mimeType = String(document.mimeType || "").toLowerCase();
-  const fileName = String(document.originalName || "").toLowerCase();
-
-  return (
-    mimeType.startsWith("image/") ||
-    mimeType === "application/pdf" ||
-    fileName.endsWith(".pdf") ||
-    fileName.endsWith(".png") ||
-    fileName.endsWith(".jpg") ||
-    fileName.endsWith(".jpeg") ||
-    fileName.endsWith(".webp")
-  );
-}
 
 function getDocumentByType(
   documents: SampleTestingDocument[],
@@ -188,7 +174,7 @@ export default function SampleTestingDocumentsSection({
           const canUpload = allowActions && isOwner && canManageDocuments;
           const canReplace = canManageDocuments;
           const canDelete = canManageDocuments;
-          const canPreview = document ? isPreviewableDocument(document) : false;
+          const canPreview = document ? isPreviewableDocumentFile(document) : false;
           const isPendingAction =
             pendingDocumentType === definition.type ||
             pendingDeleteDocumentType === definition.type;
@@ -263,13 +249,20 @@ export default function SampleTestingDocumentsSection({
                       type="button"
                       variant="outline"
                       className="h-auto w-full whitespace-normal py-3"
-                      onClick={() => setPreviewDocument(document)}
+                      onClick={() => {
+                        if (canPreview) {
+                          setPreviewDocument(document);
+                          return;
+                        }
+
+                        downloadDocumentFile(document);
+                      }}
                     >
                       <span className="flex min-w-0 items-start gap-3 text-left">
                         <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
                         <span className="min-w-0 flex-1">
                           <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
-                            {canPreview ? "Lihat Dokumen" : "Lihat Detail Dokumen"}
+                            {canPreview ? "Lihat Dokumen" : "Download Dokumen"}
                           </span>
                           {/* <span
                             className="line-clamp-2 block text-sm font-medium text-slate-900"

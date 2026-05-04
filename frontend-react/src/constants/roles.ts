@@ -103,7 +103,6 @@ const MENU_ACCESS_RULES: Record<string, readonly string[]> = {
   "bebas-laboratorium": [
     ROLE_VALUES.STUDENT,
     ROLE_VALUES.ADMIN,
-    ROLE_VALUES.SUPER_ADMINISTRATOR,
   ],
 } as const;
 

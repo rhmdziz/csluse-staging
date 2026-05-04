@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  CalendarClock,
   Check,
   Download,
   Eye,
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui";
 
 import { formatDateTimeWib } from "@/lib/date";
+import { downloadDocumentFile, isPreviewableDocumentFile } from "@/lib/core";
 import {
   getRequestStatusDisplayLabel,
   getStatusBadgeClass,
@@ -55,6 +57,10 @@ import {
   type LabClearanceListItem,
 } from "@/services/lab-clearance";
 import { roomsService, type RoomOption } from "@/services/shared/resources";
+import {
+  LabClearanceMetaItem,
+  LabClearanceSectionCard,
+} from "./LabClearanceApprovalComponents";
 
 const PAGE_SIZE = 10;
 
@@ -113,35 +119,6 @@ function extractLabClearanceDetailPayload(
   const payload = (data as { surat_bebas_lab?: LabClearanceDetail })
     .surat_bebas_lab;
   return payload ?? null;
-}
-
-function DetailInfoItem({
-  label,
-  value,
-  statusClassName,
-}: {
-  label: string;
-  value: string;
-  statusClassName?: string;
-}) {
-  const displayValue = value?.trim() ? value : "-";
-
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-700">{label}</p>
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-700">
-        {statusClassName ? (
-          <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
-          >
-            {displayValue}
-          </span>
-        ) : (
-          displayValue
-        )}
-      </div>
-    </div>
-  );
 }
 
 function FileUploadField({
@@ -535,8 +512,8 @@ export function LabClearancePageContent() {
                       ) : null}
                       <TableActionIconButton
                         type="button"
-                        label="Dokumen"
-                        icon={<FileText className="h-3.5 w-3.5" />}
+                        label="Lihat dokumen"
+                        icon={<Eye className="h-3.5 w-3.5" />}
                         className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
                         onClick={() => setDetailTarget(item)}
                       />
@@ -606,119 +583,217 @@ export function LabClearancePageContent() {
               <InlineErrorAlert>{detailError}</InlineErrorAlert>
             ) : detailData ? (
               <>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Informasi Pengajuan
-                    </p>
-                    <div className="grid gap-3">
-                      <DetailInfoItem
-                        label="Kode Pengajuan"
-                        value={detailData.code}
-                      />
-                      <DetailInfoItem
-                        label="Status"
-                        value={getLabClearanceStatusLabel(detailData.status)}
-                        statusClassName={getStatusBadgeClass(detailData.status)}
-                      />
-                      <DetailInfoItem
-                        label="Diajukan Pada"
-                        value={formatDateTimeWib(detailData.created_at)}
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-6">
+                  <LabClearanceSectionCard
+                    title="Hasil Review"
+                    subtitle="Status pemeriksaan admin terhadap permohonan yang diajukan."
+                    icon={<Info className="h-5 w-5" />}
+                  >
+                    <LabClearanceMetaItem label="Kode Pengajuan" value={detailData.code} />
+                    <LabClearanceMetaItem
+                      label="Diajukan Pada"
+                      value={formatDateTimeWib(detailData.created_at)}
+                    />
+                    <LabClearanceMetaItem
+                      label="Status"
+                      valueNode={
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(detailData.status)}`}
+                        >
+                          {getLabClearanceStatusLabel(detailData.status)}
+                        </span>
+                      }
+                    />
+                    <LabClearanceMetaItem
+                      label="Ringkasan Review"
+                      value={
+                        detailData.status === "Approved"
+                          ? "Permohonan sudah disetujui."
+                          : detailData.status === "Rejected"
+                            ? "Permohonan ditolak."
+                            : "Permohonan masih menunggu review admin."
+                      }
+                    />
+                    <LabClearanceMetaItem
+                      label="Direview Oleh"
+                      value={detailData.reviewed_by_detail?.full_name || "-"}
+                    />
+                    <LabClearanceMetaItem
+                      label="Direview Pada"
+                      value={
+                        detailData.reviewed_at
+                          ? formatDateTimeWib(detailData.reviewed_at)
+                          : "-"
+                      }
+                    />
+                    <LabClearanceMetaItem
+                      label="Terakhir Diperbarui"
+                      value={formatDateTimeWib(detailData.updated_at)}
+                    />
+                    <LabClearanceMetaItem
+                      label="Catatan"
+                      value={detailData.note || "-"}
+                    />
+                  </LabClearanceSectionCard>
 
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Hasil Review
-                    </p>
-                    <div className="grid gap-3">
-                      <DetailInfoItem
-                        label="Ringkasan Review"
-                        value={
-                          detailData.status === "Approved"
-                            ? "Permohonan sudah disetujui."
-                            : detailData.status === "Rejected"
-                              ? "Permohonan ditolak."
-                              : "Permohonan masih menunggu review admin."
-                        }
-                      />
-                      <DetailInfoItem
-                        label="Direview Oleh"
-                        value={detailData.reviewed_by_detail?.full_name || "-"}
-                      />
-                      <DetailInfoItem
-                        label="Direview Pada"
-                        value={
-                          detailData.reviewed_at
-                            ? formatDateTimeWib(detailData.reviewed_at)
-                            : "-"
-                        }
-                      />
-                      {detailData.note?.trim() ? (
-                        <DetailInfoItem
-                          label="Catatan"
-                          value={detailData.note}
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Riwayat Booking yang Diajukan
-                  </p>
-                  <div className="overflow-x-auto rounded-md border border-slate-200">
-                    <table className="min-w-full table-auto text-sm">
-                      <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                          <th className="w-16 px-3 py-2 font-semibold">No</th>
-                          <th className="px-3 py-2 font-semibold">
-                            Ruang Lab
-                          </th>
-                          <th className="px-3 py-2 font-semibold">Mulai</th>
-                          <th className="px-3 py-2 font-semibold">Selesai</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detailData.booking_histories.length ? (
-                          detailData.booking_histories.map((history, index) => (
-                            <tr key={history.id} className="border-t">
-                              <td className="px-3 py-2 text-slate-600">
-                                {index + 1}
-                              </td>
-                              <td className="px-3 py-2 text-slate-700">
-                                {history.lab_room_name || "-"}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                {formatBookingHistoryDate(history.start_date)}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                {formatBookingHistoryDate(history.end_date)}
+                  <LabClearanceSectionCard
+                    title="Riwayat Penggunaan Ruang Lab"
+                    subtitle="Daftar ruang laboratorium yang dicantumkan sebagai dasar pengajuan."
+                    icon={<CalendarClock className="h-5 w-5" />}
+                  >
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="min-w-full table-auto text-sm">
+                        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                          <tr>
+                            <th className="w-16 px-3 py-2 font-semibold">No</th>
+                            <th className="px-3 py-2 font-semibold">Ruang Lab</th>
+                            <th className="px-3 py-2 font-semibold">Mulai</th>
+                            <th className="px-3 py-2 font-semibold">Selesai</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailData.booking_histories.length ? (
+                            detailData.booking_histories.map((history, index) => (
+                              <tr key={history.id} className="border-t">
+                                <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                                <td className="px-3 py-2 text-slate-700">
+                                  {history.lab_room_name || "-"}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                                  {formatBookingHistoryDate(history.start_date)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                                  {formatBookingHistoryDate(history.end_date)}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td
+                                colSpan={4}
+                                className="px-3 py-4 text-center text-sm text-slate-500"
+                              >
+                                Belum ada riwayat booking yang tersimpan pada pengajuan ini.
                               </td>
                             </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td
-                              colSpan={4}
-                              className="px-3 py-4 text-center text-sm text-slate-500"
-                            >
-                              Belum ada riwayat booking yang tersimpan pada
-                              pengajuan ini.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </LabClearanceSectionCard>
 
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Dokumen Pengajuan
-                  </p>
+                  <LabClearanceSectionCard
+                    title="Dokumen Pengajuan"
+                    subtitle="File formulir yang sudah Anda unggah untuk proses verifikasi."
+                    icon={<FileText className="h-5 w-5" />}
+                  >
+                    {detailData.documents.length ? (
+                      <div className="space-y-2">
+                        {detailData.documents.map((document) => (
+                          <div
+                            key={document.id}
+                            className="flex flex-col gap-3 rounded-lg border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-slate-800">
+                                {DOCUMENT_TYPE_LABEL[document.document_type] ??
+                                  document.document_type}
+                              </p>
+                              <p className="truncate text-sm text-slate-500">
+                                {document.original_name}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Diunggah pada {formatDateTimeWib(document.created_at)}
+                              </p>
+                              {canManagePendingDocuments ? (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  <button
+                                    type="button"
+                                    className="inline text-sky-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+                                    disabled={pendingDocumentType === document.document_type}
+                                    onClick={() =>
+                                      inputRefs.current[document.document_type]?.click()
+                                    }
+                                  >
+                                    {pendingDocumentType === document.document_type
+                                      ? "Mengganti..."
+                                      : "Ganti Dokumen"}
+                                  </button>
+                                  <span className="mx-2 text-slate-300" aria-hidden="true">
+                                    |
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="inline text-rose-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+                                    disabled={
+                                      pendingDeleteDocumentType === document.document_type
+                                    }
+                                    onClick={() => setDeleteDraft(document)}
+                                  >
+                                    {pendingDeleteDocumentType === document.document_type
+                                      ? "Menghapus..."
+                                      : "Hapus Dokumen"}
+                                  </button>
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {document.document_url ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="rounded-md border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                                  onClick={() => {
+                                    if (isPreviewableDocumentFile({
+                                      mimeType: document.mime_type,
+                                      originalName: document.original_name,
+                                      document_url: document.document_url,
+                                    })) {
+                                      setPreviewDocument(document);
+                                      return;
+                                    }
+
+                                    downloadDocumentFile({
+                                      originalName: document.original_name,
+                                      document_url: document.document_url,
+                                    });
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  Lihat file
+                                </Button>
+                              ) : (
+                                <span className="text-sm text-slate-400">
+                                  File tidak tersedia
+                                </span>
+                              )}
+
+                              {canManagePendingDocuments ? (
+                                <input
+                                  ref={(element) => {
+                                    inputRefs.current[document.document_type] = element;
+                                  }}
+                                  type="file"
+                                  accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.webp"
+                                  className="hidden"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    if (!file) return;
+                                    void handleReplaceDocument(document.document_type, file);
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        Belum ada dokumen yang tersimpan.
+                      </p>
+                    )}
+                  </LabClearanceSectionCard>
+
                   {detailData.status === "Pending" ? (
                     <div className="flex justify-end">
                       <Button
@@ -742,121 +817,6 @@ export function LabClearancePageContent() {
                       </Button>
                     </div>
                   ) : null}
-                  {detailData.documents.length ? (
-                    <div className="space-y-2">
-                      {detailData.documents.map((document) => (
-                        <div
-                          key={document.id}
-                          className="flex flex-col gap-3 rounded-lg border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-800">
-                              {DOCUMENT_TYPE_LABEL[document.document_type] ??
-                                document.document_type}
-                            </p>
-                            <p className="truncate text-sm text-slate-500">
-                              {document.original_name}
-                            </p>
-                            {canManagePendingDocuments ? (
-                              <p className="mt-1 text-xs text-slate-500">
-                                <span>
-                                  Diunggah pada{" "}
-                                  {formatDateTimeWib(document.created_at)}
-                                </span>
-                                <span
-                                  className="mx-2 text-slate-300"
-                                  aria-hidden="true"
-                                >
-                                  |
-                                </span>
-                                <button
-                                  type="button"
-                                  className="inline text-sky-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
-                                  disabled={
-                                    pendingDocumentType ===
-                                    document.document_type
-                                  }
-                                  onClick={() =>
-                                    inputRefs.current[
-                                      document.document_type
-                                    ]?.click()
-                                  }
-                                >
-                                  {pendingDocumentType ===
-                                  document.document_type
-                                    ? "Mengganti..."
-                                    : "Ganti Dokumen"}
-                                </button>
-                                <span
-                                  className="mx-2 text-slate-300"
-                                  aria-hidden="true"
-                                >
-                                  |
-                                </span>
-                                <button
-                                  type="button"
-                                  className="inline text-rose-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
-                                  disabled={
-                                    pendingDeleteDocumentType ===
-                                    document.document_type
-                                  }
-                                  onClick={() => setDeleteDraft(document)}
-                                >
-                                  {pendingDeleteDocumentType ===
-                                  document.document_type
-                                    ? "Menghapus..."
-                                    : "Hapus Dokumen"}
-                                </button>
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {document.document_url ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="rounded-md border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                                onClick={() => setPreviewDocument(document)}
-                              >
-                                <Eye className="h-4 w-4" />
-                                Lihat file
-                              </Button>
-                            ) : (
-                              <span className="text-sm text-slate-400">
-                                File tidak tersedia
-                              </span>
-                            )}
-
-                            {canManagePendingDocuments ? (
-                              <>
-                                <input
-                                  ref={(element) => {
-                                    inputRefs.current[document.document_type] =
-                                      element;
-                                  }}
-                                  type="file"
-                                  accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.webp"
-                                  className="hidden"
-                                  onChange={(event) => {
-                                    const file = event.target.files?.[0];
-                                    if (!file) return;
-                                    void handleReplaceDocument(
-                                      document.document_type,
-                                      file,
-                                    );
-                                  }}
-                                />
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      Belum ada dokumen yang tersimpan.
-                    </p>
-                  )}
                 </div>
               </>
             ) : (

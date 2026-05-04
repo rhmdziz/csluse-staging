@@ -103,6 +103,9 @@ const BorrowEquipmentDetailPage = lazyWithReload(
 const LabClearancePage = lazyWithReload(
   () => import("@/pages/dashboard/lab-clearance/LabClearancePage"),
 );
+const LabClearanceAllListPage = lazyWithReload(
+  () => import("@/pages/dashboard/lab-clearance/LabClearanceAllListPage"),
+);
 const NotificationsPage = lazyWithReload(() => import("@/pages/dashboard/account/NotificationsPage"));
 const MyProfilePage = lazyWithReload(() => import("@/pages/dashboard/account/MyProfilePage"));
 const AdminHomePage = lazyWithReload(() => import("@/pages/admin/home/AdminHomePage"));
@@ -124,11 +127,11 @@ const AdminEquipmentBorrowHistoryPage = lazyWithReload(
 const AdminSampleTestingHistoryPage = lazyWithReload(
   () => import("@/pages/admin/history/AdminSampleTestingHistoryPage"),
 );
+const AdminLabClearanceHistoryPage = lazyWithReload(
+  () => import("@/pages/admin/history/AdminLabClearanceHistoryPage"),
+);
 const AdminSampleTestingDocumentsPage = lazyWithReload(
   () => import("@/pages/admin/documents/AdminSampleTestingDocumentsPage"),
-);
-const AdminLabClearancePage = lazyWithReload(
-  () => import("@/pages/admin/documents/AdminLabClearancePage"),
 );
 const AdminMyProfilePage = lazyWithReload(() => import("@/pages/admin/profile/AdminMyProfilePage"));
 const UserManagementAllPage = lazyWithReload(
@@ -442,9 +445,27 @@ export const router = createBrowserRouter([
         path: "lab-clearance",
         element: (
           <RequireMenuAccess menuId="bebas-laboratorium">
-            {renderPage(LabClearancePage)}
+            <Outlet />
           </RequireMenuAccess>
         ),
+        children: [
+          {
+            index: true,
+            element: (
+              <RequireFeatureScope featurePath="/lab-clearance" scope="requester">
+                {renderPage(LabClearancePage)}
+              </RequireFeatureScope>
+            ),
+          },
+          {
+            path: "approval",
+            element: (
+              <RequireFeatureScope featurePath="/lab-clearance" scope="approval">
+                {renderPage(LabClearanceAllListPage)}
+              </RequireFeatureScope>
+            ),
+          },
+        ],
       },
       {
         path: "notifications",
@@ -508,6 +529,7 @@ export const router = createBrowserRouter([
           { path: "room-bookings", element: renderPage(AdminRoomBookingHistoryPage) },
           { path: "equipment-borrows", element: renderPage(AdminEquipmentBorrowHistoryPage) },
           { path: "sample-testing", element: renderPage(AdminSampleTestingHistoryPage) },
+          { path: "lab-clearance", element: renderPage(AdminLabClearanceHistoryPage) },
         ],
       },
       {
@@ -515,7 +537,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="sample-testing" replace /> },
           { path: "sample-testing", element: renderPage(AdminSampleTestingDocumentsPage) },
-          { path: "lab-clearance", element: renderPage(AdminLabClearancePage) },
+          { path: "lab-clearance", element: <Navigate to="/lab-clearance/approval" replace /> },
         ],
       },
       {
