@@ -1141,6 +1141,14 @@ class BookingUserListSerializer(serializers.ModelSerializer):
 
 
 GLASSWARE_BORROW_REQUEST_LIMIT = 5
+BORROW_ACTIVE_HOLD_STATUSES = [
+    "Borrowed",
+    "Returned Pending Inspection",
+    "Overdue",
+]
+BORROW_SCHEDULED_BLOCK_STATUSES = [
+    "Approved",
+]
 
 
 def _validate_glassware_borrow_quantity(equipment, quantity):
@@ -1305,29 +1313,49 @@ class BorrowSerializer(serializers.ModelSerializer):
                     end_time__gt=start_time,
                 ).aggregate(total=Sum("equipment_items__quantity"))["total"] or 0
             )
-            borrow_allocated = (
+            scheduled_borrow_allocated = (
                 Borrow.objects.filter(
                     equipment_id=equipment.id,
-                    status__in=[
-                        "Approved",
-                        "Borrowed",
-                        "Returned Pending Inspection",
-                        "Overdue",
-                    ],
+                    status__in=BORROW_SCHEDULED_BLOCK_STATUSES,
                     start_time__lt=end_time,
                     end_time__gt=start_time,
                 ).exclude(pk=instance.pk if instance else None)
                 .aggregate(total=Sum("quantity"))["total"] or 0
             )
-            allocated = booking_allocated + borrow_allocated
+            active_borrow_allocated = (
+                Borrow.objects.filter(
+                    equipment_id=equipment.id,
+                    status__in=BORROW_ACTIVE_HOLD_STATUSES,
+                ).exclude(pk=instance.pk if instance else None)
+                .aggregate(total=Sum("quantity"))["total"] or 0
+            )
+            allocated = (
+                booking_allocated
+                + scheduled_borrow_allocated
+                + active_borrow_allocated
+            )
             remaining = max(equipment.quantity - allocated, 0)
             if quantity > remaining:
+                allocation_notes = []
+                if booking_allocated:
+                    allocation_notes.append(
+                        f"{booking_allocated} unit sudah dipakai booking pada rentang waktu yang sama"
+                    )
+                if scheduled_borrow_allocated:
+                    allocation_notes.append(
+                        f"{scheduled_borrow_allocated} unit sudah dialokasikan untuk borrow yang disetujui pada rentang waktu yang sama"
+                    )
+                if active_borrow_allocated:
+                    allocation_notes.append(
+                        f"{active_borrow_allocated} unit masih ada dalam peminjaman aktif dan baru kembali setelah return selesai"
+                    )
                 raise serializers.ValidationError(
                     {
                         "quantity": (
                             f"Stok {equipment.name} tidak mencukupi pada rentang waktu yang dipilih. "
                             f"Stok total {equipment.quantity}, sudah teralokasi {allocated} unit "
-                            f"(sisa {remaining} unit)."
+                            + (f"({'; '.join(allocation_notes)}) " if allocation_notes else "")
+                            + f"(sisa {remaining} unit)."
                         )
                     }
                 )

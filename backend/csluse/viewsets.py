@@ -123,6 +123,14 @@ PENGUJIAN_APPROVER_DOCUMENT_TYPES = {
 }
 
 LEGACY_IMPORT_CODE_PREFIX = "CSLUSE020"
+BORROW_ACTIVE_HOLD_STATUSES = [
+    "Borrowed",
+    "Returned Pending Inspection",
+    "Overdue",
+]
+BORROW_SCHEDULED_BLOCK_STATUSES = [
+    "Approved",
+]
 
 
 def _resolve_legacy_row_index(row, default_index):
@@ -797,14 +805,6 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             )
 
         booking_block = ['Pending', 'Approved']
-        borrow_block = [
-            'Pending',
-            'Approved',
-            'Borrowed',
-            'Returned Pending Inspection',
-            'Overdue',
-        ]
-
         bookings = (
             Booking.objects
             .filter(
@@ -821,9 +821,14 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             Borrow.objects
             .filter(
                 equipment=equipment,
-                status__in=borrow_block,
-                start_time__lt=end,
-                end_time__gt=start,
+            )
+            .filter(
+                Q(
+                    status__in=BORROW_SCHEDULED_BLOCK_STATUSES,
+                    start_time__lt=end,
+                    end_time__gt=start,
+                )
+                | Q(status__in=BORROW_ACTIVE_HOLD_STATUSES)
             )
             .values('id', 'start_time', 'end_time', 'status')
         )
@@ -4478,43 +4483,62 @@ def _equipment_review_overlap_issues(
         booking_qs = booking_qs.exclude(pk=exclude_booking_id)
     booking_allocated_qty = booking_qs.aggregate(total=Sum("equipment_items__quantity")).get("total") or 0
 
-    borrow_qs = Borrow.objects.filter(
+    scheduled_borrow_qs = Borrow.objects.filter(
         equipment_id=equipment_id,
-        status__in=[
-            "Approved",
-            "Borrowed",
-            "Returned Pending Inspection",
-            "Overdue",
-        ],
+        status__in=BORROW_SCHEDULED_BLOCK_STATUSES,
         start_time__lt=end_time,
         end_time__gt=start_time,
     )
     if exclude_borrow_id is not None:
-        borrow_qs = borrow_qs.exclude(pk=exclude_borrow_id)
-    borrow_allocated_qty = borrow_qs.aggregate(total=Sum("quantity")).get("total") or 0
+        scheduled_borrow_qs = scheduled_borrow_qs.exclude(pk=exclude_borrow_id)
+    scheduled_borrow_allocated_qty = (
+        scheduled_borrow_qs.aggregate(total=Sum("quantity")).get("total") or 0
+    )
 
-    allocated_qty = booking_allocated_qty + borrow_allocated_qty
+    active_borrow_qs = Borrow.objects.filter(
+        equipment_id=equipment_id,
+        status__in=BORROW_ACTIVE_HOLD_STATUSES,
+    )
+    if exclude_borrow_id is not None:
+        active_borrow_qs = active_borrow_qs.exclude(pk=exclude_borrow_id)
+    active_borrow_allocated_qty = (
+        active_borrow_qs.aggregate(total=Sum("quantity")).get("total") or 0
+    )
+
+    allocated_qty = (
+        booking_allocated_qty
+        + scheduled_borrow_allocated_qty
+        + active_borrow_allocated_qty
+    )
     remaining_qty = max((stock_quantity or 0) - allocated_qty, 0)
 
     if requested_quantity > remaining_qty:
         segments = []
         if booking_allocated_qty:
             segments.append(f"{booking_allocated_qty} unit untuk booking")
-        if borrow_allocated_qty:
-            segments.append(f"{borrow_allocated_qty} unit untuk peminjaman alat")
+        if scheduled_borrow_allocated_qty:
+            segments.append(
+                f"{scheduled_borrow_allocated_qty} unit untuk borrow approved di rentang waktu yang sama"
+            )
+        if active_borrow_allocated_qty:
+            segments.append(
+                f"{active_borrow_allocated_qty} unit masih dipinjam aktif sampai return selesai"
+            )
         issues.append(
             _review_issue(
-                "Stok tidak mencukupi pada rentang waktu yang sama",
+                "Stok tidak mencukupi untuk dipinjam",
                 (
                     f"Stok total alat {stock_quantity} unit. "
                     f"Sudah teralokasi {allocated_qty} unit"
                     + (f" ({', '.join(segments)})" if segments else "")
-                    + f", sehingga sisa stok hanya {remaining_qty} unit untuk rentang waktu ini."
+                    + f", sehingga sisa stok hanya {remaining_qty} unit."
                 ),
             )
         )
     else:
-        passed_indicators.append("Sisa stok alat pada rentang waktu yang sama masih mencukupi")
+        passed_indicators.append(
+            "Sisa stok alat masih mencukupi setelah memperhitungkan borrow aktif dan alokasi pada rentang waktu yang sama"
+        )
 
     return _review_result(issues=issues, passed_indicators=passed_indicators)
 
