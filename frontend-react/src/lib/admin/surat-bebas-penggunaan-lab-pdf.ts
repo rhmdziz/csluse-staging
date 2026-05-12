@@ -299,22 +299,6 @@ export async function buildSuratBebasPdf(detail: LabClearanceDetail): Promise<{
 
   // ─── Usage section ───────────────────────────────────────────────────────
   if (histories.length === 0) {
-    // No history – dotted lines like the template
-    drawInlineCollaborativeStemText(
-      pdf,
-      margin,
-      y,
-      "menggunakan fasilitas ",
-      " ruang .............................................",
-    );
-    y += BODY_ITEM_SPACING;
-    pdf.text("untuk keperluan Skripsi/TA", margin, y);
-    y += BODY_ITEM_SPACING;
-    pdf.text(
-      "yang dilakukan pada tanggal ............................................... s/d ............................................",
-      margin,
-      y,
-    );
     y += BODY_ITEM_SPACING;
   } else if (histories.length === 1) {
     const h = histories[0];
@@ -378,7 +362,9 @@ export async function buildSuratBebasPdf(detail: LabClearanceDetail): Promise<{
     y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
   }
 
-  y += 10;
+  if (histories.length > 0) {
+    y += 10;
+  }
 
   // ─── TELAH BEBAS paragraph (bold prefix + normal rest) ───────────────────
   pdf.setFont(BODY_FONT, "bold");
