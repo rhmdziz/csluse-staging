@@ -210,7 +210,7 @@ export default function RoomPicDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`${USER_MODAL_WIDTH_CLASS} gap-0 p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
+        className={`${USER_MODAL_WIDTH_CLASS} max-h-[90vh] min-w-0 gap-0 overflow-y-auto p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
       >
         <DialogTitle className="sr-only">
           {isEditing ? "Edit Ruangan PIC" : "Detail PIC Ruangan"}
