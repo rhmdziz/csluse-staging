@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { Eye, Loader2 } from "lucide-react";
+import { Eye } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { DashboardListTable } from "@/components/dashboard/shared";
 import { DataPagination, TableActionIconButton } from "@/components/shared";
 
 import { useEquipments } from "@/hooks/shared/resources/equipments";
@@ -54,70 +55,57 @@ export default function EquipmentListPage() {
         </div>
       ) : null}
 
-      <div className="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[1020px] table-fixed">
-          <thead className="border-b border-slate-800 bg-slate-900">
-            <tr className="text-left text-sm">
-              <th className="w-[180px] px-3 py-3 font-medium text-slate-50">Nama</th>
-              <th className="w-[140px] px-3 py-3 font-medium text-slate-50">Kategori</th>
-              <th className="w-[120px] px-3 py-3 font-medium text-slate-50">Status</th>
-              <th className="w-[90px] px-3 py-3 font-medium text-slate-50">Jumlah</th>
-              <th className="w-[320px] px-3 py-3 font-medium text-slate-50">Ruangan</th>
-              <th className="sticky right-0 z-20 w-[100px] bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {isLoading || !hasLoadedOnce ? (
-              <tr>
-                <td colSpan={6} className="px-3 py-5 text-center text-slate-500">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat data...
-                  </div>
-                </td>
-              </tr>
-            ) : equipments.length ? (
-              equipments.map((item) => (
-                <tr key={String(item.id)} className="border-b last:border-b-0">
-                  <td className="truncate px-3 py-2.5 font-medium text-slate-800">{item.name}</td>
-                  <td className="truncate px-3 py-2.5">{item.category}</td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[item.status] || "bg-slate-500/10 text-slate-600"}`}
-                    >
-                      {formatStatus(item.status)}
-                    </span>
-                  </td>
-                  <td className="truncate px-3 py-2.5">{item.quantity}</td>
-                  <td className="truncate px-3 py-2.5">
-                    {item.roomName}
-                    {item.roomNumber && (
-                      <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
-                    )}
-                  </td>
-                  <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                    <TableActionIconButton
-                      type="button"
-                      label="Lihat detail"
-                      icon={<Eye className="h-3.5 w-3.5" />}
-                      className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
-                      onClick={() => router.push(`/booking-rooms/equipment/${item.id}`)}
-                    />
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="px-3 py-5 text-center text-slate-500">
-                  Belum ada peralatan yang tersedia.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DashboardListTable
+        columns={[
+          { key: "name", label: "Nama", className: "w-[180px]" },
+          { key: "category", label: "Kategori", className: "w-[140px]" },
+          { key: "status", label: "Status", className: "w-[120px]" },
+          { key: "quantity", label: "Jumlah", className: "w-[90px]" },
+          { key: "room", label: "Ruangan", className: "w-[320px]" },
+          {
+            key: "actions",
+            label: "Aksi",
+            className:
+              "sticky right-0 z-20 w-[100px] bg-slate-900 text-center shadow-[-1px_0_0_0_rgba(51,65,85,1)]",
+          },
+        ]}
+        colSpan={6}
+        hasRows={equipments.length > 0}
+        isLoading={isLoading}
+        hasLoadedOnce={hasLoadedOnce}
+        emptyMessage="Belum ada peralatan yang tersedia."
+        tableClassName="min-w-[1020px] table-fixed"
+      >
+        {equipments.map((item) => (
+          <tr key={String(item.id)} className="border-b last:border-b-0">
+            <td className="truncate px-3 py-2.5 font-medium text-slate-800">{item.name}</td>
+            <td className="truncate px-3 py-2.5">{item.category}</td>
+            <td className="px-3 py-2.5">
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${STATUS_STYLES[item.status] || "bg-slate-500/10 text-slate-600"}`}
+              >
+                {formatStatus(item.status)}
+              </span>
+            </td>
+            <td className="truncate px-3 py-2.5">{item.quantity}</td>
+            <td className="truncate px-3 py-2.5">
+              {item.roomName}
+              {item.roomNumber && (
+                <span className="ml-1 text-xs text-slate-400">({item.roomNumber})</span>
+              )}
+            </td>
+            <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
+              <TableActionIconButton
+                type="button"
+                label="Lihat detail"
+                icon={<Eye className="h-3.5 w-3.5" />}
+                className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
+                onClick={() => router.push(`/booking-rooms/equipment/${item.id}`)}
+              />
+            </td>
+          </tr>
+        ))}
+      </DashboardListTable>
 
       <DataPagination
         page={page}

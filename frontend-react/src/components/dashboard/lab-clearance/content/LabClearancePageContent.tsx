@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 
 import { DeleteRequestConfirmDialog } from "@/components/dialogs";
+import { DashboardListTable } from "@/components/dashboard/shared";
 import {
   DataPagination,
   DocumentPreviewDialog,
@@ -451,100 +452,71 @@ export function LabClearancePageContent() {
       {error ? <InlineErrorAlert>{error}</InlineErrorAlert> : null}
 
       {/* Table */}
-      <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-160">
-          <thead className="border-b border-slate-800 bg-slate-900">
-            <tr className="text-left text-sm">
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                No
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Kode
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Dokumen
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Status
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Tanggal Pengajuan
-              </th>
-              <th className="sticky right-0 z-20 bg-slate-900 px-3 py-3 text-center font-medium whitespace-nowrap text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {isLoading || !hasLoadedOnce ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat data...
-                  </div>
-                </td>
-              </tr>
-            ) : items.length ? (
-              items.map((item, index) => (
-                <tr key={item.id} className="border-b last:border-b-0">
-                  <td className="px-3 py-2.5 text-slate-500">
-                    {(page - 1) * PAGE_SIZE + index + 1}
-                  </td>
-                  <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
-                    {item.code}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-slate-700">
-                    {item.document_count} formulir
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
-                    >
-                      {getLabClearanceStatusLabel(item.status)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                    {formatDateTimeWib(item.created_at)}
-                  </td>
-                  <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                    <div className="flex justify-center gap-2">
-                      {item.status === "Pending" ? (
-                        <TableActionIconButton
-                          type="button"
-                          label="Hapus permohonan"
-                          icon={<Trash2 className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
-                          onClick={() => setDeleteRequestTarget(item)}
-                        />
-                      ) : null}
-                      <TableActionIconButton
-                        type="button"
-                        label="Lihat dokumen"
-                        icon={<Eye className="h-3.5 w-3.5" />}
-                        className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
-                        onClick={() => setDetailTarget(item)}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  Belum ada permohonan surat bebas laboratorium.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DashboardListTable
+        columns={[
+          { key: "number", label: "No" },
+          { key: "code", label: "Kode" },
+          { key: "documents", label: "Dokumen" },
+          { key: "status", label: "Status" },
+          { key: "created", label: "Tanggal Pengajuan" },
+          {
+            key: "actions",
+            label: "Aksi",
+            className:
+              "sticky right-0 z-20 bg-slate-900 text-center shadow-[-1px_0_0_0_rgba(51,65,85,1)]",
+          },
+        ]}
+        colSpan={6}
+        hasRows={items.length > 0}
+        isLoading={isLoading}
+        hasLoadedOnce={hasLoadedOnce}
+        emptyMessage="Belum ada permohonan surat bebas laboratorium."
+        tableClassName="min-w-160"
+      >
+        {items.map((item, index) => (
+          <tr key={item.id} className="border-b last:border-b-0">
+            <td className="px-3 py-2.5 text-slate-500">
+              {(page - 1) * PAGE_SIZE + index + 1}
+            </td>
+            <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
+              {item.code}
+            </td>
+            <td className="px-3 py-2.5 text-sm text-slate-700">
+              {item.document_count} formulir
+            </td>
+            <td className="px-3 py-2.5">
+              <span
+                className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
+              >
+                {getLabClearanceStatusLabel(item.status)}
+              </span>
+            </td>
+            <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+              {formatDateTimeWib(item.created_at)}
+            </td>
+            <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
+              <div className="flex justify-center gap-2">
+                {item.status === "Pending" ? (
+                  <TableActionIconButton
+                    type="button"
+                    label="Hapus permohonan"
+                    icon={<Trash2 className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                    onClick={() => setDeleteRequestTarget(item)}
+                  />
+                ) : null}
+                <TableActionIconButton
+                  type="button"
+                  label="Lihat dokumen"
+                  icon={<Eye className="h-3.5 w-3.5" />}
+                  className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
+                  onClick={() => setDetailTarget(item)}
+                />
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DashboardListTable>
 
       <DataPagination
         page={page}

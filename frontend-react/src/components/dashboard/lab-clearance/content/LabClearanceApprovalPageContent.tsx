@@ -20,6 +20,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
+import { DashboardListTable } from "@/components/dashboard/shared";
 import {
   DataPagination,
   DocumentPreviewDialog,
@@ -348,126 +349,95 @@ export function LabClearanceApprovalPageContent() {
 
       {error ? <InlineErrorAlert>{error}</InlineErrorAlert> : null}
 
-      <div className="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[1080px]">
-          <thead className="border-b border-slate-800 bg-slate-900">
-            <tr className="text-left text-sm">
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Kode
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Pemohon
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Prodi
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Angkatan
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Status
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Dibuat
-              </th>
-              <th className="sticky right-0 z-20 bg-slate-900 px-3 py-3 text-center font-medium whitespace-nowrap text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {isLoading || !hasLoadedOnce ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat data...
-                  </div>
-                </td>
-              </tr>
-            ) : items.length ? (
-              items.map((item) => {
-                const rowId = String(item.id);
+      <DashboardListTable
+        columns={[
+          { key: "code", label: "Kode" },
+          { key: "requester", label: "Pemohon" },
+          { key: "department", label: "Prodi" },
+          { key: "batch", label: "Angkatan" },
+          { key: "status", label: "Status" },
+          { key: "created", label: "Dibuat" },
+          {
+            key: "actions",
+            label: "Aksi",
+            className:
+              "sticky right-0 z-20 bg-slate-900 text-center shadow-[-1px_0_0_0_rgba(51,65,85,1)]",
+          },
+        ]}
+        colSpan={7}
+        hasRows={items.length > 0}
+        isLoading={isLoading}
+        hasLoadedOnce={hasLoadedOnce}
+        emptyMessage={emptyMessage}
+        tableClassName="min-w-[1080px]"
+      >
+        {items.map((item) => {
+          const rowId = String(item.id);
 
-                return (
-                  <tr key={rowId} className="border-b last:border-b-0">
-                    <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
-                      {item.code}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-700">
-                      <p className="font-medium text-slate-800">
-                        {item.requested_by_detail?.full_name || "-"}
-                      </p>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                      {item.requested_by_detail?.department || "-"}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                      {item.requested_by_detail?.batch || "-"}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
-                      >
-                        {getRequestStatusDisplayLabel(item.status)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                      {formatDateTimeWib(item.created_at)}
-                    </td>
-                    <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                      <div className="flex items-center justify-center gap-2">
-                        <TableActionIconButton
-                          type="button"
-                          label="Review"
-                          icon={<ClipboardCheck className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-sky-200 bg-sky-50 p-0 text-sky-700 shadow-none hover:bg-sky-100"
-                          onClick={() => handleOpenReview(rowId)}
-                        />
-                        {item.status === "Approved" ? (
-                          <TableActionIconButton
-                            type="button"
-                            label="Generate surat"
-                            icon={
-                              loadingDetailIds[rowId] ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <ScrollText className="h-3.5 w-3.5" />
-                              )
-                            }
-                            className="w-8 rounded-md border border-emerald-200 bg-emerald-50 p-0 text-emerald-700 shadow-none hover:bg-emerald-100"
-                            onClick={() => void handleGenerateSurat(rowId)}
-                            disabled={Boolean(loadingDetailIds[rowId])}
-                          />
-                        ) : null}
-                        <TableActionIconButton
-                          type="button"
-                          label="Lihat detail"
-                          icon={<Eye className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
-                          onClick={() => handleOpenReview(rowId)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-5 text-center text-slate-500"
+          return (
+            <tr key={rowId} className="border-b last:border-b-0">
+              <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
+                {item.code}
+              </td>
+              <td className="px-3 py-2.5 text-slate-700">
+                <p className="font-medium text-slate-800">
+                  {item.requested_by_detail?.full_name || "-"}
+                </p>
+              </td>
+              <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+                {item.requested_by_detail?.department || "-"}
+              </td>
+              <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+                {item.requested_by_detail?.batch || "-"}
+              </td>
+              <td className="px-3 py-2.5">
+                <span
+                  className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
                 >
-                  {emptyMessage}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  {getRequestStatusDisplayLabel(item.status)}
+                </span>
+              </td>
+              <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+                {formatDateTimeWib(item.created_at)}
+              </td>
+              <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
+                <div className="flex items-center justify-center gap-2">
+                  <TableActionIconButton
+                    type="button"
+                    label="Review"
+                    icon={<ClipboardCheck className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-sky-200 bg-sky-50 p-0 text-sky-700 shadow-none hover:bg-sky-100"
+                    onClick={() => handleOpenReview(rowId)}
+                  />
+                  {item.status === "Approved" ? (
+                    <TableActionIconButton
+                      type="button"
+                      label="Generate surat"
+                      icon={
+                        loadingDetailIds[rowId] ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ScrollText className="h-3.5 w-3.5" />
+                        )
+                      }
+                      className="w-8 rounded-md border border-emerald-200 bg-emerald-50 p-0 text-emerald-700 shadow-none hover:bg-emerald-100"
+                      onClick={() => void handleGenerateSurat(rowId)}
+                      disabled={Boolean(loadingDetailIds[rowId])}
+                    />
+                  ) : null}
+                  <TableActionIconButton
+                    type="button"
+                    label="Lihat detail"
+                    icon={<Eye className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
+                    onClick={() => handleOpenReview(rowId)}
+                  />
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </DashboardListTable>
 
       <DataPagination
         page={page}

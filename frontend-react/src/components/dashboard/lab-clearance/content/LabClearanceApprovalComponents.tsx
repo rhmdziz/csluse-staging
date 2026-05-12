@@ -1,8 +1,9 @@
 "use client";
 
 import type { ComponentProps, ReactNode, RefObject } from "react";
-import { ArrowUpRight, ChevronDown, Download, FileSpreadsheet, Loader2, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Download, FileSpreadsheet, SlidersHorizontal, Trash2, X } from "lucide-react";
 
+import { DashboardListTable } from "@/components/dashboard/shared";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui";
 import {
   Button,
@@ -52,52 +53,28 @@ export function LabClearanceApprovalTable({
   children,
 }: ApprovalTableProps) {
   return (
-    <div className="w-full min-w-0 overflow-x-auto rounded border border-slate-200 bg-card [scrollbar-width:thin]">
-      <table className="min-w-max w-full table-auto">
-        <thead className="border-b border-slate-800 bg-slate-900">
-          <tr className="text-left text-sm">
-            <th className="w-12 px-3 py-3 text-center font-medium text-slate-50">
-              <input
-                ref={selectAllRef}
-                type="checkbox"
-                aria-label={selectAllAriaLabel}
-                className="h-4 w-4 rounded border-slate-300 align-middle"
-                checked={allVisibleSelected}
-                disabled={selectAllDisabled}
-                onChange={(event) => onToggleSelectAll(event.target.checked)}
-              />
-            </th>
-            {columns.map((column) => (
-              <th
-                key={column.label}
-                className={column.className ?? "whitespace-nowrap px-3 py-3 font-medium text-slate-50"}
-              >
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="text-sm">
-          {isLoading || !hasLoadedOnce ? (
-            <tr>
-              <td colSpan={colSpan} className="px-3 py-8 text-center">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                </div>
-              </td>
-            </tr>
-          ) : hasRows ? (
-            children
-          ) : (
-            <tr>
-              <td colSpan={colSpan} className="px-3 py-6 text-center text-muted-foreground">
-                {emptyMessage}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <DashboardListTable
+      columns={columns}
+      colSpan={colSpan}
+      hasRows={hasRows}
+      isLoading={isLoading}
+      hasLoadedOnce={hasLoadedOnce}
+      emptyMessage={emptyMessage}
+      tableClassName="min-w-max table-auto"
+      containerClassName="min-w-0 max-w-none rounded border bg-card [scrollbar-width:thin]"
+      loadingCellClassName="px-3 py-8 text-center"
+      emptyCellClassName="px-3 py-6 text-center text-muted-foreground"
+      loadingMessage={null}
+      selectAll={{
+        ref: selectAllRef,
+        checked: allVisibleSelected,
+        disabled: selectAllDisabled,
+        ariaLabel: selectAllAriaLabel,
+        onChange: onToggleSelectAll,
+      }}
+    >
+      {children}
+    </DashboardListTable>
   );
 }
 

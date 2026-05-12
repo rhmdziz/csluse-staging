@@ -1,4 +1,5 @@
 export { default as AdminEquipmentDetailDialog } from "./AdminEquipmentDetailDialog";
+export { default as AdminInventoryTable } from "./AdminInventoryTable";
 export { default as AdminMaterialDetailDialog } from "./AdminMaterialDetailDialog";
 export { default as MaterialBulkImportByRoomDialog } from "./MaterialBulkImportByRoomDialog";
 export { default as MaterialBulkImportDialog } from "./MaterialBulkImportDialog";

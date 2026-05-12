@@ -33,6 +33,7 @@ import {
   SampleTestingDocumentsDialog,
   SampleTestingSummaryCard,
 } from "@/components/dashboard/sample-testing";
+import { DashboardListTable } from "@/components/dashboard/shared";
 
 import { formatDateTimeWib } from "@/lib/date";
 
@@ -205,163 +206,122 @@ export default function SampleTestingListContent({
 
       {error ? <InlineErrorAlert>{error}</InlineErrorAlert> : null}
 
-      <div className="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[1160px]">
-          <thead className="border-b border-slate-800 bg-slate-900">
-            <tr className="text-left text-sm">
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Kode
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Sampel
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Jenis Uji
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Institusi
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Status
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Dibuat
-              </th>
-              <th className="sticky right-0 z-20 bg-slate-900 px-3 py-3 text-center font-medium whitespace-nowrap text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {isLoading || !hasLoadedOnce ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat data...
-                  </div>
-                </td>
-              </tr>
-            ) : filteredSampleTestings.length ? (
-              filteredSampleTestings.map((item) => (
-                <tr key={String(item.id)} className="border-b last:border-b-0">
-                  <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
-                    {item.code}
-                  </td>
-                  <td className="px-3 py-2.5 text-slate-700">
-                    <div className="space-y-1">
-                      <p className="font-medium text-slate-800">
-                        {item.sampleName}
-                      </p>
-                      <p className="whitespace-nowrap text-slate-500">
-                        {item.sampleType}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                    {item.sampleTestingType}
-                  </td>
-                  <td className="px-3 py-2.5 text-slate-700">
-                    <p className="font-medium text-slate-800">
-                      {item.institution}
-                    </p>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <button
+      <DashboardListTable
+        columns={[
+          { key: "code", label: "Kode" },
+          { key: "sample", label: "Sampel" },
+          { key: "type", label: "Jenis Uji" },
+          { key: "institution", label: "Institusi" },
+          { key: "status", label: "Status" },
+          { key: "created", label: "Dibuat" },
+          {
+            key: "actions",
+            label: "Aksi",
+            className:
+              "sticky right-0 z-20 bg-slate-900 text-center shadow-[-1px_0_0_0_rgba(51,65,85,1)]",
+          },
+        ]}
+        colSpan={7}
+        hasRows={filteredSampleTestings.length > 0}
+        isLoading={isLoading}
+        hasLoadedOnce={hasLoadedOnce}
+        emptyMessage={emptyMessage}
+        tableClassName="min-w-[1160px]"
+      >
+        {filteredSampleTestings.map((item) => (
+          <tr key={String(item.id)} className="border-b last:border-b-0">
+            <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
+              {item.code}
+            </td>
+            <td className="px-3 py-2.5 text-slate-700">
+              <div className="space-y-1">
+                <p className="font-medium text-slate-800">{item.sampleName}</p>
+                <p className="whitespace-nowrap text-slate-500">{item.sampleType}</p>
+              </div>
+            </td>
+            <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+              {item.sampleTestingType}
+            </td>
+            <td className="px-3 py-2.5 text-slate-700">
+              <p className="font-medium text-slate-800">{item.institution}</p>
+            </td>
+            <td className="px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setProgressState({
+                    code: item.code,
+                    steps: getSampleTestingProgressFlow(item),
+                  })
+                }
+                className={`inline-flex cursor-pointer rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
+              >
+                {getSampleTestingStatusDisplayLabel(item.status)}
+              </button>
+            </td>
+            <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+              {formatDateTimeWib(item.createdAt)}
+            </td>
+            <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
+              <div className="flex items-center justify-center gap-2">
+                {canShowDocumentAction(item.status) ? (
+                  <TableActionIconButton
+                    type="button"
+                    label="Dokumen"
+                    icon={<FileText className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
+                    onClick={() => setDocumentsSampleTestingId(String(item.id))}
+                  />
+                ) : null}
+                {canManageSampleTesting(item.status) ? (
+                  <>
+                    <TableActionIconButton
                       type="button"
+                      label="Edit"
+                      icon={<Pencil className="h-3.5 w-3.5" />}
+                      className="w-8 rounded-md border border-amber-200 bg-amber-50 p-0 text-amber-700 shadow-none hover:bg-amber-100"
+                      onClick={() => router.push(`/sample-testing/${item.id}/edit`)}
+                    />
+                    <TableActionIconButton
+                      type="button"
+                      label="Hapus"
+                      icon={<Trash2 className="h-3.5 w-3.5" />}
+                      className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
                       onClick={() =>
-                        setProgressState({
+                        setDeleteTarget({
+                          id: String(item.id),
                           code: item.code,
-                          steps: getSampleTestingProgressFlow(item),
                         })
                       }
-                      className={`inline-flex cursor-pointer rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
-                    >
-                      {getSampleTestingStatusDisplayLabel(item.status)}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                    {formatDateTimeWib(item.createdAt)}
-                  </td>
-                  <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                    <div className="flex items-center justify-center gap-2">
-                      {canShowDocumentAction(item.status) ? (
-                        <TableActionIconButton
-                          type="button"
-                          label="Dokumen"
-                          icon={<FileText className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-blue-200 bg-blue-50 p-0 text-blue-700 shadow-none hover:bg-blue-100"
-                          onClick={() =>
-                            setDocumentsSampleTestingId(String(item.id))
-                          }
-                        />
-                      ) : null}
-                      {canManageSampleTesting(item.status) ? (
-                        <>
-                          <TableActionIconButton
-                            type="button"
-                            label="Edit"
-                            icon={<Pencil className="h-3.5 w-3.5" />}
-                            className="w-8 rounded-md border border-amber-200 bg-amber-50 p-0 text-amber-700 shadow-none hover:bg-amber-100"
-                            onClick={() => router.push(`/sample-testing/${item.id}/edit`)}
-                          />
-                          <TableActionIconButton
-                            type="button"
-                            label="Hapus"
-                            icon={<Trash2 className="h-3.5 w-3.5" />}
-                            className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
-                            onClick={() =>
-                              setDeleteTarget({
-                                id: String(item.id),
-                                code: item.code,
-                              })
-                            }
-                          />
-                        </>
-                      ) : null}
-                      {canCancelSampleTesting(item.status) ? (
-                        <TableActionIconButton
-                          type="button"
-                          label="Batalkan"
-                          icon={<X className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
-                          onClick={() =>
-                            setCancelTarget({
-                              id: String(item.id),
-                              code: item.code,
-                            })
-                          }
-                        />
-                      ) : null}
-                      <TableActionIconButton
-                        type="button"
-                        label="Lihat detail"
-                        icon={<Eye className="h-3.5 w-3.5" />}
-                        className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
-                        onClick={() =>
-                          router.push(`/sample-testing/${item.id}`)
-                        }
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  {emptyMessage}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    />
+                  </>
+                ) : null}
+                {canCancelSampleTesting(item.status) ? (
+                  <TableActionIconButton
+                    type="button"
+                    label="Batalkan"
+                    icon={<X className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                    onClick={() =>
+                      setCancelTarget({
+                        id: String(item.id),
+                        code: item.code,
+                      })
+                    }
+                  />
+                ) : null}
+                <TableActionIconButton
+                  type="button"
+                  label="Lihat detail"
+                  icon={<Eye className="h-3.5 w-3.5" />}
+                  className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
+                  onClick={() => router.push(`/sample-testing/${item.id}`)}
+                />
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DashboardListTable>
 
       <DataPagination
         page={page}

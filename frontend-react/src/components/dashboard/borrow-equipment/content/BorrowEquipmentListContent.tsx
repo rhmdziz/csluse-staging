@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { DashboardDetailReviewDialog } from "@/components/dashboard/layout";
+import { DashboardListTable } from "@/components/dashboard/shared";
 import { DeleteRequestConfirmDialog } from "@/components/dialogs";
 
 import {
@@ -573,175 +574,136 @@ export default function BorrowEquipmentListContent({
         </div>
       ) : null}
 
-      <div className="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[1120px]">
+      <DashboardListTable
+        columns={[
+          { key: "code", label: "Kode" },
+          { key: "equipment", label: "Alat" },
+          ...(showRequesterColumn
+            ? [{ key: "requester", label: "Pemohon" }]
+            : []),
+          { key: "purpose", label: "Tujuan" },
+          { key: "quantity", label: "Jumlah" },
+          { key: "start", label: "Waktu Mulai" },
+          { key: "end", label: "Waktu Selesai" },
+          { key: "status", label: "Status" },
+          {
+            key: "actions",
+            label: "Aksi",
+            className:
+              "sticky right-0 z-20 bg-slate-900 text-center shadow-[-1px_0_0_0_rgba(51,65,85,1)]",
+          },
+        ]}
+        colSpan={showRequesterColumn ? 9 : 8}
+        hasRows={generalBorrows.length > 0}
+        isLoading={isLoading}
+        hasLoadedOnce={hasLoadedOnce}
+        emptyMessage={resolvedEmptyMessage}
+        tableClassName="min-w-[1120px]"
+        colGroup={
           <colgroup>
             {TABLE_COLUMN_WIDTHS.slice(0, showRequesterColumn ? 9 : 8).map((width) => (
               <col key={width} style={{ width }} />
             ))}
           </colgroup>
-          <thead className="border-b border-slate-800 bg-slate-900">
-            <tr className="text-left text-sm">
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Kode
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Alat
-              </th>
-              {showRequesterColumn ? (
-                <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                  Pemohon
-                </th>
-              ) : null}
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Tujuan
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Jumlah
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Waktu Mulai
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Waktu Selesai
-              </th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
-                Status
-              </th>
-              <th className="sticky right-0 z-20 bg-slate-900 px-3 py-3 text-center font-medium whitespace-nowrap text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {isLoading || !hasLoadedOnce ? (
-              <tr>
-                <td
-                  colSpan={showRequesterColumn ? 9 : 8}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Memuat data...
-                  </div>
-                </td>
-              </tr>
-            ) : generalBorrows.length ? (
-              generalBorrows.map((item) => (
-                <tr key={String(item.id)} className="border-b last:border-b-0">
-                  <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
-                    {item.code}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    {item.equipmentName}
-                  </td>
-                  {showRequesterColumn ? (
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {item.requesterName}
-                    </td>
-                  ) : null}
-                  <td className="px-3 py-2.5 text-slate-700">{item.purpose}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    {item.quantity}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                    {formatDateTimeWib(item.startTime)}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
-                    {formatDateTimeWib(item.endTime)}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <button
+        }
+      >
+        {generalBorrows.map((item) => (
+          <tr key={String(item.id)} className="border-b last:border-b-0">
+            <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
+              {item.code}
+            </td>
+            <td className="px-3 py-2.5 whitespace-nowrap">{item.equipmentName}</td>
+            {showRequesterColumn ? (
+              <td className="px-3 py-2.5 whitespace-nowrap">{item.requesterName}</td>
+            ) : null}
+            <td className="px-3 py-2.5 text-slate-700">{item.purpose}</td>
+            <td className="px-3 py-2.5 whitespace-nowrap">{item.quantity}</td>
+            <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+              {formatDateTimeWib(item.startTime)}
+            </td>
+            <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+              {formatDateTimeWib(item.endTime)}
+            </td>
+            <td className="px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setProgressState({
+                    code: item.code,
+                    steps: getBorrowProgressFlow(item),
+                  })
+                }
+                className={`inline-flex cursor-pointer rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
+              >
+                {getBorrowStatusDisplayLabel(item.status)}
+              </button>
+            </td>
+            <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
+              <div className="flex items-center justify-center gap-2">
+                {canShowReviewButton(item) ? (
+                  <TableActionIconButton
+                    type="button"
+                    label="Review"
+                    icon={<ShieldCheck className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-sky-200 bg-sky-50 p-0 text-sky-700 shadow-none hover:bg-sky-100"
+                    onClick={() => setReviewBorrowId(String(item.id))}
+                  />
+                ) : null}
+                {canManageBorrow(item) ? (
+                  <>
+                    <TableActionIconButton
                       type="button"
+                      label="Edit"
+                      icon={<Pencil className="h-3.5 w-3.5" />}
+                      className="w-8 rounded-md border border-amber-200 bg-amber-50 p-0 text-amber-700 shadow-none hover:bg-amber-100"
+                      onClick={() => router.push(`/borrow-equipment/${item.id}/edit`)}
+                    />
+                    <TableActionIconButton
+                      type="button"
+                      label="Hapus"
+                      icon={<Trash2 className="h-3.5 w-3.5" />}
+                      className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
                       onClick={() =>
-                        setProgressState({
+                        setDeleteTarget({
+                          id: String(item.id),
                           code: item.code,
-                          steps: getBorrowProgressFlow(item),
                         })
                       }
-                      className={`inline-flex cursor-pointer rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeClass(item.status)}`}
-                    >
-                      {getBorrowStatusDisplayLabel(item.status)}
-                    </button>
-                  </td>
-                  <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
-                    <div className="flex items-center justify-center gap-2">
-                      {canShowReviewButton(item) ? (
-                        <TableActionIconButton
-                          type="button"
-                          label="Review"
-                          icon={<ShieldCheck className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-sky-200 bg-sky-50 p-0 text-sky-700 shadow-none hover:bg-sky-100"
-                          onClick={() => setReviewBorrowId(String(item.id))}
-                        />
-                      ) : null}
-                      {canManageBorrow(item) ? (
-                        <>
-                          <TableActionIconButton
-                            type="button"
-                            label="Edit"
-                            icon={<Pencil className="h-3.5 w-3.5" />}
-                            className="w-8 rounded-md border border-amber-200 bg-amber-50 p-0 text-amber-700 shadow-none hover:bg-amber-100"
-                            onClick={() => router.push(`/borrow-equipment/${item.id}/edit`)}
-                          />
-                          <TableActionIconButton
-                            type="button"
-                            label="Hapus"
-                            icon={<Trash2 className="h-3.5 w-3.5" />}
-                            className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
-                            onClick={() =>
-                              setDeleteTarget({
-                                id: String(item.id),
-                                code: item.code,
-                              })
-                            }
-                          />
-                        </>
-                      ) : null}
-                      {canCancelBorrow(item) ? (
-                        <TableActionIconButton
-                          type="button"
-                          label="Batalkan"
-                          icon={<X className="h-3.5 w-3.5" />}
-                          className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
-                          onClick={() =>
-                            setCancelTarget({
-                              id: String(item.id),
-                              code: item.code,
-                            })
-                          }
-                        />
-                      ) : null}
-                      <TableActionIconButton
-                        type="button"
-                        label="Lihat detail"
-                        icon={<Eye className="h-3.5 w-3.5" />}
-                        className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
-                        onClick={() =>
-                          router.push(
-                            scope === "all"
-                              ? `/borrow-equipment/approval/${item.id}`
-                              : `/borrow-equipment/${item.id}`,
-                          )
-                        }
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={showRequesterColumn ? 9 : 8}
-                  className="px-3 py-5 text-center text-slate-500"
-                >
-                  {resolvedEmptyMessage}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    />
+                  </>
+                ) : null}
+                {canCancelBorrow(item) ? (
+                  <TableActionIconButton
+                    type="button"
+                    label="Batalkan"
+                    icon={<X className="h-3.5 w-3.5" />}
+                    className="w-8 rounded-md border border-rose-200 bg-rose-50 p-0 text-rose-700 shadow-none hover:bg-rose-100"
+                    onClick={() =>
+                      setCancelTarget({
+                        id: String(item.id),
+                        code: item.code,
+                      })
+                    }
+                  />
+                ) : null}
+                <TableActionIconButton
+                  type="button"
+                  label="Lihat detail"
+                  icon={<Eye className="h-3.5 w-3.5" />}
+                  className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
+                  onClick={() =>
+                    router.push(
+                      scope === "all"
+                        ? `/borrow-equipment/approval/${item.id}`
+                        : `/borrow-equipment/${item.id}`,
+                    )
+                  }
+                />
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DashboardListTable>
 
       <DataPagination
         page={page}

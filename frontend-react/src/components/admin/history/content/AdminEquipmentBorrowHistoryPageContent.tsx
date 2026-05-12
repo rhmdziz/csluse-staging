@@ -359,8 +359,8 @@ export default function AdminEquipmentBorrowHistoryPage() {
 
   return (
     <section className="w-full min-w-0 space-y-4 px-4 pb-6">
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1 space-y-4">
+      <div className="min-w-0 flex flex-col gap-4 lg:flex-row">
+        <div className="min-w-0 flex-1 space-y-4">
           <AdminPageHeader
             title="Riwayat Peminjaman Alat"
             description="Pantau histori peminjaman alat laboratorium."
@@ -579,16 +579,16 @@ export default function AdminEquipmentBorrowHistoryPage() {
 
           <AdminHistoryTable
             columns={[
-              { label: "Kode" },
+              { label: "Kode", className: "w-[140px]" },
               { label: "Alat" },
               { label: "Pemohon" },
-              { label: "Waktu Mulai" },
-              { label: "Waktu Selesai" },
-              { label: "Status" },
+              { label: "Waktu Mulai", className: "w-[180px]" },
+              { label: "Waktu Selesai", className: "w-[180px]" },
+              { label: "Status", className: "w-[140px]" },
               {
                 label: "Aksi",
                 className:
-                  "sticky right-0 z-10 relative whitespace-nowrap bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700",
+                  "sticky right-0 z-20 w-[140px] bg-slate-900 text-center shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700",
               },
             ]}
             colSpan={8}
@@ -635,7 +635,7 @@ export default function AdminEquipmentBorrowHistoryPage() {
                     {getStatusDisplayLabel(item.status)}
                   </span>
                 </td>
-                <td className="sticky right-0 z-10 relative bg-card px-3 py-2 before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
+                <td className="sticky right-0 z-20 w-[140px] bg-card px-3 py-2 text-center shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
                   <div className="flex justify-center gap-2">
                     {shouldShowReviewAction("borrow", item.status) &&
                     !isWaitingForMentorApproval(item) ? (

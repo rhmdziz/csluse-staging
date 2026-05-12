@@ -1,63 +1,68 @@
+"use client";
+
 import type { ReactNode, RefObject } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/core";
 
-type AdminHistoryTableColumn = {
-  label: string;
+type AdminInventoryTableColumn = {
+  key?: string;
+  label: ReactNode;
   className?: string;
 };
 
-type AdminHistoryTableProps = {
-  columns: AdminHistoryTableColumn[];
-  colSpan: number;
+type AdminInventoryTableProps = {
+  columns: AdminInventoryTableColumn[];
   hasRows: boolean;
   isLoading: boolean;
   hasLoadedOnce: boolean;
   emptyMessage: string;
-  allVisibleSelected: boolean;
-  onToggleSelectAll: (checked: boolean) => void;
-  selectAllRef?: RefObject<HTMLInputElement | null>;
-  selectAllAriaLabel?: string;
-  selectAllDisabled?: boolean;
   children: ReactNode;
   tableClassName?: string;
+  tbodyClassName?: string;
+  loadingCellClassName?: string;
+  emptyCellClassName?: string;
+  selectAll: {
+    checked: boolean;
+    ariaLabel: string;
+    ref: RefObject<HTMLInputElement | null>;
+    onChange: (checked: boolean) => void;
+  };
 };
 
-export default function AdminHistoryTable({
+export default function AdminInventoryTable({
   columns,
-  colSpan,
   hasRows,
   isLoading,
   hasLoadedOnce,
   emptyMessage,
-  allVisibleSelected,
-  onToggleSelectAll,
-  selectAllRef,
-  selectAllAriaLabel = "Pilih semua record pada halaman ini",
-  selectAllDisabled = false,
   children,
   tableClassName,
-}: AdminHistoryTableProps) {
+  tbodyClassName,
+  loadingCellClassName,
+  emptyCellClassName,
+  selectAll,
+}: AdminInventoryTableProps) {
+  const colSpan = columns.length + 1;
+
   return (
-    <div className="relative w-full min-w-0 overflow-x-auto rounded border border-slate-200 bg-card [scrollbar-width:thin]">
-      <table className={cn("w-max min-w-full table-auto", tableClassName)}>
+    <div className="w-full min-w-0 overflow-x-auto rounded border border-slate-200 bg-card [scrollbar-width:thin]">
+      <table className={cn("w-full table-fixed", tableClassName)}>
         <thead className="border-b border-slate-800 bg-slate-900">
           <tr className="text-left text-sm">
             <th className="w-12 px-3 py-3 text-center font-medium text-slate-50">
               <input
-                ref={selectAllRef}
+                ref={selectAll.ref}
                 type="checkbox"
-                aria-label={selectAllAriaLabel}
                 className="h-4 w-4 rounded border-slate-300 align-middle"
-                checked={allVisibleSelected}
-                disabled={selectAllDisabled}
-                onChange={(event) => onToggleSelectAll(event.target.checked)}
+                checked={selectAll.checked}
+                onChange={(event) => selectAll.onChange(event.target.checked)}
+                aria-label={selectAll.ariaLabel}
               />
             </th>
-            {columns.map((column) => (
+            {columns.map((column, index) => (
               <th
-                key={column.label}
+                key={column.key ?? `${String(column.label)}-${index}`}
                 className={cn(
                   "px-3 py-3 font-medium whitespace-nowrap text-slate-50",
                   column.className,
@@ -69,10 +74,10 @@ export default function AdminHistoryTable({
             ))}
           </tr>
         </thead>
-        <tbody className="text-sm">
+        <tbody className={cn("text-sm", tbodyClassName)}>
           {isLoading || !hasLoadedOnce ? (
             <tr>
-              <td colSpan={colSpan} className="px-3 py-8 text-center">
+              <td colSpan={colSpan} className={cn("px-3 py-8 text-center", loadingCellClassName)}>
                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin" />
                 </div>
@@ -84,7 +89,7 @@ export default function AdminHistoryTable({
             <tr>
               <td
                 colSpan={colSpan}
-                className="px-3 py-6 text-center text-muted-foreground"
+                className={cn("px-3 py-6 text-center text-muted-foreground", emptyCellClassName)}
               >
                 {emptyMessage}
               </td>

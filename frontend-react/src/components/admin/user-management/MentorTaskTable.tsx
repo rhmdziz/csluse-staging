@@ -6,6 +6,7 @@ import { Eye, Pencil, Trash2 } from "lucide-react";
 import { TableActionIconButton } from "@/components/shared";
 import { getUserInitials, type UserRow } from "@/hooks/shared/resources/users";
 import type { UserDetailMode } from "@/components/admin/user-management";
+import AdminUserManagementTable from "./AdminUserManagementTable";
 
 type TaskTableUserRow = UserRow & {
   roomNames?: string[];
@@ -55,99 +56,83 @@ export default function MentorTaskTable({
   getSecondaryLabel,
 }: MentorTaskTableProps) {
   return (
-    <div className="w-full max-w-full overflow-x-auto rounded border border-slate-200 bg-card">
-      <table className="w-full min-w-[820px] table-fixed">
-        <thead className="border-b border-slate-800 bg-slate-900">
-          <tr className="text-left text-sm">
-            <th className="w-[52px] px-3 py-3 text-center align-middle font-medium text-slate-50">
-              <input
-                ref={selectAllRef}
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 align-middle"
-                checked={allVisibleSelected}
-                onChange={(event) => onToggleSelectAllVisible(event.target.checked)}
-                aria-label={`Pilih semua ${selectionLabel} yang tampil`}
+    <AdminUserManagementTable
+      columns={[
+        { key: "initials", label: "Inisial", className: "w-[72px]" },
+        { key: "name", label: "Nama", className: "w-[220px]" },
+        { key: "email", label: "Email", className: "w-[260px]" },
+        { key: "room", label: roomHeader, className: "w-[220px]" },
+        { key: "secondary", label: secondaryHeader, className: "w-[140px]" },
+        {
+          key: "actions",
+          label: "Aksi",
+          className:
+            "sticky right-0 z-10 w-36 bg-slate-900 text-center shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700",
+        },
+      ]}
+      hasRows={users.length > 0}
+      isLoading={isLoading}
+      hasLoadedOnce={hasLoadedOnce}
+      emptyMessage={emptyMessage}
+      tableClassName="min-w-[820px]"
+      loadingIndicator={<div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />}
+      selectAll={{
+        ref: selectAllRef,
+        checked: allVisibleSelected,
+        ariaLabel: `Pilih semua ${selectionLabel} yang tampil`,
+        onChange: onToggleSelectAllVisible,
+      }}
+    >
+      {users.map((user) => (
+        <tr key={String(user.uid)} className="border-b last:border-b-0">
+          <td className="px-3 py-2 text-center align-middle">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 align-middle"
+              checked={selectedIds.includes(user.id)}
+              onChange={() => onToggleItemSelection(user.id)}
+              aria-label={`Pilih ${selectionLabel} ${user.name || user.email}`}
+            />
+          </td>
+          <td className="px-3 py-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-semibold uppercase">
+              {getUserInitials(user)}
+            </div>
+          </td>
+          <td className="truncate px-3 py-2">{user.name}</td>
+          <td className="truncate px-3 py-2 text-muted-foreground">{user.email}</td>
+          <td className="px-3 py-2">{getRoomLabel ? getRoomLabel(user) : user.department}</td>
+          <td className="px-3 py-2">{getSecondaryLabel ? getSecondaryLabel(user) : user.idNumber}</td>
+          <td className="sticky right-0 z-10 bg-card px-3 py-2 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
+            <div className="flex justify-center gap-2">
+              <TableActionIconButton
+                label="Lihat detail"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => onOpenDetail(user, "view")}
+                icon={<Eye className="h-4 w-4" />}
               />
-            </th>
-            <th className="w-[72px] px-3 py-3 font-medium text-slate-50">Inisial</th>
-            <th className="w-[220px] px-3 py-3 font-medium text-slate-50">Nama</th>
-            <th className="w-[260px] px-3 py-3 font-medium text-slate-50">Email</th>
-            <th className="w-[220px] px-3 py-3 font-medium text-slate-50">{roomHeader}</th>
-            <th className="w-[140px] px-3 py-3 font-medium text-slate-50">{secondaryHeader}</th>
-            <th className="sticky right-0 z-10 relative w-36 bg-slate-900 px-3 py-3 text-center font-medium text-slate-50 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-700">
-              Aksi
-            </th>
-          </tr>
-        </thead>
-        <tbody className="text-sm">
-          {isLoading || !hasLoadedOnce ? (
-            <tr>
-              <td colSpan={7} className="px-3 py-8 text-center">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                </div>
-              </td>
-            </tr>
-          ) : users.length ? (
-            users.map((user) => (
-              <tr key={String(user.uid)} className="border-b last:border-b-0">
-                <td className="px-3 py-2 text-center align-middle">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 align-middle"
-                    checked={selectedIds.includes(user.id)}
-                    onChange={() => onToggleItemSelection(user.id)}
-                    aria-label={`Pilih ${selectionLabel} ${user.name || user.email}`}
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-semibold uppercase">
-                    {getUserInitials(user)}
-                  </div>
-                </td>
-                <td className="truncate px-3 py-2">{user.name}</td>
-                <td className="truncate px-3 py-2 text-muted-foreground">{user.email}</td>
-                <td className="px-3 py-2">{getRoomLabel ? getRoomLabel(user) : user.department}</td>
-                <td className="px-3 py-2">{getSecondaryLabel ? getSecondaryLabel(user) : user.idNumber}</td>
-                <td className="sticky right-0 z-10 relative bg-card px-3 py-2 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
-                  <div className="flex justify-center gap-2">
-                    <TableActionIconButton
-                      label="Lihat detail"
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={() => onOpenDetail(user, "view")}
-                      icon={<Eye className="h-4 w-4" />}
-                    />
-                    {onEdit && (
-                      <TableActionIconButton
-                        label="Edit ruangan"
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => onEdit(user)}
-                        icon={<Pencil className="h-4 w-4" />}
-                      />
-                    )}
-                    <TableActionIconButton
-                      label={removeLabel}
-                      variant="outline"
-                      size="icon-sm"
-                      disabled={isDeleting}
-                      onClick={() => onDelete(user)}
-                      icon={<Trash2 className="h-4 w-4 text-destructive" />}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                {emptyMessage}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+              {onEdit && (
+                <TableActionIconButton
+                  label="Edit ruangan"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => onEdit(user)}
+                  icon={<Pencil className="h-4 w-4" />}
+                />
+              )}
+              <TableActionIconButton
+                label={removeLabel}
+                variant="outline"
+                size="icon-sm"
+                disabled={isDeleting}
+                onClick={() => onDelete(user)}
+                icon={<Trash2 className="h-4 w-4 text-destructive" />}
+              />
+            </div>
+          </td>
+        </tr>
+      ))}
+    </AdminUserManagementTable>
   );
 }

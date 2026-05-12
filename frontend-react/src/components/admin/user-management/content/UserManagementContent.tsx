@@ -358,7 +358,6 @@ export default function UserManagementContent({
             hasLoadedOnce={hasLoadedOnce}
             canManageUsers={canManageUsers}
             isRoleScoped={isRoleScoped}
-            columnCount={columnCount}
             selectedIds={actions.selectedIds}
             allVisibleSelected={Boolean(actions.allVisibleSelected)}
             onToggleItemSelection={actions.toggleItemSelection}
