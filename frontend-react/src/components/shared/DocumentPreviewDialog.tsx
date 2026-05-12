@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
@@ -50,7 +51,6 @@ export default function DocumentPreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        showCloseButton={false}
         className="flex max-h-[96vh] w-[calc(100vw-1rem)] !max-w-[1200px] flex-col overflow-hidden border-slate-200 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:w-[96vw]"
       >
         <DialogHeader className="border-b border-slate-200 px-4 py-4 text-left sm:px-6 sm:py-5">
@@ -70,16 +70,6 @@ export default function DocumentPreviewDialog({
                 {document?.originalName ?? "Dokumen tidak tersedia."}
               </DialogDescription>
             </div>
-            {document ? (
-              <Button
-                type="button"
-                className="w-full border-blue-600 bg-blue-600 text-white hover:bg-blue-700 sm:w-auto sm:shrink-0"
-                onClick={handleDownload}
-              >
-                <Download className="h-4 w-4" />
-                Download
-              </Button>
-            ) : null}
           </div>
         </DialogHeader>
 
@@ -115,6 +105,20 @@ export default function DocumentPreviewDialog({
             </div>
           )}
         </div>
+        {document ? (
+          <div className="border-t border-slate-200 px-4 py-4 sm:px-6">
+            <DialogFooter>
+              <Button
+                type="button"
+                className="border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

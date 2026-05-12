@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps, ReactNode, RefObject } from "react";
-import { ArrowLeft, ArrowUpRight, ChevronDown, Download, FileSpreadsheet, Loader2, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Download, FileSpreadsheet, Loader2, SlidersHorizontal, Trash2, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui";
 import {
@@ -294,7 +294,7 @@ export function LabClearanceApprovalDetailDialogShell({
   contentClassName,
   contentProps,
   dialogProps,
-  showCloseButton = false,
+  showCloseButton = true,
   backLabel = "Tutup",
 }: ApprovalDetailDialogShellProps) {
   return (
@@ -312,8 +312,6 @@ export function LabClearanceApprovalDetailDialogShell({
           title={title}
           description={description}
           icon={icon}
-          backLabel={backLabel}
-          onBack={() => onOpenChange(false)}
         />
         {children}
       </DialogContent>
@@ -326,8 +324,6 @@ type ApprovalDetailHeaderProps = {
   icon: ReactNode;
   description?: string;
   meta?: string;
-  backLabel?: string;
-  onBack: () => void;
   actions?: ReactNode;
   compact?: boolean;
 };
@@ -337,15 +333,13 @@ export function LabClearanceApprovalDetailHeader({
   icon,
   description,
   meta,
-  backLabel = "Kembali",
-  onBack,
   actions,
   compact = false,
 }: ApprovalDetailHeaderProps) {
   return (
     <div className={`border-b border-slate-200 sm:px-6 ${compact ? "px-4 py-3.5" : "px-5 py-5"}`}>
       <div
-        className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${compact ? "gap-2.5" : "gap-4"}`}
+        className={`flex flex-col ${compact ? "gap-2.5" : "gap-4"}`}
       >
         <div className={`flex items-start ${compact ? "gap-2.5" : "gap-4"}`}>
           <div
@@ -366,13 +360,7 @@ export function LabClearanceApprovalDetailHeader({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {actions}
-          <Button type="button" variant="outline" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" />
-            {backLabel}
-          </Button>
-        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     </div>
   );

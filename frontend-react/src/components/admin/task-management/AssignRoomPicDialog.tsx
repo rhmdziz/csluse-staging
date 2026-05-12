@@ -222,9 +222,6 @@ export default function AssignRoomPicDialog({
         {errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Batal
-          </Button>
           <Button
             type="submit"
             disabled={isSubmitting || isLoadingRoomDetail || !selectedRoomId}

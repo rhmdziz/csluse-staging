@@ -86,6 +86,13 @@ const SERVICE_TYPE_LABEL: Record<string, string> = {
   pengujian: "Pengujian Sampel",
 };
 
+const ACTIVE_BORROW_STATUSES = new Set([
+  "Borrowed",
+  "Returned Pending Inspection",
+  "Overdue",
+  "Lost/Damaged",
+]);
+
 function mapPreviewDocument(document: LabClearanceDocument) {
   return {
     id: document.id,
@@ -526,7 +533,7 @@ export function LabClearanceApprovalPageContent() {
   );
 }
 
-function DialogReview({
+export function DialogReview({
   open,
   onOpenChange,
   detail,
@@ -816,7 +823,9 @@ function DialogReview({
                         (() => {
                           const borrowServices =
                             clearanceCheck.activeServices.filter(
-                              (service) => service.type === "borrow",
+                              (service) =>
+                                service.type === "borrow" &&
+                                ACTIVE_BORROW_STATUSES.has(service.status),
                             );
 
                           return borrowServices.length === 0 ? (
@@ -883,50 +892,43 @@ function DialogReview({
           ) : null}
         </div>
 
-        <div className="border-t border-slate-200 px-6 py-4">
-          <DialogFooter className="gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isSubmitting}
-              className="rounded-md border-slate-300 text-sm"
-              onClick={() => onOpenChange(false)}
-            >
-              Tutup
-            </Button>
-            {detail?.status === "Pending" ? (
-              <>
+        {detail?.status === "Pending" || detail?.status === "Approved" ? (
+          <div className="border-t border-slate-200 px-6 py-4">
+            <DialogFooter className="gap-2 sm:justify-end">
+              {detail?.status === "Pending" ? (
+                <>
+                  <Button
+                    type="button"
+                    disabled={isSubmitting}
+                    variant="outline"
+                    className="rounded-md border-rose-200 text-sm text-rose-700 hover:bg-rose-50"
+                    onClick={() => onRejectConfirmOpenChange(true)}
+                  >
+                    Tolak
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={isSubmitting}
+                    className="rounded-md bg-[#0052C7] text-sm text-white hover:bg-[#0048B4]"
+                    onClick={() => onApproveConfirmOpenChange(true)}
+                  >
+                    Setujui
+                  </Button>
+                </>
+              ) : null}
+              {detail?.status === "Approved" ? (
                 <Button
                   type="button"
-                  disabled={isSubmitting}
-                  variant="outline"
-                  className="rounded-md border-rose-200 text-sm text-rose-700 hover:bg-rose-50"
-                  onClick={() => onRejectConfirmOpenChange(true)}
+                  className="rounded-md bg-emerald-600 text-sm text-white hover:bg-emerald-700"
+                  onClick={() => onGenerateSurat(detail)}
                 >
-                  Tolak
+                  <ScrollText className="mr-2 h-4 w-4" />
+                  Generate Surat Bebas Lab
                 </Button>
-                <Button
-                  type="button"
-                  disabled={isSubmitting}
-                  className="rounded-md bg-[#0052C7] text-sm text-white hover:bg-[#0048B4]"
-                  onClick={() => onApproveConfirmOpenChange(true)}
-                >
-                  Setujui
-                </Button>
-              </>
-            ) : null}
-            {detail?.status === "Approved" ? (
-              <Button
-                type="button"
-                className="rounded-md bg-emerald-600 text-sm text-white hover:bg-emerald-700"
-                onClick={() => onGenerateSurat(detail)}
-              >
-                <ScrollText className="mr-2 h-4 w-4" />
-                Generate Surat Bebas Lab
-              </Button>
-            ) : null}
-          </DialogFooter>
-        </div>
+              ) : null}
+            </DialogFooter>
+          </div>
+        ) : null}
       </LabClearanceApprovalDetailDialogShell>
 
       <AlertDialog
@@ -1113,14 +1115,6 @@ function DialogGenerateSurat({
 
         <div className="border-t border-slate-200 px-6 py-4">
           <DialogFooter className="gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-md border-slate-300 text-sm"
-              onClick={() => onOpenChange(false)}
-            >
-              Tutup
-            </Button>
             <Button
               type="button"
               variant="outline"

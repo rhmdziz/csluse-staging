@@ -10,7 +10,7 @@ import { bookingRoomsService, type LegacyBookingImportRow } from "@/services/boo
 
 import { BulkImportDialogShell, InlineErrorAlert } from "@/components/shared";
 
-import { Button, DialogFooter } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 import { extractApiErrorMessage } from "@/lib/core";
 
@@ -338,14 +338,9 @@ export default function BookingHistoryLegacyImportDialog({
       fileName={fileName}
       error={errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
       footer={
-        <DialogFooter className="mt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Tutup
-          </Button>
-          <Button type="button" onClick={() => void handleSubmit()} disabled={!previewRows.length || isSubmitting}>
-            {isSubmitting ? "Mengimport..." : "Import Data"}
-          </Button>
-        </DialogFooter>
+        <Button type="button" onClick={() => void handleSubmit()} disabled={!previewRows.length || isSubmitting}>
+          {isSubmitting ? "Mengimport..." : "Import Data"}
+        </Button>
       }
     >
       <div className="space-y-3">

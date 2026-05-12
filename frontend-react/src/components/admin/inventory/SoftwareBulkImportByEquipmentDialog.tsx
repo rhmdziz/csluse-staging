@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 
 import { toast } from "sonner";
 
-import { DialogFooter, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 import { BulkImportDialogShell, InlineErrorAlert } from "@/components/shared";
 
@@ -343,27 +343,18 @@ export default function SoftwareBulkImportByEquipmentDialog({
         ) : undefined
       }
       footer={
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-          >
-            Batal
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSubmitBulk()}
-            disabled={
-              !selectedEquipmentId ||
-              !previewRows.length ||
-              !selectedRowIndexes.length ||
-              isSubmitting
-            }
-          >
-            {isSubmitting ? "Memproses..." : "Import Software"}
-          </Button>
-        </DialogFooter>
+        <Button
+          type="button"
+          onClick={() => void handleSubmitBulk()}
+          disabled={
+            !selectedEquipmentId ||
+            !previewRows.length ||
+            !selectedRowIndexes.length ||
+            isSubmitting
+          }
+        >
+          {isSubmitting ? "Memproses..." : "Import Software"}
+        </Button>
       }
     >
       <div className="space-y-1.5">

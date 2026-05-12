@@ -1,7 +1,4 @@
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
-
-import { Button } from "@/components/ui";
 
 type AdminDetailHeaderProps = {
   title: string;
@@ -9,7 +6,7 @@ type AdminDetailHeaderProps = {
   description?: string;
   meta?: string;
   backLabel?: string;
-  onBack: () => void;
+  onBack?: () => void;
   actions?: ReactNode;
   compact?: boolean;
 };
@@ -29,7 +26,7 @@ export function AdminDetailHeader({
       className={`border-b border-slate-200 sm:px-6 ${compact ? "px-4 py-3.5" : "px-5 py-5"}`}
     >
       <div
-        className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${compact ? "gap-2.5" : "gap-4"}`}
+        className={`flex flex-col ${compact ? "gap-2.5" : "gap-4"}`}
       >
         <div className={`flex items-start ${compact ? "gap-2.5" : "gap-4"}`}>
           <div
@@ -57,14 +54,7 @@ export function AdminDetailHeader({
             </div>
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {actions}
-          <Button type="button" variant="outline" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" />
-            {backLabel}
-          </Button>
-        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     </div>
   );

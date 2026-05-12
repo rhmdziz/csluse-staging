@@ -9,6 +9,7 @@ import {
 import {
   labClearanceService,
   type LabClearanceBookingHistory,
+  type LabClearanceBookingHistoryDraft,
   type LabClearanceDocumentType,
 } from "@/services/lab-clearance";
 
@@ -18,7 +19,7 @@ export function useSubmitLabClearance() {
 
   const submit = async (
     files: Partial<Record<LabClearanceDocumentType, File>>,
-    bookingHistories: Omit<LabClearanceBookingHistory, "id">[] = [],
+    bookingHistories: LabClearanceBookingHistoryDraft[] = [],
   ) => {
     setErrorMessage("");
     setIsSubmitting(true);
@@ -190,7 +191,7 @@ export function useUpdateLabClearanceBookingHistories() {
 
   const updateHistories = async (
     id: string,
-    histories: Omit<LabClearanceBookingHistory, "id">[],
+    histories: LabClearanceBookingHistoryDraft[],
   ) => {
     setIsPending(true);
     try {

@@ -293,9 +293,6 @@ export default function AssignMentorDialog({
         {message ? <InlineErrorAlert>{message}</InlineErrorAlert> : null}
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Batal
-          </Button>
           <Button
             type="submit"
             disabled={isSubmitting || isLoadingCandidates || !selectedCandidates.length}

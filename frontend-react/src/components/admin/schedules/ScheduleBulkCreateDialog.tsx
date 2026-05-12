@@ -381,18 +381,13 @@ export default function ScheduleBulkCreateDialog({
       fileName={fileName}
       error={errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : undefined}
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Batal
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSubmitBulk()}
-            disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}
-          >
-            {isSubmitting ? "Memproses..." : "Buat Jadwal"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          onClick={() => void handleSubmitBulk()}
+          disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}
+        >
+          {isSubmitting ? "Memproses..." : "Buat Jadwal"}
+        </Button>
       }
     >
       <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/70 p-3">

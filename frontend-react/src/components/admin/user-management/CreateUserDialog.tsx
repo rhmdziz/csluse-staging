@@ -254,9 +254,6 @@ export default function CreateUserDialog({
         {errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Batal
-          </Button>
           <Button type="submit" disabled={isSubmitting} className="gap-2">
             <UserPlus className="h-4 w-4" />
             {isSubmitting ? "Menyimpan..." : isGuestRole ? "Buat User" : "Buat Profile"}

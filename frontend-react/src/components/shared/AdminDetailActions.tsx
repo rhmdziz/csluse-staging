@@ -33,7 +33,7 @@ export default function AdminDetailActions({
   onDelete,
 }: AdminDetailActionsProps) {
   return (
-    <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+    <DialogFooter>
       {isEditing ? (
         <Button
           type="button"

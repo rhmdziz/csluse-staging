@@ -694,9 +694,13 @@ class LabClearanceViewSet(viewsets.ViewSet):
         ]
         active_services = []
 
-        for b in Borrow.objects.select_related("equipment").filter(
-            requested_by=profile, status__in=ACTIVE_BORROW_STATUSES
-        ):
+        active_borrows = (
+            Borrow.objects
+            .select_related("equipment")
+            .filter(requested_by=profile, status__in=ACTIVE_BORROW_STATUSES)
+        )
+
+        for b in active_borrows:
             active_services.append({
                 "id": b.id,
                 "code": b.code,

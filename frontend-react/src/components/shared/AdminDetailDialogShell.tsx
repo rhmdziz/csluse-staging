@@ -33,7 +33,7 @@ export default function AdminDetailDialogShell({
   contentClassName,
   contentProps,
   dialogProps,
-  showCloseButton = false,
+  showCloseButton = true,
   backLabel = "Tutup",
 }: AdminDetailDialogShellProps) {
   return (
@@ -58,7 +58,6 @@ export default function AdminDetailDialogShell({
           description={description}
           icon={icon}
           backLabel={backLabel}
-          onBack={() => onOpenChange(false)}
         />
 
         {children}

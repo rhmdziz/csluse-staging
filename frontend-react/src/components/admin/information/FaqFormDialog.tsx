@@ -134,7 +134,6 @@ export default function FaqFormDialog({
       icon={<CircleHelp className="h-5 w-5" />}
       trigger={trigger}
       contentClassName={`${USER_MODAL_WIDTH_CLASS} gap-0 p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
-      showCloseButton={!useDetailHeader}
     >
       {!useDetailHeader ? (
           <DialogHeader className="px-6 pt-6">

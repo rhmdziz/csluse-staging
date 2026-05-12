@@ -301,7 +301,6 @@ export function ScheduleFormDialog({
       icon={<CalendarDays className="h-5 w-5" />}
       trigger={trigger}
       contentClassName={DIALOG_WIDTH_CLASS}
-      showCloseButton={!useDetailHeader}
     >
       <form
         ref={formRef}

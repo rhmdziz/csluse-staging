@@ -9,6 +9,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui";
@@ -61,19 +62,7 @@ export default function BulkImportDialogShell({
         </DialogHeader>
 
         <div className="min-w-0 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">{description}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={onDownloadTemplate}
-            >
-              <FileDown className="h-4 w-4" />
-              Template
-            </Button>
-          </div>
+          <p className="text-xs text-muted-foreground">{description}</p>
 
           <label className="group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-4 py-6 text-center transition hover:border-primary/50 hover:bg-muted/50">
             <input
@@ -95,7 +84,21 @@ export default function BulkImportDialogShell({
 
           {error}
           {children}
-          {footer}
+          <DialogFooter className="border-t border-slate-200 pt-4 sm:items-center sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={onDownloadTemplate}
+            >
+              <FileDown className="h-4 w-4" />
+              Template
+            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {footer}
+            </div>
+          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>

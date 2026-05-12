@@ -360,14 +360,9 @@ export default function BulkCreateDialog({
       }
       contentClassName={USER_MODAL_WIDTH_CLASS}
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Batal
-          </Button>
-          <Button type="button" onClick={() => void handleSubmitBulk()} disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}>
+        <Button type="button" onClick={() => void handleSubmitBulk()} disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}>
             {isSubmitting ? "Memproses..." : "Buat Akun/Profile"}
-          </Button>
-        </div>
+        </Button>
       }
     >
       {previewRows.length ? (

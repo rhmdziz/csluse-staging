@@ -35,6 +35,13 @@ export type LabClearanceBookingHistory = {
   end_date: string;
 };
 
+export type LabClearanceBookingHistoryDraft = Omit<
+  LabClearanceBookingHistory,
+  "id"
+> & {
+  purpose?: string;
+};
+
 export type LabClearanceBookingSuggestion = {
   id: string;
   code: string;
@@ -133,7 +140,7 @@ export const labClearanceService = {
 
   async submit(
     files: Partial<Record<LabClearanceDocumentType, File>>,
-    bookingHistories: Omit<LabClearanceBookingHistory, "id">[] = [],
+    bookingHistories: LabClearanceBookingHistoryDraft[] = [],
   ): Promise<MutationResult> {
     const formData = new FormData();
     for (const [key, file] of Object.entries(files)) {
@@ -156,7 +163,7 @@ export const labClearanceService = {
 
   async updateBookingHistories(
     id: string,
-    histories: Omit<LabClearanceBookingHistory, "id">[],
+    histories: LabClearanceBookingHistoryDraft[],
   ): Promise<MutationResult> {
     const formData = new FormData();
     formData.append("booking_histories", JSON.stringify(histories));

@@ -11,7 +11,7 @@ import type { RoomPicTaskUserRow } from "@/hooks/shared/resources/users";
 import { USER_MODAL_WIDTH_CLASS } from "@/components/admin/user-management";
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 import { roomsService, mapRoom } from "@/services/shared/resources";
-import { Button, Dialog, DialogClose, DialogContent, DialogFooter, DialogTitle } from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui";
 
 type RoomPicDetailDialogProps = {
   open: boolean;
@@ -334,11 +334,6 @@ export default function RoomPicDetailDialog({
                 </>
               ) : (
                 <>
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline">
-                      Tutup
-                    </Button>
-                  </DialogClose>
                   <Button type="button" variant="outline" onClick={handleEnterEdit}>
                     Edit
                   </Button>

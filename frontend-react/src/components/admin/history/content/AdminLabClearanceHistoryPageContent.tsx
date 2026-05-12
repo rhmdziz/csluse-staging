@@ -22,7 +22,6 @@ import {
   AdminHistoryTable,
   RelatedUserDetailDialog,
 } from "@/components/admin/history";
-import { AdminLabClearanceHistoryDetailContent } from "@/components/admin/history/content";
 import {
   ActionTooltip,
   ConfirmDeleteDialog,
@@ -57,6 +56,13 @@ import { buildSuratBebasPdf } from "@/lib/admin/surat-bebas-penggunaan-lab-pdf";
 import { useDeleteRecord } from "@/hooks/use-delete-record";
 import { formatDateKey, formatDateTimeWib, toEndOfDay, toStartOfDay } from "@/lib/date";
 import { getStatusBadgeClass, getStatusDisplayLabel, normalizeStatus } from "@/lib/request";
+import {
+  DialogReview,
+} from "@/components/dashboard/lab-clearance/content/LabClearanceApprovalPageContent";
+import {
+  labClearanceService as adminLabClearanceService,
+  type LabClearanceResult,
+} from "@/services/admin";
 import {
   labClearanceService,
   type LabClearanceDetail,
@@ -101,6 +107,9 @@ export default function AdminLabClearanceHistoryPageContent() {
   const [detailData, setDetailData] = useState<LabClearanceDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [clearanceCheck, setClearanceCheck] = useState<LabClearanceResult | null>(null);
+  const [isLoadingClearance, setIsLoadingClearance] = useState(false);
+  const [clearanceCheckError, setClearanceCheckError] = useState("");
   const [relatedUserId, setRelatedUserId] = useState<string | number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -183,6 +192,9 @@ export default function AdminLabClearanceHistoryPageContent() {
     if (!detailTarget) {
       setDetailData(null);
       setDetailError("");
+      setClearanceCheck(null);
+      setIsLoadingClearance(false);
+      setClearanceCheckError("");
       return;
     }
 
@@ -213,6 +225,50 @@ export default function AdminLabClearanceHistoryPageContent() {
 
     return () => controller.abort();
   }, [detailTarget, reloadKey]);
+
+  useEffect(() => {
+    if (!detailTarget || !detailData || !isPendingStatus(detailData.status)) {
+      setClearanceCheck(null);
+      setIsLoadingClearance(false);
+      setClearanceCheckError("");
+      return;
+    }
+
+    const profileId = detailData.requested_by_detail?.id;
+    if (!profileId) {
+      setClearanceCheck(null);
+      setIsLoadingClearance(false);
+      setClearanceCheckError("");
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingClearance(true);
+    setClearanceCheckError("");
+
+    void adminLabClearanceService
+      .getLabClearance(String(profileId))
+      .then((result) => {
+        if (cancelled) return;
+        setClearanceCheck(result);
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) return;
+        setClearanceCheck(null);
+        setClearanceCheckError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Gagal memuat status tanggungan.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingClearance(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailTarget, detailData]);
 
   const loadDetail = async (id: string) => {
     const result = await labClearanceService.getDetail(id);
@@ -340,33 +396,6 @@ export default function AdminLabClearanceHistoryPageContent() {
           <Eye className="h-4 w-4" />
         </Button>
       </ActionTooltip>
-      {isPendingStatus(item.status) ? (
-        <>
-          <ActionTooltip label="Setujui">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-              onClick={() => setApproveTarget(item)}
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-          </ActionTooltip>
-          <ActionTooltip label="Tolak">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-              onClick={() => {
-                setRejectTarget(item);
-                setRejectNote("");
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </ActionTooltip>
-        </>
-      ) : null}
       {isApprovedStatus(item.status) ? (
         <ActionTooltip label="Generate surat bebas">
           <Button
@@ -647,42 +676,44 @@ export default function AdminLabClearanceHistoryPageContent() {
             onConfirm={handleBulkDelete}
           />
 
-          <Dialog
+          <DialogReview
             open={Boolean(detailTarget)}
             onOpenChange={(open) => {
               if (!open) {
                 setDetailTarget(null);
                 setDetailData(null);
                 setDetailError("");
+                setClearanceCheck(null);
+                setIsLoadingClearance(false);
+                setClearanceCheckError("");
               }
             }}
-          >
-            <DialogContent
-              showCloseButton={false}
-              className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:w-[50vw] sm:max-w-[960px] sm:min-w-[720px] sm:max-w-none"
-            >
-              <DialogHeader className="sr-only">
-                <DialogTitle>Detail Surat Bebas Lab</DialogTitle>
-                <DialogDescription>
-                  Detail record surat bebas lab ditampilkan dalam modal.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-[85vh] overflow-y-auto px-1 pt-1 pb-4">
-                <div className="space-y-4">
-                  <AdminLabClearanceHistoryDetailContent
-                    item={detailData}
-                    isLoading={isDetailLoading}
-                    error={detailError}
-                    actions={detailActions}
-                    showAside={false}
-                    backLabel="Tutup"
-                    onBack={() => setDetailTarget(null)}
-                    onOpenUserDetail={setRelatedUserId}
-                  />
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+            detail={detailData}
+            isLoading={isDetailLoading}
+            errorMessage={detailError}
+            rejectNote={rejectNote}
+            approveConfirmOpen={Boolean(approveTarget)}
+            rejectConfirmOpen={Boolean(rejectTarget)}
+            pendingId={pendingId}
+            clearanceCheck={clearanceCheck}
+            isLoadingClearance={isLoadingClearance}
+            clearanceCheckError={clearanceCheckError}
+            onRejectNoteChange={setRejectNote}
+            onApproveConfirmOpenChange={(open) => {
+              setApproveTarget(open ? detailData : null);
+            }}
+            onRejectConfirmOpenChange={(open) => {
+              if (open) {
+                setRejectTarget(detailData);
+                return;
+              }
+              setRejectTarget(null);
+            }}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onPreview={() => {}}
+            onGenerateSurat={setGenerateDetail}
+          />
 
           <RelatedUserDetailDialog
             open={Boolean(relatedUserId)}
@@ -892,10 +923,7 @@ function DialogGenerateSurat({
           if (!open) onOpenChange(false);
         }}
       >
-        <DialogContent
-          showCloseButton={false}
-          className="flex max-h-[96vh] w-[calc(100vw-1rem)] !max-w-[1200px] flex-col overflow-hidden border-slate-200 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:w-[96vw]"
-        >
+        <DialogContent className="flex max-h-[96vh] w-[calc(100vw-1rem)] !max-w-[1200px] flex-col overflow-hidden border-slate-200 p-0 shadow-[0_24px_60px_rgba(15,23,42,0.18)] sm:w-[96vw]">
           <DialogHeader className="border-b border-slate-200 px-6 py-5">
             <DialogTitle className="flex items-center gap-2 text-base font-semibold">
               <ScrollText className="h-5 w-5 text-emerald-600" />
@@ -927,9 +955,6 @@ function DialogGenerateSurat({
 
           <div className="border-t border-slate-200 px-6 py-4">
             <DialogFooter className="gap-2 sm:justify-end">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Tutup
-              </Button>
               <Button
                 type="button"
                 variant="outline"

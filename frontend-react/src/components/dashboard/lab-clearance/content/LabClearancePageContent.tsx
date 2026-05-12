@@ -51,6 +51,7 @@ import {
 import {
   labClearanceService,
   type LabClearanceBookingHistory,
+  type LabClearanceBookingHistoryDraft,
   type LabClearanceDetail,
   type LabClearanceDocument,
   type LabClearanceDocumentType,
@@ -63,6 +64,7 @@ import {
 } from "./LabClearanceApprovalComponents";
 
 const PAGE_SIZE = 10;
+const LAB_CLEARANCE_PURPOSE = "Skripsi/TA";
 
 const TEMPLATES: {
   type: LabClearanceDocumentType;
@@ -119,6 +121,15 @@ function extractLabClearanceDetailPayload(
   const payload = (data as { surat_bebas_lab?: LabClearanceDetail })
     .surat_bebas_lab;
   return payload ?? null;
+}
+
+function withLabClearancePurpose(
+  histories: Omit<LabClearanceBookingHistory, "id">[],
+): LabClearanceBookingHistoryDraft[] {
+  return histories.map((entry) => ({
+    ...entry,
+    purpose: LAB_CLEARANCE_PURPOSE,
+  }));
 }
 
 function FileUploadField({
@@ -305,7 +316,7 @@ export function LabClearancePageContent() {
       setErrorMessage("Minimal satu formulir harus dilampirkan.");
       return;
     }
-    const result = await submit(files, bookingHistories);
+    const result = await submit(files, withLabClearancePurpose(bookingHistories));
     if (result.ok) {
       toast.success("Permohonan berhasil dikirim.");
       setIsDialogOpen(false);
@@ -878,6 +889,7 @@ export function LabClearancePageContent() {
                   <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Ruang Lab</th>
+                      <th className="px-3 py-2 font-semibold">Tujuan</th>
                       <th className="px-3 py-2 font-semibold">Mulai</th>
                       <th className="px-3 py-2 font-semibold">Selesai</th>
                       <th className="px-3 py-2 text-center font-semibold">Aksi</th>
@@ -902,6 +914,9 @@ export function LabClearancePageContent() {
                                 <option key={r.id} value={r.name}>{r.label}</option>
                               ))}
                             </select>
+                          </td>
+                          <td className="px-3 py-2 text-sm text-slate-700">
+                            {LAB_CLEARANCE_PURPOSE}
                           </td>
                           <td className="p-0">
                             <input
@@ -961,6 +976,9 @@ export function LabClearancePageContent() {
                       ) : (
                         <tr key={index} className="border-t last:border-b-0">
                           <td className="px-3 py-2 text-sm text-slate-700">{entry.lab_room_name || "-"}</td>
+                          <td className="px-3 py-2 text-sm text-slate-700">
+                            {LAB_CLEARANCE_PURPOSE}
+                          </td>
                           <td className="whitespace-nowrap px-3 py-2 text-sm text-slate-700">
                             {entry.start_date || "-"}
                           </td>
@@ -1010,6 +1028,9 @@ export function LabClearancePageContent() {
                               <option key={r.id} value={r.name}>{r.label}</option>
                             ))}
                           </select>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-slate-700">
+                          {LAB_CLEARANCE_PURPOSE}
                         </td>
                         <td className="p-0">
                           <input
@@ -1072,7 +1093,7 @@ export function LabClearancePageContent() {
                     {bookingHistories.length === 0 && !isAddingNew && (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={5}
                           className="px-3 py-4 text-center text-xs text-slate-400"
                         >
                           Belum ada riwayat. Klik &ldquo;Tambah&rdquo; untuk menambahkan secara manual.
