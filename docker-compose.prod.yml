@@ -1,3 +1,4 @@
+
 services:
   backend:
     container_name: csluse-backend
@@ -14,20 +15,40 @@ services:
     container_name: csluse-frontend
     build:
       context: ./frontend-react
-    expose:
-      - "80"
+    ports:
+      - "9081:80"
     restart: unless-stopped
 
-  nginx:
-    container_name: csluse-nginx
-    image: nginx:1.27-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-    depends_on:
-      - frontend
-      - backend
-    restart: unless-stopped
+# services:
+#   backend:
+#     container_name: csluse-backend
+#     build:
+#       context: ./backend
+#       dockerfile: Dockerfile.prod
+#     env_file:
+#       - ./backend/.env.prod
+#     expose:
+#       - "8000"
+#     restart: unless-stopped
+
+#   frontend:
+#     container_name: csluse-frontend
+#     build:
+#       context: ./frontend-react
+#     expose:
+#       - "80"
+#     restart: unless-stopped
+
+#   nginx:
+#     container_name: csluse-nginx
+#     image: nginx:1.27-alpine
+#     ports:
+#       - "80:80"
+#       - "443:443"
+#     volumes:
+#       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#       - /etc/letsencrypt:/etc/letsencrypt:ro
+#     depends_on:
+#       - frontend
+#       - backend
+#     restart: unless-stopped
