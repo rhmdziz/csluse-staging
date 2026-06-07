@@ -351,7 +351,13 @@ class Borrow(BaseModel):
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.code} - {self.equipment.name} - {self.requested_by.user.email} - {self.status}"
+        equipment_name = self.equipment.name if self.equipment else "Tanpa Alat"
+        requester_email = "unknown"
+        if self.requested_by:
+            requester_user = getattr(self.requested_by, "user", None)
+            requester_email = getattr(requester_user, "email", None) or "unknown"
+
+        return f"{self.code} - {equipment_name} - {requester_email} - {self.status}"
 
 
 # endregion Borrow Models

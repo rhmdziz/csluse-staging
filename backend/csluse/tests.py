@@ -981,6 +981,16 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["deleted_count"], 1)
         self.assertFalse(Borrow.objects.filter(id=borrow.id).exists())
 
+    def test_admin_can_delete_borrow_history_after_requester_profile_is_removed(self):
+        borrow = self.create_borrow(self.student_profile, status="Borrowed")
+        self.student_profile.delete()
+
+        self.client.force_authenticate(self.admin_user)
+        response = self.client.delete(f"/api/borrows/{borrow.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Borrow.objects.filter(id=borrow.id).exists())
+
     def test_requester_can_cancel_own_approved_pengujian(self):
         pengujian = self.create_pengujian(self.student_profile, status="Approved")
         pengujian.approved_by = self.admin_profile
