@@ -1,6 +1,4 @@
 "use client";
-
-
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { UserPlus, X } from "lucide-react";
@@ -11,16 +9,13 @@ import { AdminDetailDialogShell, InlineErrorAlert } from "@/components/shared";
 
 import { Button, DialogFooter, Input } from "@/components/ui";
 
-import { API_AUTH_USERS } from "@/constants/api";
-
 import { useUpdateUserProfile } from "@/hooks/shared/resources/users";
 
-import { authFetch } from "@/lib/auth";
+import { mapProfile, usersService } from "@/services/shared/resources";
 
 import { USER_MODAL_WIDTH_CLASS } from "@/components/admin/user-management";
 
 type LecturerCandidate = {
-  userId: string;
   profileId: string;
   name: string;
   email: string;
@@ -32,17 +27,6 @@ type AssignMentorDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAssigned: () => void;
-};
-
-type ApiCandidate = {
-  id?: string | number | null;
-  email?: string | null;
-  profile?: {
-    id?: string | number | null;
-    full_name?: string | null;
-    department?: string | null;
-    id_number?: string | null;
-  } | null;
 };
 
 export default function AssignMentorDialog({
@@ -94,41 +78,35 @@ export default function AssignMentorDialog({
       setLoadError("");
 
       try {
-        const url = new URL(API_AUTH_USERS, window.location.origin);
-        url.searchParams.set("page", "1");
-        url.searchParams.set("page_size", "200");
-        url.searchParams.set("role", "Lecturer");
-        url.searchParams.set("is_mentor", "false");
-        if (debouncedSearchQuery) {
-          url.searchParams.set("search", debouncedSearchQuery);
-        }
+        const payload = await usersService.getList(
+          1,
+          200,
+          {
+            role: "Lecturer",
+            isMentor: false,
+            search: debouncedSearchQuery,
+          },
+          controller.signal,
+        );
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload.results)
+            ? payload.results
+            : [];
+        const nextCandidates = list
+          .map((item) => {
+            const user = mapProfile(item);
+            if (!user.profileId) return null;
 
-        const response = await authFetch(url.toString(), {
-          method: "GET",
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`Gagal memuat daftar dosen (${response.status})`);
-        }
-
-        const payload = (await response.json()) as { results?: ApiCandidate[] };
-        const nextCandidates = Array.isArray(payload.results)
-          ? payload.results
-              .map((item) => {
-                const profile = item.profile;
-                if (!item.id || !profile?.id) return null;
-
-                return {
-                  userId: String(item.id),
-                  profileId: String(profile.id),
-                  name: String(profile.full_name ?? item.email ?? "-"),
-                  email: String(item.email ?? "-"),
-                  department: String(profile.department ?? "-"),
-                  idNumber: String(profile.id_number ?? "-"),
-                } satisfies LecturerCandidate;
-              })
-              .filter((item): item is LecturerCandidate => item !== null)
-          : [];
+            return {
+              profileId: String(user.profileId),
+              name: String(user.name || user.email || "-"),
+              email: String(user.email || "-"),
+              department: String(user.department || "-"),
+              idNumber: String(user.idNumber || "-"),
+            } satisfies LecturerCandidate;
+          })
+          .filter((item): item is LecturerCandidate => item !== null);
 
         setCandidates(nextCandidates);
       } catch (error) {

@@ -1,5 +1,5 @@
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 
 from .viewsets import (
     AdminActionViewSet,
@@ -10,7 +10,7 @@ from .viewsets import (
     UserWithProfileViewSet,
 )
 
-router = DefaultRouter()
+router = SimpleRouter()
 router.register(r"profile", AdminProfileViewSet, basename="admin-profile")
 router.register(r"users", UserWithProfileViewSet, basename="users")
 router.register(r"pic-users", PicUserViewSet, basename="pic-users")

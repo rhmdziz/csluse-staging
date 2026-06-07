@@ -67,6 +67,31 @@ class AuthBaseTestMixin:
 
         return user
 
+    def create_profile(
+        self,
+        *,
+        email,
+        full_name="Test Profile",
+        role="Guest",
+        is_mentor=False,
+        department=None,
+        batch=None,
+        id_number=None,
+        user_type="External",
+        institution=None,
+    ):
+        return Profile.objects.create(
+            email=email,
+            full_name=full_name,
+            role=role,
+            is_mentor=is_mentor,
+            department=department,
+            batch=batch,
+            id_number=id_number,
+            user_type=user_type,
+            institution=institution,
+        )
+
 
 class ProfileModelTests(AuthBaseTestMixin, TestCase):
     def test_profile_save_normalizes_initials_and_clears_invalid_institution(self):
@@ -102,7 +127,7 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         assign_role(self.admin, ADMINISTRATOR)
         self.client.force_authenticate(user=self.admin)
 
-    def test_list_filters_users_and_returns_role_aggregates(self):
+    def test_list_filters_profiles_and_returns_role_aggregates(self):
         self.create_user(
             email="alice@example.com",
             full_name="Alice Student",
@@ -131,6 +156,15 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             user_type="Internal",
             verified=True,
         )
+        standalone_profile = self.create_profile(
+            email="alice-standalone@example.com",
+            full_name="Alice Standalone",
+            role="Student",
+            department="Digital Business Technology",
+            batch="2024",
+            id_number="STD-003",
+            user_type="Internal",
+        )
 
         response = self.client.get(
             "/api/admin/users/",
@@ -142,16 +176,66 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 1)
-        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
         self.assertEqual(response.data["results"][0]["email"], "alice@example.com")
         self.assertTrue(response.data["results"][0]["is_verified"])
-        self.assertEqual(response.data["aggregates"]["total"], 1)
-        self.assertEqual(response.data["aggregates"]["student"], 1)
+        returned_ids = {item["id"] for item in response.data["results"]}
+        self.assertIn(str(standalone_profile.id), returned_ids)
+        self.assertEqual(response.data["aggregates"]["total"], 2)
+        self.assertEqual(response.data["aggregates"]["student"], 2)
         self.assertEqual(response.data["aggregates"]["lecturer"], 0)
         self.assertEqual(response.data["aggregates"]["guest"], 0)
 
-    def test_bulk_delete_skips_super_administrator_and_deletes_regular_users(self):
+    def test_export_returns_all_filtered_profiles_without_pagination(self):
+        self.create_user(
+            email="alice@example.com",
+            full_name="Alice Student",
+            role="Student",
+            department="Digital Business Technology",
+            batch="2024",
+            id_number="STD-001",
+            user_type="Internal",
+            verified=True,
+        )
+        self.create_user(
+            email="bob@example.com",
+            full_name="Bob Student",
+            role="Student",
+            department="Digital Business Technology",
+            batch="2024",
+            id_number="STD-002",
+            user_type="Internal",
+            verified=True,
+        )
+        self.create_user(
+            email="charlie@example.com",
+            full_name="Charlie Lecturer",
+            role="Lecturer",
+            department="Business Mathematics",
+            id_number="LEC-001",
+            user_type="Internal",
+        )
+
+        response = self.client.get(
+            "/api/admin/profile/export/",
+            {
+                "department": "Digital Business Technology",
+                "batch": "2024",
+                "search": "Student",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 2)
+        self.assertCountEqual(
+            [item["email"] for item in response.data],
+            ["alice@example.com", "bob@example.com"],
+        )
+        self.assertNotIn("count", response.data[0])
+
+    def test_bulk_delete_skips_super_administrator_and_deletes_regular_profiles(self):
         deletable_user = self.create_user(
             email="deletable@example.com",
             full_name="Delete Me",
@@ -159,6 +243,11 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             batch="2024",
         )
         deletable_profile_id = deletable_user.profile.pk
+        standalone_profile = self.create_profile(
+            email="standalone-delete@example.com",
+            full_name="Standalone Delete",
+            role="Guest",
+        )
         protected_user = self.create_user(
             email="superadmin@example.com",
             full_name="Protected User",
@@ -168,26 +257,19 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
 
         response = self.client.post(
             "/api/admin/users/bulk-delete/",
-            {"ids": [deletable_user.pk, protected_user.pk, 999999]},
+            {"ids": [deletable_profile_id, standalone_profile.id, protected_user.profile.pk, "missing-profile-id"]},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["deleted_count"], 1)
+        self.assertEqual(response.data["deleted_count"], 2)
         self.assertEqual(response.data["failed_count"], 2)
-        self.assertEqual(response.data["deleted_ids"], [deletable_user.pk])
-        self.assertCountEqual(response.data["failed_ids"], [protected_user.pk, 999999])
+        self.assertCountEqual(response.data["deleted_ids"], [str(deletable_profile_id), str(standalone_profile.id)])
+        self.assertCountEqual(response.data["failed_ids"], [str(protected_user.profile.pk), "missing-profile-id"])
         self.assertFalse(User.objects.filter(pk=deletable_user.pk).exists())
         self.assertFalse(Profile.objects.filter(pk=deletable_profile_id).exists())
+        self.assertFalse(Profile.objects.filter(pk=standalone_profile.id).exists())
         self.assertTrue(User.objects.filter(pk=protected_user.pk).exists())
-        self.assertEqual(
-            LogEntry.objects.filter(
-                user=self.admin,
-                object_id=str(deletable_user.pk),
-                action_flag=DELETION,
-            ).count(),
-            1,
-        )
         self.assertEqual(
             LogEntry.objects.filter(
                 user=self.admin,
@@ -196,8 +278,16 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             ).count(),
             1,
         )
+        self.assertEqual(
+            LogEntry.objects.filter(
+                user=self.admin,
+                object_id=str(standalone_profile.id),
+                action_flag=DELETION,
+            ).count(),
+            1,
+        )
 
-    def test_destroy_deletes_user_and_linked_profile(self):
+    def test_destroy_deletes_linked_user_and_profile(self):
         target_user = self.create_user(
             email="destroy-target@example.com",
             full_name="Destroy Target",
@@ -210,6 +300,18 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(User.objects.filter(pk=target_user.pk).exists())
         self.assertFalse(Profile.objects.filter(pk=profile_id).exists())
+
+    def test_destroy_deletes_pre_provisioned_profile_only(self):
+        profile = self.create_profile(
+            email="standalone-destroy@example.com",
+            full_name="Standalone Destroy",
+            role="Guest",
+        )
+
+        response = self.client.delete(f"/api/admin/users/{profile.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Profile.objects.filter(pk=profile.id).exists())
 
     def test_list_aggregates_follow_role_filter(self):
         self.create_user(
@@ -237,6 +339,60 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["aggregates"]["total"], 1)
         self.assertEqual(response.data["aggregates"]["guest"], 1)
         self.assertEqual(response.data["aggregates"]["student"], 0)
+
+    def test_list_includes_pre_provisioned_profiles(self):
+        standalone_student = self.create_profile(
+            email="standalone-student@example.com",
+            full_name="Standalone Student",
+            role="Student",
+            department="Digital Business Technology",
+            batch="2024",
+            id_number="STD-011",
+            user_type="Internal",
+        )
+
+        response = self.client.get(
+            "/api/admin/users/",
+            {
+                "department": "Digital Business Technology",
+                "batch": "2024",
+                "search": "Standalone",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data["results"]}
+        self.assertIn(str(standalone_student.id), returned_ids)
+        self.assertEqual(response.data["aggregates"]["total"], 1)
+
+    def test_list_filters_by_mentor_flag(self):
+        mentor_lecturer = self.create_user(
+            email="mentor-lecturer@example.com",
+            full_name="Mentor Lecturer",
+            role="Lecturer",
+            is_mentor=True,
+            department="Digital Business Technology",
+        )
+        non_mentor_lecturer = self.create_user(
+            email="non-mentor-lecturer@example.com",
+            full_name="Non Mentor Lecturer",
+            role="Lecturer",
+            is_mentor=False,
+            department="Digital Business Technology",
+        )
+
+        response = self.client.get(
+            "/api/admin/profile/",
+            {
+                "role": "Lecturer",
+                "is_mentor": "true",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data["results"]}
+        self.assertIn(str(mentor_lecturer.profile.id), returned_ids)
+        self.assertNotIn(str(non_mentor_lecturer.profile.id), returned_ids)
 
     def test_admin_profile_confirm_user_marks_email_as_verified(self):
         target_user = self.create_user(
@@ -491,6 +647,11 @@ class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
             full_name="Assigned Lecturer",
             role="Lecturer",
         )
+        standalone_lecturer = self.create_profile(
+            email="standalone-lecturer@example.com",
+            full_name="Standalone Lecturer",
+            role="Lecturer",
+        )
         eligible_admin = self.create_user(
             email="eligible-admin@example.com",
             full_name="Eligible Admin",
@@ -509,6 +670,7 @@ class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         returned_ids = {item["id"] for item in response.data}
         self.assertIn(str(assigned_lecturer.profile.id), returned_ids)
+        self.assertIn(str(standalone_lecturer.id), returned_ids)
         self.assertIn(str(eligible_admin.profile.id), returned_ids)
         self.assertNotIn(str(self.admin.profile.id), returned_ids)
 
@@ -518,20 +680,59 @@ class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
             full_name="Assigned Only",
             role="Lecturer",
         )
+        assigned_profile = self.create_profile(
+            email="assigned-profile@example.com",
+            full_name="Assigned Profile",
+            role="Lecturer",
+        )
         unassigned_admin = self.create_user(
             email="unassigned-admin@example.com",
             full_name="Unassigned Admin",
             role="Admin",
         )
         room = Room.objects.create(name="Lab B", number="102")
-        room.pics.add(assigned_lecturer.profile)
+        room.pics.add(assigned_lecturer.profile, assigned_profile)
 
         response = self.client.get("/api/admin/pic-users/assigned-dropdown/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         returned_ids = {item["id"] for item in response.data}
         self.assertIn(str(assigned_lecturer.profile.id), returned_ids)
+        self.assertIn(str(assigned_profile.id), returned_ids)
         self.assertNotIn(str(unassigned_admin.profile.id), returned_ids)
+
+    def test_list_returns_profiles_without_user_accounts(self):
+        standalone_admin = self.create_profile(
+            email="standalone-admin@example.com",
+            full_name="Standalone Admin",
+            role="Admin",
+        )
+
+        response = self.client.get("/api/admin/pic-users/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(str(standalone_admin.id), returned_ids)
+
+    def test_mentor_dropdown_includes_standalone_mentor_profile(self):
+        standalone_mentor = self.create_profile(
+            email="standalone-mentor@example.com",
+            full_name="Standalone Mentor",
+            role="Lecturer",
+            is_mentor=True,
+        )
+        self.create_profile(
+            email="non-mentor@example.com",
+            full_name="Non Mentor",
+            role="Lecturer",
+            is_mentor=False,
+        )
+
+        response = self.client.get("/api/users/mentors/dropdown/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item["id"] for item in response.data}
+        self.assertIn(str(standalone_mentor.id), returned_ids)
 
 
 class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
@@ -596,9 +797,17 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
         )
 
     def test_admin_dashboard_kpis_include_pengujian_totals(self):
+        Profile.objects.create(
+            email="standalone-profile@example.com",
+            full_name="Standalone Profile",
+            role="Guest",
+            user_type="External",
+        )
+
         response = self.client.get("/api/admin/dashboard/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["total_users"], Profile.objects.count())
         self.assertEqual(response.data["total_rooms"], 1)
         self.assertEqual(response.data["total_equipments"], 1)
         self.assertEqual(response.data["total_bookings"], 1)

@@ -33,7 +33,7 @@ import {
 
 import { Button, Input } from "@/components/ui";
 
-import { API_AUTH_ADMIN_PROFILE } from "@/constants/api";
+import { API_AUTH_ADMIN_PROFILE_EXPORT } from "@/constants/api";
 
 import { BATCH_OPTIONS } from "@/constants/batches";
 
@@ -137,7 +137,7 @@ export default function UserManagementContent({
 
   const { exportPdf, exportExcel, isExportingPdf, isExportingExcel } =
     useAdminRecordExport({
-      endpoint: API_AUTH_ADMIN_PROFILE,
+      endpoint: API_AUTH_ADMIN_PROFILE_EXPORT,
       filters: {
         department: effectiveFilters.department,
         role: effectiveFilters.role,

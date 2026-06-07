@@ -235,7 +235,7 @@ export default function DashboardAnnouncementsPage() {
           ))
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
-            Tidak ada pengumuman yang cocok dengan pencarian Anda.
+            Belum ada pengumuman yang tersedia.
           </div>
         )}
       </div>

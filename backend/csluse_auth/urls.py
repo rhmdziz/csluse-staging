@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 
 from .views import (
     EmailVerificationStatusView,
@@ -20,7 +20,7 @@ def password_reset_confirm_redirect(request, uidb64, token):
         f"{frontend_url}/reset-password/{uidb64}/{token}/"
     )
 
-router = DefaultRouter()
+router = SimpleRouter()
 router.register(r'user/profile', ProfileViewSet, basename='profile')
 
 urlpatterns = [

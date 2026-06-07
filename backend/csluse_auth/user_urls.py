@@ -1,10 +1,10 @@
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 
 from .viewsets import MentorViewSet
 
 
-router = DefaultRouter()
+router = SimpleRouter()
 router.register(r"mentors", MentorViewSet, basename="mentor-users")
 
 urlpatterns = [

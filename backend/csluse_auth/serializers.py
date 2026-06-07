@@ -348,7 +348,7 @@ class UserWithProfileSerializer(serializers.ModelSerializer):
 
 class UserBulkDeleteSerializer(serializers.Serializer):
     ids = serializers.ListField(
-        child=serializers.IntegerField(min_value=1),
+        child=serializers.CharField(allow_blank=False, trim_whitespace=True),
         allow_empty=False,
         error_messages={
             "empty": "Pilih minimal satu user untuk dihapus.",
@@ -356,7 +356,18 @@ class UserBulkDeleteSerializer(serializers.Serializer):
     )
 
     def validate_ids(self, value):
-        unique_ids = list(dict.fromkeys(value))
+        unique_ids = []
+        seen = set()
+
+        for item in value:
+            normalized = str(item).strip()
+            if not normalized:
+                raise serializers.ValidationError("Terdapat ID user yang kosong.")
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_ids.append(normalized)
+
         if len(unique_ids) != len(value):
             raise serializers.ValidationError("Terdapat ID user yang duplikat.")
         return unique_ids
@@ -411,16 +422,16 @@ class AdminProfileSerializer(ProfileSerializer):
 
 
 class PicUserSerializer(serializers.ModelSerializer):
-    profile_id = serializers.UUIDField(source="profile.id", read_only=True)
-    full_name = serializers.CharField(source="profile.full_name", read_only=True)
-    role = serializers.CharField(source="profile.role", read_only=True)
-    department = serializers.CharField(source="profile.department", read_only=True)
-    id_number = serializers.CharField(source="profile.id_number", read_only=True)
+    profile_id = serializers.UUIDField(source="id", read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    role = serializers.CharField(read_only=True)
+    department = serializers.CharField(read_only=True)
+    id_number = serializers.CharField(read_only=True)
     room_names = serializers.SerializerMethodField()
-    is_mentor = serializers.BooleanField(source="profile.is_mentor", read_only=True)
+    is_mentor = serializers.BooleanField(read_only=True)
 
     class Meta:
-        model = User
+        model = Profile
         fields = (
             "id",
             "email",
@@ -434,23 +445,20 @@ class PicUserSerializer(serializers.ModelSerializer):
         )
 
     def get_room_names(self, obj):
-        profile = getattr(obj, "profile", None)
-        if profile is None:
-            return []
         return list(
-            profile.rooms_as_pic.order_by("name", "number").values_list("name", flat=True)
+            obj.rooms_as_pic.order_by("name", "number").values_list("name", flat=True)
         )
 
 
 class PicUserDropdownSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(source="profile.id", read_only=True)
+    id = serializers.UUIDField(read_only=True)
     name = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
-    department = serializers.CharField(source="profile.department", read_only=True)
-    is_mentor = serializers.BooleanField(source="profile.is_mentor", read_only=True)
+    department = serializers.CharField(read_only=True)
+    is_mentor = serializers.BooleanField(read_only=True)
 
     class Meta:
-        model = User
+        model = Profile
         fields = (
             "id",
             "name",
@@ -460,23 +468,30 @@ class PicUserDropdownSerializer(serializers.ModelSerializer):
         )
 
     def get_name(self, obj):
-        full_name = getattr(getattr(obj, "profile", None), "full_name", None)
+        full_name = getattr(obj, "full_name", None)
         if full_name:
             return full_name
+        linked_user = getattr(obj, "user", None)
+        if linked_user and getattr(linked_user, "email", None):
+            return linked_user.email
         return obj.email
 
     def get_role(self, obj):
-        profile_role = getattr(getattr(obj, "profile", None), "role", None)
+        profile_role = getattr(obj, "role", None)
         if profile_role:
             return profile_role
 
-        if obj.groups.filter(name="SuperAdministrator").exists():
+        linked_user = getattr(obj, "user", None)
+        if linked_user is None:
+            return None
+
+        if linked_user.groups.filter(name="SuperAdministrator").exists():
             return "Admin"
-        if obj.groups.filter(name="Administrator").exists():
+        if linked_user.groups.filter(name="Administrator").exists():
             return "Admin"
-        if obj.groups.filter(name="Staff").exists():
+        if linked_user.groups.filter(name="Staff").exists():
             return "Staff"
-        if obj.groups.filter(name="Lecturer").exists():
+        if linked_user.groups.filter(name="Lecturer").exists():
             return "Lecturer"
         return None
 

@@ -5,6 +5,7 @@ from django.contrib.admin.models import CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models.functions import Lower, Trim
 from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -34,7 +35,6 @@ from .serializers import (
     PicUserSerializer,
     ProfileSerializer,
     UserBulkDeleteSerializer,
-    UserWithProfileSerializer,
 )
 
 
@@ -91,9 +91,15 @@ class MentorViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="dropdown")
     def dropdown(self, request):
         queryset = (
-            User.objects.select_related("profile")
-            .filter(profile__role__iexact="Lecturer", profile__is_mentor=True)
-            .order_by("profile__full_name", "email")
+            Profile.objects.select_related("user").prefetch_related("rooms_as_pic")
+            .annotate(normalized_profile_role=Lower(Trim("role")))
+            .filter(
+                models.Q(normalized_profile_role="lecturer")
+                | models.Q(user__groups__name="Lecturer")
+            )
+            .filter(is_mentor=True)
+            .distinct()
+            .order_by("full_name", "email", "pk")
         )
         serializer = PicUserDropdownSerializer(queryset, many=True)
         return Response(serializer.data)
@@ -106,8 +112,20 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
     pagination_class = DefaultPagination
     http_method_names = ["get", "post", "patch", "delete"]
 
+    def _parse_is_mentor_filter(self, value):
+        if value is None:
+            return None
+
+        normalized = str(value).strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+        return None
+
     def get_queryset(self):
         request = self.request
+        is_mentor = self._parse_is_mentor_filter(request.query_params.get("is_mentor"))
         queryset = Profile.objects.select_related("user").annotate(
             is_verified=Exists(
                 EmailAddress.objects.filter(user=OuterRef("user_id"), verified=True)
@@ -123,6 +141,9 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
         filters = {key: value for key, value in filters.items() if value}
         if filters:
             queryset = queryset.filter(**filters)
+
+        if is_mentor is not None:
+            queryset = queryset.filter(is_mentor=is_mentor)
 
         has_user = request.query_params.get("has_user")
         if has_user is not None:
@@ -162,6 +183,12 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
             response.data["aggregates"] = aggregates
             return response
         return Response({"results": serializer.data, "aggregates": aggregates})
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -232,9 +259,9 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
 
 
 class UserWithProfileViewSet(viewsets.ModelViewSet):
-    serializer_class = UserWithProfileSerializer
+    serializer_class = AdminProfileSerializer
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
-    queryset = User.objects.select_related("profile").all()
+    queryset = Profile.objects.select_related("user").all()
     pagination_class = DefaultPagination
     http_method_names = ["get", "delete", "post"]
 
@@ -245,11 +272,11 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
     def _build_role_aggregates(self, queryset):
         return {
             "total": queryset.count(),
-            "student": queryset.filter(profile__role__iexact="Student").count(),
-            "lecturer": queryset.filter(profile__role__iexact="Lecturer").count(),
-            "admin": queryset.filter(profile__role__iexact="Admin").count(),
-            "staff": queryset.filter(profile__role__iexact="Staff").count(),
-            "guest": queryset.filter(profile__role__iexact="Guest").count(),
+            "student": queryset.filter(role__iexact="Student").count(),
+            "lecturer": queryset.filter(role__iexact="Lecturer").count(),
+            "admin": queryset.filter(role__iexact="Admin").count(),
+            "staff": queryset.filter(role__iexact="Staff").count(),
+            "guest": queryset.filter(role__iexact="Guest").count(),
         }
 
     def _parse_is_mentor_filter(self, value):
@@ -264,34 +291,34 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
         return None
 
     def _ensure_user_deletable(self, target):
-        is_target_super_admin = has_role(target, SUPER_ADMINISTRATOR) or getattr(
-            target,
-            "is_superuser",
-            False,
+        linked_user = getattr(target, "user", None)
+        is_target_super_admin = bool(linked_user) and (
+            has_role(linked_user, SUPER_ADMINISTRATOR) or getattr(linked_user, "is_superuser", False)
         )
         if is_target_super_admin:
             raise PermissionDenied("Tidak bisa menghapus SuperAdministrator.")
 
     def _delete_user_instance(self, target):
-        profile = getattr(target, "profile", None)
+        profile = target
+        user = getattr(profile, "user", None)
 
         with transaction.atomic():
-            log_admin_action(
-                self.request.user,
-                target,
-                DELETION,
-                "Deleted user via CSL Admin (user management).",
-            )
-            target.delete()
-
-            if profile is not None:
+            if user is not None:
                 log_admin_action(
                     self.request.user,
-                    profile,
+                    user,
                     DELETION,
-                    "Deleted linked profile via CSL Admin (user management).",
+                    "Deleted linked user via CSL Admin (user management).",
                 )
-                profile.delete()
+                user.delete()
+
+            log_admin_action(
+                self.request.user,
+                profile,
+                DELETION,
+                "Deleted profile via CSL Admin (user management).",
+            )
+            profile.delete()
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
@@ -302,53 +329,57 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
 
         try:
             uuid.UUID(str(lookup_value))
-            return get_object_or_404(queryset, profile__id=lookup_value)
-        except ValueError:
             return get_object_or_404(queryset, pk=lookup_value)
+        except ValueError:
+            return get_object_or_404(queryset, user_id=lookup_value)
 
     def get_queryset(self):
         request = self.request
         is_mentor = self._parse_is_mentor_filter(request.query_params.get("is_mentor"))
 
         qs = (
-            User.objects.select_related("profile")
+            Profile.objects.select_related("user")
             .annotate(
-                is_verified=Exists(
-                    EmailAddress.objects.filter(user=OuterRef("pk"), verified=True)
-                )
+                is_verified=Exists(EmailAddress.objects.filter(user=OuterRef("user_id"), verified=True))
             )
         )
 
         filters = {
-            "profile__department__iexact": request.query_params.get("department"),
-            "profile__role__iexact": request.query_params.get("role"),
-            "profile__batch": request.query_params.get("batch"),
-            "profile__user_type__iexact": request.query_params.get("user_type"),
+            "department__iexact": request.query_params.get("department"),
+            "role__iexact": request.query_params.get("role"),
+            "batch": request.query_params.get("batch"),
+            "user_type__iexact": request.query_params.get("user_type"),
         }
         filters = {key: value for key, value in filters.items() if value}
 
         if filters:
             qs = qs.filter(**filters)
         if is_mentor is not None:
-            qs = qs.filter(profile__is_mentor=is_mentor)
+            qs = qs.filter(is_mentor=is_mentor)
 
         search_term = request.query_params.get("search") or request.query_params.get("q")
         if search_term:
             qs = qs.filter(
-                models.Q(profile__full_name__icontains=search_term)
+                models.Q(full_name__icontains=search_term)
                 | models.Q(email__icontains=search_term)
-                | models.Q(profile__id_number__icontains=search_term)
+                | models.Q(id_number__icontains=search_term)
             )
 
-        return qs.order_by("profile__full_name", "email", "pk")
+        has_user = request.query_params.get("has_user")
+        if has_user is not None:
+            normalized = str(has_user).strip().lower()
+            if normalized in {"true", "1", "yes"}:
+                qs = qs.filter(user__isnull=False)
+            elif normalized in {"false", "0", "no"}:
+                qs = qs.filter(user__isnull=True)
+
+        return qs.order_by("full_name", "email", "pk")
 
     def list(self, request, *args, **kwargs):
         aggregate_qs = (
-            User.objects.select_related("profile")
+            Profile.objects.select_related("user")
             .annotate(
-                is_verified=Exists(
-                    EmailAddress.objects.filter(user=OuterRef("pk"), verified=True)
-                )
+                is_verified=Exists(EmailAddress.objects.filter(user=OuterRef("user_id"), verified=True))
             )
         )
 
@@ -360,23 +391,30 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
         search_term = request.query_params.get("search") or request.query_params.get("q")
 
         base_filters = {
-            "profile__department__iexact": department,
-            "profile__role__iexact": role,
-            "profile__batch": batch,
-            "profile__user_type__iexact": user_type,
+            "department__iexact": department,
+            "role__iexact": role,
+            "batch": batch,
+            "user_type__iexact": user_type,
         }
         base_filters = {key: value for key, value in base_filters.items() if value}
 
         if base_filters:
             aggregate_qs = aggregate_qs.filter(**base_filters)
         if is_mentor is not None:
-            aggregate_qs = aggregate_qs.filter(profile__is_mentor=is_mentor)
+            aggregate_qs = aggregate_qs.filter(is_mentor=is_mentor)
+        has_user = request.query_params.get("has_user")
+        if has_user is not None:
+            normalized = str(has_user).strip().lower()
+            if normalized in {"true", "1", "yes"}:
+                aggregate_qs = aggregate_qs.filter(user__isnull=False)
+            elif normalized in {"false", "0", "no"}:
+                aggregate_qs = aggregate_qs.filter(user__isnull=True)
 
         if search_term:
             aggregate_qs = aggregate_qs.filter(
-                models.Q(profile__full_name__icontains=search_term)
+                models.Q(full_name__icontains=search_term)
                 | models.Q(email__icontains=search_term)
-                | models.Q(profile__id_number__icontains=search_term)
+                | models.Q(id_number__icontains=search_term)
             )
 
         aggregates = self._build_role_aggregates(aggregate_qs)
@@ -401,6 +439,18 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
         self._ensure_user_deletable(instance)
         self._delete_user_instance(instance)
 
+    @staticmethod
+    def _resolve_profile_by_identifier(queryset, identifier):
+        normalized = str(identifier).strip()
+        if not normalized:
+            return None
+
+        try:
+            uuid.UUID(normalized)
+            return queryset.filter(pk=normalized).first()
+        except ValueError:
+            return queryset.filter(models.Q(pk=normalized) | models.Q(user_id=normalized)).first()
+
     @extend_schema(request=UserBulkDeleteSerializer)
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
@@ -408,22 +458,37 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         requested_ids = serializer.validated_data["ids"]
-        users = self.get_queryset().filter(pk__in=requested_ids)
-        users_by_id = {user.pk: user for user in users}
+        queryset = self.get_queryset()
+        profiles_by_identifier = {}
+        processed_profile_ids = set()
+
+        for requested_id in requested_ids:
+            profile = self._resolve_profile_by_identifier(queryset, requested_id)
+            if profile is None:
+                continue
+
+            profiles_by_identifier[str(requested_id)] = profile
+            profiles_by_identifier[str(profile.pk)] = profile
+            if profile.user_id is not None:
+                profiles_by_identifier[str(profile.user_id)] = profile
 
         deleted_ids = []
         failed_ids = []
 
         for user_id in requested_ids:
-            user = users_by_id.get(user_id)
-            if user is None:
+            profile = profiles_by_identifier.get(str(user_id))
+            if profile is None:
+                failed_ids.append(user_id)
+                continue
+            if str(profile.pk) in processed_profile_ids:
                 failed_ids.append(user_id)
                 continue
 
             try:
-                self._ensure_user_deletable(user)
-                self._delete_user_instance(user)
-                deleted_ids.append(user_id)
+                self._ensure_user_deletable(profile)
+                self._delete_user_instance(profile)
+                deleted_ids.append(str(profile.pk))
+                processed_profile_ids.add(str(profile.pk))
             except PermissionDenied:
                 failed_ids.append(user_id)
 
@@ -463,12 +528,13 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = (
-            User.objects.select_related("profile")
+            Profile.objects.select_related("user")
+            .annotate(normalized_profile_role=Lower(Trim("role")))
             .filter(
-                models.Q(profile__role__iregex=r"^(lecturer|admin)$")
-                | models.Q(groups__name__in=["Lecturer", "Administrator"])
+                models.Q(normalized_profile_role__in=["lecturer", "admin"])
+                | models.Q(user__groups__name__in=["Lecturer", "Administrator", "Admin"])
             )
-            .exclude(groups__name="SuperAdministrator")
+            .exclude(user__groups__name="SuperAdministrator")
             .distinct()
         )
 
@@ -479,24 +545,30 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
         search = self.request.query_params.get("search") or self.request.query_params.get("q")
 
         if assigned_only is True:
-            queryset = queryset.filter(profile__rooms_as_pic__isnull=False).distinct()
+            queryset = queryset.filter(rooms_as_pic__isnull=False).distinct()
         elif assigned_only is False:
-            queryset = queryset.filter(profile__rooms_as_pic__isnull=True).distinct()
+            queryset = queryset.filter(rooms_as_pic__isnull=True).distinct()
 
         if department:
-            queryset = queryset.filter(profile__department__iexact=department)
+            queryset = queryset.filter(department__iexact=department)
 
         if role:
-            queryset = queryset.filter(profile__role__iexact=role)
+            normalized_role = role.strip().lower()
+            role_filter = models.Q(normalized_profile_role=normalized_role)
+            if normalized_role == "lecturer":
+                role_filter |= models.Q(user__groups__name="Lecturer")
+            elif normalized_role == "admin":
+                role_filter |= models.Q(user__groups__name__in=["Admin", "Administrator"])
+            queryset = queryset.filter(role_filter)
 
         if room:
-            queryset = queryset.filter(profile__rooms_as_pic__id=room).distinct()
+            queryset = queryset.filter(rooms_as_pic__id=room).distinct()
 
         if search:
             queryset = queryset.filter(
-                models.Q(profile__full_name__icontains=search)
+                models.Q(full_name__icontains=search)
                 | models.Q(email__icontains=search)
-                | models.Q(profile__id_number__icontains=search)
+                | models.Q(id_number__icontains=search)
             )
 
         return queryset
@@ -505,7 +577,7 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
     def dropdown(self, request):
         queryset = (
             self.get_queryset()
-            .order_by("profile__full_name", "email")
+            .order_by("full_name", "email", "pk")
         )
         serializer = PicUserDropdownSerializer(queryset, many=True)
         return Response(serializer.data)
@@ -514,9 +586,9 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
     def assigned_dropdown(self, request):
         queryset = (
             self.get_queryset()
-            .filter(profile__rooms_as_pic__isnull=False)
+            .filter(rooms_as_pic__isnull=False)
             .distinct()
-            .order_by("profile__full_name", "email")
+            .order_by("full_name", "email", "pk")
         )
         serializer = PicUserDropdownSerializer(queryset, many=True)
         return Response(serializer.data)
@@ -646,7 +718,7 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
 
     def _build_dashboard_data(self):
         return {
-            "total_users": User.objects.count(),
+            "total_users": Profile.objects.count(),
             "total_rooms": Room.objects.count(),
             "total_equipments": Equipment.objects.count(),
             "total_materials": Material.objects.count(),

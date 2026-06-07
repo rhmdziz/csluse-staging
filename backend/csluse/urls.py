@@ -1,9 +1,9 @@
 from django.urls import path, include
 from . import viewsets as views
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 
 
-router = DefaultRouter()
+router = SimpleRouter()
 router.register(r'images', views.ImageViewSet, basename='images')
 router.register(r'rooms', views.RoomViewSet, basename='rooms')
 router.register(r'equipments', views.EquipmentViewSet, basename='equipments')
