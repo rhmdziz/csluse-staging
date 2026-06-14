@@ -71,6 +71,7 @@ import { formatDateKey, toEndOfDay, toStartOfDay } from "@/lib/date";
 import {
   getStatusBadgeClass,
   getStatusDisplayLabel,
+  isLegacyImportedCode,
   normalizeStatus,
   SAMPLE_TESTING_STATUS_OPTIONS,
 } from "@/lib/request";
@@ -182,6 +183,7 @@ export default function AdminSampleTestingHistoryPage() {
       createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
     },
     reloadKey,
+    "admin-all",
   );
   const {
     sampleTesting: detailSampleTesting,
@@ -602,7 +604,7 @@ export default function AdminSampleTestingHistoryPage() {
                         <Eye className="h-4 w-4" />
                       </Button>
                     </ActionTooltip>
-                    {canShowDocumentAction(item.status) ? (
+                    {canShowDocumentAction(item.status) && !isLegacyImportedCode(item.code) ? (
                       <ActionTooltip label="Dokumen pengujian">
                         <Button
                           variant="outline"

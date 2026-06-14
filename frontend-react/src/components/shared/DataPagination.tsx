@@ -19,6 +19,42 @@ type DataPaginationProps = {
   onPageChange: (page: number) => void;
 };
 
+type PaginationItem =
+  | { type: "page"; value: number }
+  | { type: "ellipsis"; key: string };
+
+function buildPaginationItems(page: number, totalPages: number): PaginationItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => ({
+      type: "page" as const,
+      value: index + 1,
+    }));
+  }
+
+  const pages = new Set<number>([1, totalPages, page - 1, page, page + 1]);
+  const normalizedPages = Array.from(pages)
+    .filter((value) => value >= 1 && value <= totalPages)
+    .sort((a, b) => a - b);
+
+  const items: PaginationItem[] = [];
+
+  normalizedPages.forEach((value, index) => {
+    const previous = normalizedPages[index - 1];
+
+    if (typeof previous === "number" && value - previous > 1) {
+      if (value - previous === 2) {
+        items.push({ type: "page", value: previous + 1 });
+      } else {
+        items.push({ type: "ellipsis", key: `${previous}-${value}` });
+      }
+    }
+
+    items.push({ type: "page", value });
+  });
+
+  return items;
+}
+
 export function DataPagination({
   page,
   totalPages,
@@ -28,14 +64,7 @@ export function DataPagination({
   isLoading = false,
   onPageChange,
 }: DataPaginationProps) {
-  const maxVisible = 5;
-  let start = Math.max(1, page - Math.floor(maxVisible / 2));
-  const end = Math.min(totalPages, start + maxVisible - 1);
-  start = Math.max(1, end - maxVisible + 1);
-  const visiblePages = Array.from(
-    { length: end - start + 1 },
-    (_, idx) => start + idx,
-  );
+  const visibleItems = buildPaginationItems(page, totalPages);
   const startItem = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const endItem = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
 
@@ -73,20 +102,30 @@ export function DataPagination({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        {visiblePages.map((pageNumber) => (
-          <Button
-            key={pageNumber}
-            type="button"
-            variant={pageNumber === page ? "default" : "ghost"}
-            size="sm"
-            className="min-w-8 px-2"
-            disabled={isLoading}
-            onClick={() => onPageChange(pageNumber)}
-            aria-label={`Halaman ${pageNumber}`}
-          >
-            {pageNumber}
-          </Button>
-        ))}
+        {visibleItems.map((item) =>
+          item.type === "ellipsis" ? (
+            <span
+              key={item.key}
+              className="flex min-w-8 items-center justify-center px-1 text-sm text-slate-500"
+              aria-hidden="true"
+            >
+              ...
+            </span>
+          ) : (
+            <Button
+              key={item.value}
+              type="button"
+              variant={item.value === page ? "default" : "ghost"}
+              size="sm"
+              className="min-w-8 px-2"
+              disabled={isLoading}
+              onClick={() => onPageChange(item.value)}
+              aria-label={`Halaman ${item.value}`}
+            >
+              {item.value}
+            </Button>
+          ),
+        )}
         <Button
           type="button"
           variant="ghost"

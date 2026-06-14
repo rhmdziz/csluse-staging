@@ -22,7 +22,7 @@ export type SampleTestingServiceFilters = {
   createdBefore?: string;
 };
 
-export type SampleTestingServiceListScope = "default" | "my" | "all";
+export type SampleTestingServiceListScope = "default" | "my" | "all" | "admin-all";
 
 export type CreateSampleTestingPayload = {
   name: string;
@@ -103,7 +103,11 @@ export const sampleTestingService = {
     signal?: AbortSignal,
   ) {
     const listEndpoint =
-      scope === "my" ? API_PENGUJIANS_MY : scope === "all" ? API_PENGUJIANS_ALL : API_PENGUJIANS;
+      scope === "my"
+        ? API_PENGUJIANS_MY
+        : (scope === "all" || scope === "admin-all")
+          ? API_PENGUJIANS_ALL
+          : API_PENGUJIANS;
     const url = new URL(listEndpoint, window.location.origin);
 
     url.searchParams.set("page", String(page));

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { isLegacyImportedCode } from "@/lib/request";
 import { bookingRoomsService } from "@/services/booking-rooms";
 
 export type BookingFilters = {
@@ -390,7 +391,9 @@ export function useBookings(
           : Array.isArray(payload.results)
             ? payload.results
             : [];
-        const mapped = list.map(mapBooking);
+        const mapped = list
+          .map(mapBooking)
+          .filter((booking) => scope === "admin-all" || !isLegacyImportedCode(booking.code));
 
         setBookings(mapped);
         setTotalCount(Array.isArray(payload) ? mapped.length : (payload.count ?? mapped.length));

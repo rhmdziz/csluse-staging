@@ -18,6 +18,7 @@ import {
 } from "@/components/admin/history";
 import type { SampleTestingRow } from "@/hooks/sample-testing";
 import { formatDateTimeWib } from "@/lib/date";
+import { isLegacyImportedCode } from "@/lib/request";
 
 type Props = {
   item: SampleTestingRow | null;
@@ -43,6 +44,7 @@ export default function AdminSampleTestingRecordDetailContent({
   onOpenUserDetail,
 }: Props) {
   const isGuestRequester = item ? !hasValue(item.requesterDepartment) : false;
+  const isLegacyItem = item ? isLegacyImportedCode(item.code) : false;
 
   return (
     <>
@@ -200,17 +202,19 @@ export default function AdminSampleTestingRecordDetailContent({
             </AdminRecordDetailGrid>
           </AdminRecordDetailSection>
 
-          <AdminRecordDetailSection
-            title="Dokumen Pengujian"
-            icon={<ClipboardList className="h-5 w-5" />}
-          >
-            <SampleTestingDocumentsSection
-              item={item}
-              viewerRole="approver"
-              embedded
-              allowActions={false}
-            />
-          </AdminRecordDetailSection>
+          {!isLegacyItem ? (
+            <AdminRecordDetailSection
+              title="Dokumen Pengujian"
+              icon={<ClipboardList className="h-5 w-5" />}
+            >
+              <SampleTestingDocumentsSection
+                item={item}
+                viewerRole="approver"
+                embedded
+                allowActions={false}
+              />
+            </AdminRecordDetailSection>
+          ) : null}
         </AdminRecordDetailShell>
       )}
     </>

@@ -128,7 +128,7 @@ function buildTemplateWorkbook() {
     ["approved_by_email", "Tidak", "Email approver jika ingin dihubungkan ke admin existing."],
     ["status", "Tidak", "Kosong akan dianggap Completed."],
     ["created_at", "Tidak", "Kosong akan menggunakan waktu import."],
-    ["code", "Tidak", "Kosong akan dibuat otomatis dengan prefix legacy CSLUSE020."],
+    ["code", "Tidak", "Kosong akan dibuat otomatis dengan prefix legacy CSL."],
   ];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ...sample]), "SampleTesting");

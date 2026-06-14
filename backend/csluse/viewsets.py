@@ -122,7 +122,7 @@ PENGUJIAN_APPROVER_DOCUMENT_TYPES = {
     "test_result_letter",
 }
 
-LEGACY_IMPORT_CODE_PREFIX = "CSLUSE020"
+LEGACY_IMPORT_CODE_PREFIX = "CSL"
 BORROW_ACTIVE_HOLD_STATUSES = [
     "Borrowed",
     "Returned Pending Inspection",
@@ -190,12 +190,13 @@ def _normalize_legacy_status(raw_value, allowed_statuses, default_status):
     return default_status
 
 
-def _validate_legacy_code(candidate, used_codes):
+def _validate_legacy_code(candidate, used_codes, model_cls):
     code = _coerce_legacy_string(candidate).upper().replace(" ", "")
     if not code:
         return ""
-    if len(code) > 12:
-        raise ValidationError({"code": "Kode maksimal 12 karakter."})
+    max_length = model_cls._meta.get_field("code").max_length or 12
+    if len(code) > max_length:
+        raise ValidationError({"code": f"Kode maksimal {max_length} karakter."})
     if code in used_codes:
         raise ValidationError({"code": "Kode duplikat di file import."})
     used_codes.add(code)
@@ -204,10 +205,14 @@ def _validate_legacy_code(candidate, used_codes):
 
 def _generate_legacy_code(model_cls, used_codes, prefix=LEGACY_IMPORT_CODE_PREFIX):
     normalized_prefix = _coerce_legacy_string(prefix).upper().replace(" ", "")
+    code_field = model_cls._meta.get_field("code")
+    max_length = code_field.max_length or 12
+    max_suffix_width = max_length - len(normalized_prefix)
+
     if not normalized_prefix:
         raise ValidationError({"code": "Prefix kode legacy tidak valid."})
-    if len(normalized_prefix) > 9:
-        raise ValidationError({"code": "Prefix kode legacy maksimal 9 karakter."})
+    if max_suffix_width < 1:
+        raise ValidationError({"code": "Prefix kode legacy melebihi panjang kode yang diizinkan."})
 
     last = (
         model_cls.objects.filter(code__startswith=normalized_prefix)
@@ -220,8 +225,12 @@ def _generate_legacy_code(model_cls, used_codes, prefix=LEGACY_IMPORT_CODE_PREFI
         if suffix.isdigit():
             next_seq = int(suffix) + 1
 
-    while next_seq <= 999:
-        candidate = f"{normalized_prefix}{next_seq:03d}"
+    max_seq = (10 ** max_suffix_width) - 1
+    min_suffix_width = min(3, max_suffix_width)
+
+    while next_seq <= max_seq:
+        suffix_width = max(min_suffix_width, len(str(next_seq)))
+        candidate = f"{normalized_prefix}{next_seq:0{suffix_width}d}"
         if candidate not in used_codes:
             used_codes.add(candidate)
             return candidate
@@ -1629,7 +1638,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                         {"end_time": "end_time harus setelah start_time."}
                     )
 
-                code = _validate_legacy_code(row.get("code"), used_codes)
+                code = _validate_legacy_code(row.get("code"), used_codes, Booking)
                 if not code:
                     code = _generate_legacy_code(Booking, used_codes)
                 if code in existing_codes:
@@ -3815,7 +3824,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 if not sample_type:
                     raise ValidationError({"sample_type": "sample_type wajib diisi."})
 
-                code = _validate_legacy_code(row.get("code"), used_codes)
+                code = _validate_legacy_code(row.get("code"), used_codes, Pengujian)
                 if not code:
                     code = _generate_legacy_code(Pengujian, used_codes)
                 if code in existing_codes:

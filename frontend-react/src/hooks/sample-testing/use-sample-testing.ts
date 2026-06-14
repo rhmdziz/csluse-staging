@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { isLegacyImportedCode } from "@/lib/request";
 import { sampleTestingService } from "@/services/sample-testing";
 
 export type SampleTestingFilters = {
@@ -13,7 +14,7 @@ export type SampleTestingFilters = {
   createdBefore?: string;
 };
 
-export type SampleTestingListScope = "default" | "my" | "all";
+export type SampleTestingListScope = "default" | "my" | "all" | "admin-all";
 
 export type SampleTestingRow = {
   id: string | number;
@@ -326,7 +327,12 @@ export function useSampleTestingList(
           : Array.isArray(payload.results)
             ? payload.results
             : [];
-        const mapped = list.map(mapSampleTesting);
+        const mapped = list
+          .map(mapSampleTesting)
+          .filter(
+            (sampleTesting) =>
+              scope === "admin-all" || !isLegacyImportedCode(sampleTesting.code),
+          );
 
         setSampleTestings(mapped);
         setTotalCount(Array.isArray(payload) ? mapped.length : (payload.count ?? mapped.length));

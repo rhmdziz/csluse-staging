@@ -118,7 +118,7 @@ function buildTemplateWorkbook() {
     ["status", "Tidak", "Kosong akan dianggap Completed."],
     ["purpose", "Tidak", "Kosong akan dianggap Other."],
     ["requested_by_email", "Tidak", "Jika email profile ada di sistem, akan dihubungkan otomatis."],
-    ["code", "Tidak", "Kosong akan dibuat otomatis dengan prefix legacy CSLUSE020."],
+    ["code", "Tidak", "Kosong akan dibuat otomatis dengan prefix legacy CSL."],
   ];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ...sample]), "Bookings");

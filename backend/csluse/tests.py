@@ -214,7 +214,43 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(booking.status, "Completed")
         self.assertEqual(booking.attendee_count, 12)
         self.assertEqual(booking.requester_name, "Peminjam Legacy")
-        self.assertTrue(booking.code.startswith("CSLUSE020"))
+        self.assertTrue(booking.code.startswith("CSL"))
+
+    def test_admin_legacy_booking_import_can_continue_past_999(self):
+        self.client.force_authenticate(user=self.admin_user)
+        start = timezone.now() - timedelta(days=30)
+        end = start + timedelta(hours=2)
+        Booking.objects.create(
+            code="CSL000000999",
+            requester_name="Existing Legacy",
+            room_name="Lab Legacy",
+            start_time=start,
+            end_time=end,
+            status="Completed",
+            purpose="Penelitian",
+        )
+
+        response = self.client.post(
+            "/api/bookings/legacy-bulk-import/",
+            {
+                "rows": [
+                    {
+                        "index": 2,
+                        "requester_name": "Peminjam Legacy Baru",
+                        "room_name": "Lab Legacy",
+                        "start_time": start.isoformat(),
+                        "end_time": end.isoformat(),
+                        "status": "Completed",
+                        "purpose": "Penelitian",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        imported_booking = Booking.objects.exclude(code="CSL000000999").get()
+        self.assertEqual(imported_booking.code, "CSL000001000")
 
     def test_admin_can_bulk_import_legacy_sample_testing_history(self):
         self.client.force_authenticate(user=self.admin_user)
@@ -240,7 +276,37 @@ class CsluseWorkflowRegressionTests(APITestCase):
         pengujian = Pengujian.objects.get()
         self.assertEqual(pengujian.name, "Legacy Requester")
         self.assertEqual(pengujian.status, "Completed")
-        self.assertTrue(pengujian.code.startswith("CSLUSE020"))
+        self.assertTrue(pengujian.code.startswith("CSL"))
+
+    def test_admin_legacy_sample_testing_import_can_continue_past_999(self):
+        self.client.force_authenticate(user=self.admin_user)
+        Pengujian.objects.create(
+            code="CSL000000999",
+            name="Existing Legacy",
+            email="existing-legacy@example.com",
+            sample_type="Air",
+            status="Completed",
+        )
+
+        response = self.client.post(
+            "/api/pengujians/legacy-bulk-import/",
+            {
+                "rows": [
+                    {
+                        "index": 2,
+                        "name": "Legacy Requester Baru",
+                        "email": "legacy-baru@example.com",
+                        "sample_type": "Air",
+                        "status": "Completed",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        imported_pengujian = Pengujian.objects.exclude(code="CSL000000999").get()
+        self.assertEqual(imported_pengujian.code, "CSL000001000")
 
     def test_booking_request_can_cross_weekend_when_within_three_months(self):
         start, end = self.future_weekday_window(
