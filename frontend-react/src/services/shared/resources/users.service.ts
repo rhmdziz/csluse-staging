@@ -4,6 +4,7 @@ import {
   API_AUTH_ADMIN_PROFILE_CONFIRM_USER,
   API_AUTH_ADMIN_PROFILE,
   API_AUTH_PIC_USERS,
+  API_AUTH_PIC_USERS_BULK_ASSIGN,
   API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS,
   API_AUTH_PIC_USERS_DROPDOWN,
   API_AUTH_PIC_USER_REMOVE_ASSIGNMENTS,
@@ -182,6 +183,14 @@ export type PicUser = {
 
 export type RoomPicTaskUserRow = UserRow & {
   roomNames?: string[];
+  roomAssignments?: RoomPicTaskAssignment[];
+};
+
+export type RoomPicTaskAssignment = {
+  id: string;
+  name: string;
+  number: string;
+  label: string;
 };
 
 type ApiMentorOption = {
@@ -205,6 +214,12 @@ type ApiRoomPicUser = {
   department?: string | null;
   id_number?: string | null;
   room_names?: string[] | null;
+  room_assignments?: Array<{
+    id?: string | number | null;
+    name?: string | null;
+    number?: string | number | null;
+    label?: string | null;
+  }> | null;
   is_mentor?: boolean | null;
 };
 
@@ -213,6 +228,20 @@ export type RoomPicTaskUsersFilters = {
   role?: string;
   room?: string;
   search?: string;
+};
+
+export type BulkAssignRoomPicPayload = {
+  roomIds: string[];
+  picIds: string[];
+};
+
+export type BulkAssignRoomPicResult = {
+  assigned_room_count?: number;
+  assigned_pic_count?: number;
+  created_assignment_count?: number;
+  skipped_existing_count?: number;
+  room_ids?: string[];
+  pic_ids?: string[];
 };
 
 type MutationResult =
@@ -290,6 +319,20 @@ function mapPicUser(user: ApiPicUser): PicUser | null {
 
 function mapRoomPicUser(item: ApiRoomPicUser): RoomPicTaskUserRow {
   const rawId = item.id ?? item.email ?? "user";
+  const roomAssignments = Array.isArray(item.room_assignments)
+    ? item.room_assignments
+        .filter((room): room is NonNullable<ApiRoomPicUser["room_assignments"]>[number] => Boolean(room?.id))
+        .map((room) => {
+          const name = String(room?.name ?? "-");
+          const number = String(room?.number ?? "");
+          return {
+            id: String(room?.id),
+            name,
+            number,
+            label: String(room?.label ?? (number ? `${name} (${number})` : name)),
+          };
+        })
+    : [];
 
   return {
     id: rawId,
@@ -310,9 +353,10 @@ function mapRoomPicUser(item: ApiRoomPicUser): RoomPicTaskUserRow {
     hasUser: true,
     status: "active",
     lastLogin: "",
+    roomAssignments,
     roomNames: Array.isArray(item.room_names)
       ? item.room_names.map((name) => String(name)).filter(Boolean)
-      : [],
+      : roomAssignments.map((room) => room.label),
   };
 }
 
@@ -529,5 +573,18 @@ export const usersService = {
       removed_ids?: Array<number | string>;
       failed_ids?: Array<number | string>;
     };
+  },
+
+  async bulkAssignRoomPicAssignments(payload: BulkAssignRoomPicPayload) {
+    const response = await authFetch(API_AUTH_PIC_USERS_BULK_ASSIGN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        room_ids: payload.roomIds,
+        pic_ids: payload.picIds,
+      }),
+    });
+
+    return parseMutationResponse(response);
   },
 };

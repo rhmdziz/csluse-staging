@@ -1,15 +1,20 @@
 "use client";
 
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 
 import { TableActionIconButton } from "@/components/shared";
-import { getUserInitials, type UserRow } from "@/hooks/shared/resources/users";
+import {
+  getUserInitials,
+  type RoomPicTaskAssignment,
+  type UserRow,
+} from "@/hooks/shared/resources/users";
 import type { UserDetailMode } from "@/components/admin/user-management";
 import AdminUserManagementTable from "./AdminUserManagementTable";
 
 type TaskTableUserRow = UserRow & {
   roomNames?: string[];
+  roomAssignments?: RoomPicTaskAssignment[];
 };
 
 type MentorTaskTableProps = {
@@ -29,7 +34,7 @@ type MentorTaskTableProps = {
   removeLabel?: string;
   emptyMessage?: string;
   roomHeader?: string;
-  getRoomLabel?: (user: TaskTableUserRow) => string;
+  getRoomLabel?: (user: TaskTableUserRow) => ReactNode;
   secondaryHeader?: string;
   getSecondaryLabel?: (user: TaskTableUserRow) => string;
 };
@@ -61,7 +66,7 @@ export default function MentorTaskTable({
         { key: "initials", label: "Inisial", className: "w-[72px]" },
         { key: "name", label: "Nama", className: "w-[220px]" },
         { key: "email", label: "Email", className: "w-[260px]" },
-        { key: "room", label: roomHeader, className: "w-[220px]" },
+        { key: "room", label: roomHeader, className: "w-[260px]" },
         { key: "secondary", label: secondaryHeader, className: "w-[140px]" },
         {
           key: "actions",
@@ -101,8 +106,8 @@ export default function MentorTaskTable({
           </td>
           <td className="truncate px-3 py-2">{user.name}</td>
           <td className="truncate px-3 py-2 text-muted-foreground">{user.email}</td>
-          <td className="px-3 py-2">{getRoomLabel ? getRoomLabel(user) : user.department}</td>
-          <td className="px-3 py-2">{getSecondaryLabel ? getSecondaryLabel(user) : user.idNumber}</td>
+          <td className="px-3 py-2 align-top">{getRoomLabel ? getRoomLabel(user) : user.department}</td>
+          <td className="px-3 py-2 align-top">{getSecondaryLabel ? getSecondaryLabel(user) : user.idNumber}</td>
           <td className="sticky right-0 z-10 bg-card px-3 py-2 shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-slate-200">
             <div className="flex justify-center gap-2">
               <TableActionIconButton

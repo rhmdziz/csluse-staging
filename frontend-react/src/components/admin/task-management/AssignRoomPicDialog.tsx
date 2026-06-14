@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
-import { Plus, UserRound } from "lucide-react";
+import { Building2, Plus, UserRound } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -12,9 +12,9 @@ import { Button, DialogFooter, Input } from "@/components/ui";
 
 import { USER_MODAL_WIDTH_CLASS } from "@/components/admin/user-management";
 
-import { useRoomDetail, useRoomOptions, useUpdateRoom } from "@/hooks/shared/resources/rooms";
+import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
-import { usePicUsers } from "@/hooks/shared/resources/users";
+import { useBulkAssignRoomPics, usePicUsers } from "@/hooks/shared/resources/users";
 
 type AssignRoomPicDialogProps = {
   open: boolean;
@@ -27,47 +27,81 @@ export default function AssignRoomPicDialog({
   onOpenChange,
   onAssigned,
 }: AssignRoomPicDialogProps) {
-  const [selectedRoomId, setSelectedRoomId] = useState("");
-  const [search, setSearch] = useState("");
+  const [roomSearch, setRoomSearch] = useState("");
+  const [picSearch, setPicSearch] = useState("");
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
   const [selectedPicIds, setSelectedPicIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
 
   const { rooms, isLoading: isLoadingRooms, error: roomOptionsError } = useRoomOptions(open);
   const { picUsers, isLoading: isLoadingPics, error: picUsersError } = usePicUsers(open);
   const {
-    room,
-    isLoading: isLoadingRoomDetail,
-    error: roomDetailError,
-  } = useRoomDetail(selectedRoomId || null);
-  const { updateRoom, isSubmitting, errorMessage, setErrorMessage } = useUpdateRoom();
+    bulkAssignRoomPics,
+    isSubmitting,
+    errorMessage,
+    setErrorMessage,
+  } = useBulkAssignRoomPics();
 
-  useEffect(() => {
-    setSelectedPicIds([]);
-    setSearch("");
-  }, [selectedRoomId]);
+  const filteredRooms = useMemo(() => {
+    const normalized = roomSearch.trim().toLowerCase();
+    return rooms.filter((roomOption) => {
+      if (!normalized) return true;
+      return `${roomOption.label} ${roomOption.name}`.toLowerCase().includes(normalized);
+    });
+  }, [rooms, roomSearch]);
 
-  const existingPicSet = useMemo(() => new Set(room?.picIds ?? []), [room?.picIds]);
-
-  // Only show non-assigned users in the add list
   const filteredPicUsers = useMemo(() => {
-    if (!selectedRoomId) return [];
-    const normalized = search.trim().toLowerCase();
-    return picUsers
-      .filter((user) => !existingPicSet.has(user.id))
-      .filter((user) => {
-        if (!normalized) return true;
-        return `${user.name} ${user.role ?? ""} ${user.department ?? ""}`
-          .toLowerCase()
-          .includes(normalized);
-      });
-  }, [picUsers, search, selectedRoomId, existingPicSet]);
+    const normalized = picSearch.trim().toLowerCase();
+    return picUsers.filter((user) => {
+      if (!normalized) return true;
+      return `${user.name} ${user.role ?? ""} ${user.department ?? ""}`
+        .toLowerCase()
+        .includes(normalized);
+    });
+  }, [picUsers, picSearch]);
+
+  const selectedRoomSelections = useMemo(
+    () =>
+      selectedRoomIds
+        .map((roomId) => ({
+          id: roomId,
+          label: rooms.find((roomOption) => String(roomOption.id) === roomId)?.label ?? roomId,
+        })),
+    [rooms, selectedRoomIds],
+  );
+
+  const selectedPicSelections = useMemo(
+    () =>
+      selectedPicIds
+        .map((picId) => ({
+          id: picId,
+          label: picUsers.find((user) => user.id === picId)?.name ?? picId,
+        })),
+    [picUsers, selectedPicIds],
+  );
 
   const resetState = () => {
-    setSelectedRoomId("");
-    setSearch("");
+    setRoomSearch("");
+    setPicSearch("");
+    setSelectedRoomIds([]);
     setSelectedPicIds([]);
     setMessage("");
     setErrorMessage("");
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setMessage("");
+    setErrorMessage("");
+  }, [open, setErrorMessage]);
+
+  const toggleSelection = (
+    value: string,
+    setter: Dispatch<SetStateAction<string[]>>,
+  ) => {
+    setter((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
+    );
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -75,32 +109,30 @@ export default function AssignRoomPicDialog({
     setMessage("");
     setErrorMessage("");
 
-    if (!selectedRoomId) {
-      setMessage("Pilih ruangan terlebih dahulu.");
+    if (selectedRoomIds.length === 0) {
+      setMessage("Pilih minimal satu ruangan.");
       return;
     }
-    if (!room) {
-      setMessage("Detail ruangan belum siap.");
-      return;
-    }
+
     if (selectedPicIds.length === 0) {
-      setMessage("Pilih minimal satu PIC baru untuk ditambahkan.");
+      setMessage("Pilih minimal satu PIC.");
       return;
     }
 
-    const nextPicIds = Array.from(new Set([...(room.picIds ?? []), ...selectedPicIds]));
-
-    const result = await updateRoom(selectedRoomId, {
-      name: room.name,
-      number: room.number,
-      floor: room.floor,
-      capacity: room.capacity,
-      description: room.description,
-      picIds: nextPicIds,
+    const result = await bulkAssignRoomPics({
+      roomIds: selectedRoomIds,
+      picIds: selectedPicIds,
     });
     if (!result.ok) return;
 
-    toast.success("PIC ruangan berhasil ditambahkan.");
+    const createdCount = result.data.created_assignment_count ?? 0;
+    const skippedCount = result.data.skipped_existing_count ?? 0;
+
+    toast.success(
+      skippedCount > 0
+        ? `${createdCount} assignment ditambahkan, ${skippedCount} assignment lama dilewati.`
+        : `${createdCount} assignment PIC ruangan berhasil ditambahkan.`,
+    );
     onAssigned();
     onOpenChange(false);
     resetState();
@@ -112,111 +144,140 @@ export default function AssignRoomPicDialog({
       onOpenChange={onOpenChange}
       onCloseReset={resetState}
       title="Tambahkan PIC Ruangan"
-      description="Pilih ruangan lalu pilih lecturer/admin sebagai PIC baru."
+      description="Pilih satu atau banyak ruangan, lalu pilih lecturer/admin yang ingin ditugaskan sekaligus."
       icon={<Plus className="h-5 w-5" />}
       contentClassName={`${USER_MODAL_WIDTH_CLASS} gap-0 p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
     >
       <form className="space-y-4 px-5 py-4 sm:px-6" onSubmit={handleSubmit}>
-        <div className="space-y-1">
-          <label className="text-xs font-medium">Ruangan</label>
-          <select
-            value={selectedRoomId}
-            onChange={(event) => {
-              setSelectedRoomId(event.target.value);
-              setMessage("");
-            }}
-            className="h-9 w-full rounded-md border border-sky-300 bg-sky-50/60 px-3 text-sm shadow-sm outline-none focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-200"
-            disabled={isLoadingRooms}
-          >
-            <option value="">{isLoadingRooms ? "Memuat ruangan..." : "Pilih ruangan"}</option>
-            {rooms.map((roomOption) => (
-              <option key={roomOption.id} value={roomOption.id}>
-                {roomOption.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {selectedRoomId ? (
-          <>
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-slate-700">PIC Saat Ini</p>
-              {isLoadingRoomDetail ? (
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-muted-foreground">
-                  Memuat...
-                </div>
-              ) : room?.picNames?.length ? (
-                <div className="space-y-1.5">
-                  {room.picNames.map((name) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                    >
-                      <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span>{name}</span>
-                    </div>
-                  ))}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-xs font-medium">Ruangan</label>
+              <span className="text-xs text-slate-500">{selectedRoomIds.length} dipilih</span>
+            </div>
+            <Input
+              value={roomSearch}
+              onChange={(event) => setRoomSearch(event.target.value)}
+              placeholder="Cari nama atau nomor ruangan"
+              className="border-sky-300 bg-sky-50/60 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
+              disabled={isLoadingRooms}
+            />
+            <div className="max-h-72 overflow-y-auto rounded-md border border-sky-200 bg-white">
+              {isLoadingRooms ? (
+                <div className="px-3 py-3 text-sm text-muted-foreground">Memuat ruangan...</div>
+              ) : filteredRooms.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-muted-foreground">
+                  {roomSearch ? "Tidak ada hasil pencarian ruangan." : "Belum ada ruangan tersedia."}
                 </div>
               ) : (
-                <div className="rounded-md border border-dashed border-slate-300 px-3 py-3 text-sm text-muted-foreground">
-                  Belum ada PIC pada ruangan ini.
-                </div>
+                filteredRooms.map((roomOption) => {
+                  const checked = selectedRoomIds.includes(String(roomOption.id));
+                  return (
+                    <label
+                      key={roomOption.id}
+                      className="flex cursor-pointer items-start gap-3 border-b px-3 py-2 last:border-b-0 hover:bg-sky-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSelection(String(roomOption.id), setSelectedRoomIds)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">{roomOption.label}</p>
+                        <p className="truncate text-xs text-slate-500">Kapasitas {roomOption.capacity}</p>
+                      </div>
+                    </label>
+                  );
+                })
               )}
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-slate-700">Tambah PIC</p>
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Cari nama, role, atau department"
-                className="border-sky-300 bg-sky-50/60 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
-                disabled={isLoadingPics || isLoadingRoomDetail}
-              />
-              <div className="max-h-56 overflow-y-auto rounded-md border border-sky-200 bg-white">
-                {isLoadingPics || isLoadingRoomDetail ? (
-                  <div className="px-3 py-3 text-sm text-muted-foreground">Memuat...</div>
-                ) : filteredPicUsers.length === 0 ? (
-                  <div className="px-3 py-3 text-sm text-muted-foreground">
-                    {search ? "Tidak ada hasil pencarian." : "Semua lecturer/admin sudah menjadi PIC ruangan ini."}
-                  </div>
-                ) : (
-                  filteredPicUsers.map((user) => {
-                    const checked = selectedPicIds.includes(user.id);
-                    return (
-                      <label
-                        key={user.id}
-                        className="flex cursor-pointer items-start gap-3 border-b px-3 py-2 last:border-b-0 hover:bg-sky-50"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(event) => {
-                            setSelectedPicIds((prev) =>
-                              event.target.checked
-                                ? [...prev, user.id]
-                                : prev.filter((id) => id !== user.id),
-                            );
-                          }}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">{user.name}</p>
-                          <p className="truncate text-xs text-slate-500">
-                            {[user.role, user.department].filter(Boolean).join(" • ")}
-                          </p>
-                        </div>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-xs font-medium">PIC</label>
+              <span className="text-xs text-slate-500">{selectedPicIds.length} dipilih</span>
             </div>
-          </>
+            <Input
+              value={picSearch}
+              onChange={(event) => setPicSearch(event.target.value)}
+              placeholder="Cari nama, role, atau department"
+              className="border-sky-300 bg-sky-50/60 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
+              disabled={isLoadingPics}
+            />
+            <div className="max-h-72 overflow-y-auto rounded-md border border-sky-200 bg-white">
+              {isLoadingPics ? (
+                <div className="px-3 py-3 text-sm text-muted-foreground">Memuat PIC...</div>
+              ) : filteredPicUsers.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-muted-foreground">
+                  {picSearch ? "Tidak ada hasil pencarian PIC." : "Belum ada PIC tersedia."}
+                </div>
+              ) : (
+                filteredPicUsers.map((user) => {
+                  const checked = selectedPicIds.includes(user.id);
+                  return (
+                    <label
+                      key={user.id}
+                      className="flex cursor-pointer items-start gap-3 border-b px-3 py-2 last:border-b-0 hover:bg-sky-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSelection(user.id, setSelectedPicIds)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">{user.name}</p>
+                        <p className="truncate text-xs text-slate-500">
+                          {[user.role, user.department].filter(Boolean).join(" • ")}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {selectedRoomIds.length || selectedPicIds.length ? (
+          <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-slate-700">
+                <Building2 className="h-4 w-4" />
+                <span className="font-medium">Ruangan Terpilih</span>
+              </div>
+              {selectedRoomSelections.length ? (
+                selectedRoomSelections.map((roomSelection) => (
+                  <div key={roomSelection.id} className="truncate text-slate-600">
+                    {roomSelection.label}
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-500">Belum ada ruangan dipilih.</div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-slate-700">
+                <UserRound className="h-4 w-4" />
+                <span className="font-medium">PIC Terpilih</span>
+              </div>
+              {selectedPicSelections.length ? (
+                selectedPicSelections.map((picSelection) => (
+                  <div key={picSelection.id} className="truncate text-slate-600">
+                    {picSelection.label}
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-500">Belum ada PIC dipilih.</div>
+              )}
+            </div>
+          </div>
         ) : null}
 
-        {roomOptionsError || picUsersError || (selectedRoomId && roomDetailError) ? (
-          <InlineErrorAlert>{roomOptionsError || picUsersError || roomDetailError}</InlineErrorAlert>
+        {roomOptionsError || picUsersError ? (
+          <InlineErrorAlert>{roomOptionsError || picUsersError}</InlineErrorAlert>
         ) : null}
         {message ? <InlineErrorAlert>{message}</InlineErrorAlert> : null}
         {errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
@@ -224,11 +285,11 @@ export default function AssignRoomPicDialog({
         <DialogFooter>
           <Button
             type="submit"
-            disabled={isSubmitting || isLoadingRoomDetail || !selectedRoomId}
+            disabled={isSubmitting || isLoadingRooms || isLoadingPics}
             className="gap-2"
           >
             <Plus className="h-4 w-4" />
-            {isSubmitting ? "Menyimpan..." : "Tambahkan PIC Ruangan"}
+            {isSubmitting ? "Menyimpan..." : "Tambahkan PIC ke Ruangan Terpilih"}
           </Button>
         </DialogFooter>
       </form>

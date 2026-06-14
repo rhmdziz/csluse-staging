@@ -32,6 +32,7 @@ from .serializers import (
     AdminProfileSerializer,
     LabClearanceSerializer,
     PicUserDropdownSerializer,
+    RoomPicBulkAssignSerializer,
     PicUserSerializer,
     ProfileSerializer,
     UserBulkDeleteSerializer,
@@ -513,7 +514,7 @@ class UserWithProfileViewSet(viewsets.ModelViewSet):
 class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PicUserSerializer
     permission_classes = [IsAuthenticated, IsStaffOrAbove]
-    http_method_names = ["get"]
+    http_method_names = ["get", "post"]
 
     def _parse_bool_query(self, value):
         if value is None:
@@ -651,6 +652,79 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
                 "failed_ids": failed_ids,
             },
             status=response_status,
+        )
+
+    @extend_schema(request=RoomPicBulkAssignSerializer)
+    @action(detail=False, methods=["post"], url_path="bulk-assign")
+    def bulk_assign(self, request):
+        serializer = RoomPicBulkAssignSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room_ids = serializer.validated_data["room_ids"]
+        pic_ids = serializer.validated_data["pic_ids"]
+
+        rooms = Room.objects.filter(pk__in=room_ids).prefetch_related("pics")
+        profiles = self.get_queryset().filter(pk__in=pic_ids).distinct()
+
+        rooms_by_id = {str(room.pk): room for room in rooms}
+        profiles_by_id = {str(profile.pk): profile for profile in profiles}
+
+        missing_room_ids = [room_id for room_id in room_ids if room_id not in rooms_by_id]
+        missing_pic_ids = [pic_id for pic_id in pic_ids if pic_id not in profiles_by_id]
+
+        if missing_room_ids or missing_pic_ids:
+            detail_parts = []
+            if missing_room_ids:
+                detail_parts.append("Sebagian ruangan tidak ditemukan.")
+            if missing_pic_ids:
+                detail_parts.append("Sebagian PIC tidak ditemukan atau tidak valid.")
+            raise ValidationError(
+                {
+                    "detail": " ".join(detail_parts),
+                    "room_ids": missing_room_ids,
+                    "pic_ids": missing_pic_ids,
+                }
+            )
+
+        profiles_to_add = list(profiles)
+        total_requested_pairs = len(room_ids) * len(pic_ids)
+        created_assignment_count = 0
+
+        with transaction.atomic():
+            for room_id in room_ids:
+                room = rooms_by_id[room_id]
+                existing_pic_ids = {str(pic_id) for pic_id in room.pics.values_list("id", flat=True)}
+                new_profiles = [
+                    profile
+                    for profile in profiles_to_add
+                    if str(profile.pk) not in existing_pic_ids
+                ]
+                if not new_profiles:
+                    continue
+
+                room.pics.add(*new_profiles)
+                created_assignment_count += len(new_profiles)
+                log_admin_action(
+                    request.user,
+                    room,
+                    CHANGE,
+                    (
+                        "Assigned room PICs via CSL Admin (task management bulk assign): "
+                        f"{', '.join(profile.full_name or profile.email for profile in new_profiles)}"
+                    ),
+                )
+
+        skipped_existing_count = max(total_requested_pairs - created_assignment_count, 0)
+        return Response(
+            {
+                "assigned_room_count": len(room_ids),
+                "assigned_pic_count": len(pic_ids),
+                "created_assignment_count": created_assignment_count,
+                "skipped_existing_count": skipped_existing_count,
+                "room_ids": room_ids,
+                "pic_ids": pic_ids,
+            },
+            status=status.HTTP_200_OK,
         )
 
 

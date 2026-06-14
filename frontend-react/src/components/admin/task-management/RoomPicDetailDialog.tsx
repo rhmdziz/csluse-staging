@@ -29,7 +29,7 @@ export default function RoomPicDetailDialog({
   onUpdated,
 }: RoomPicDetailDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [localRoomNames, setLocalRoomNames] = useState<string[]>([]);
+  const [localRoomIds, setLocalRoomIds] = useState<string[]>([]);
   const pendingRemovalsRef = useRef<string[]>([]);
   const pendingAdditionsRef = useRef<string[]>([]);
   const [selectedAddRoomId, setSelectedAddRoomId] = useState("");
@@ -38,13 +38,13 @@ export default function RoomPicDetailDialog({
 
   const { rooms: roomOptions, isLoading: isLoadingRooms } = useRoomOptions(open);
 
-  const resolveLabel = (name: string) =>
-    roomOptions.find((r) => r.name === name)?.label ?? name;
+  const resolveLabel = (roomId: string) =>
+    roomOptions.find((r) => String(r.id) === String(roomId))?.label ?? roomId;
 
   const availableRooms = useMemo(() => {
-    const localSet = new Set(localRoomNames);
-    return roomOptions.filter((r) => !localSet.has(r.name));
-  }, [roomOptions, localRoomNames]);
+    const localSet = new Set(localRoomIds);
+    return roomOptions.filter((r) => !localSet.has(String(r.id)));
+  }, [roomOptions, localRoomIds]);
 
   const resetPending = () => {
     pendingRemovalsRef.current = [];
@@ -53,14 +53,14 @@ export default function RoomPicDetailDialog({
 
   const stageRoomAddition = (roomId: string) => {
     const room = roomOptions.find((option) => String(option.id) === String(roomId));
-    if (!room || localRoomNames.includes(room.name)) return false;
+    if (!room || localRoomIds.includes(String(room.id))) return false;
 
-    setLocalRoomNames((prev) => [...prev, room.name]);
+    setLocalRoomIds((prev) => [...prev, String(room.id)]);
     const removals = pendingRemovalsRef.current;
-    if (removals.includes(room.name)) {
-      pendingRemovalsRef.current = removals.filter((name) => name !== room.name);
-    } else if (!pendingAdditionsRef.current.includes(room.name)) {
-      pendingAdditionsRef.current = [...pendingAdditionsRef.current, room.name];
+    if (removals.includes(String(room.id))) {
+      pendingRemovalsRef.current = removals.filter((id) => id !== String(room.id));
+    } else if (!pendingAdditionsRef.current.includes(String(room.id))) {
+      pendingAdditionsRef.current = [...pendingAdditionsRef.current, String(room.id)];
     }
     setSelectedAddRoomId("");
     return true;
@@ -70,14 +70,14 @@ export default function RoomPicDetailDialog({
     if (!open) return;
     const editing = mode === "edit";
     setIsEditing(editing);
-    setLocalRoomNames(editing ? (user?.roomNames ?? []) : []);
+    setLocalRoomIds(editing ? (user?.roomAssignments ?? []).map((room) => room.id) : []);
     resetPending();
     setSelectedAddRoomId("");
     setErrorMessage("");
   }, [open, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEnterEdit = () => {
-    setLocalRoomNames(user?.roomNames ?? []);
+    setLocalRoomIds((user?.roomAssignments ?? []).map((room) => room.id));
     resetPending();
     setSelectedAddRoomId("");
     setErrorMessage("");
@@ -86,7 +86,7 @@ export default function RoomPicDetailDialog({
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setLocalRoomNames([]);
+    setLocalRoomIds([]);
     resetPending();
     setSelectedAddRoomId("");
     setErrorMessage("");
@@ -97,13 +97,13 @@ export default function RoomPicDetailDialog({
     stageRoomAddition(selectedAddRoomId);
   };
 
-  const handleRemoveRoom = (name: string) => {
-    setLocalRoomNames((prev) => prev.filter((n) => n !== name));
+  const handleRemoveRoom = (roomId: string) => {
+    setLocalRoomIds((prev) => prev.filter((id) => id !== roomId));
     const additions = pendingAdditionsRef.current;
-    if (additions.includes(name)) {
-      pendingAdditionsRef.current = additions.filter((n) => n !== name);
+    if (additions.includes(roomId)) {
+      pendingAdditionsRef.current = additions.filter((id) => id !== roomId);
     } else {
-      pendingRemovalsRef.current = [...pendingRemovalsRef.current, name];
+      pendingRemovalsRef.current = [...pendingRemovalsRef.current, roomId];
     }
   };
 
@@ -126,8 +126,6 @@ export default function RoomPicDetailDialog({
       return;
     }
 
-    const resolveRoomId = (name: string) => roomOptions.find((r) => r.name === name)?.id;
-
     // Cache room details to avoid duplicate fetches
     type RawDetail = Awaited<ReturnType<typeof roomsService.getDetail>>;
     const rawCache = new Map<string, RawDetail>();
@@ -147,13 +145,10 @@ export default function RoomPicDetailDialog({
     };
 
     // Resolve confirmed ID from one of the user's existing rooms
-    const existingNames = user.roomNames ?? [];
     let confirmedUserId: string | null = null;
-    for (const name of existingNames) {
-      const roomId = resolveRoomId(name);
-      if (!roomId) continue;
+    for (const roomAssignment of user.roomAssignments ?? []) {
       try {
-        const raw = await getDetail(roomId);
+        const raw = await getDetail(roomAssignment.id);
         const found = findUserPicId(raw);
         if (found) { confirmedUserId = found; break; }
       } catch { /* continue */ }
@@ -163,9 +158,7 @@ export default function RoomPicDetailDialog({
     const userId = confirmedUserId ?? String(user.profileId ?? user.id);
 
     try {
-      for (const name of removedNames) {
-        const roomId = resolveRoomId(name);
-        if (!roomId) throw new Error(`Ruangan "${name}" tidak ditemukan.`);
+      for (const roomId of removedNames) {
         const raw = await getDetail(roomId);
         const detail = mapRoom(raw);
         const result = await roomsService.update(roomId, {
@@ -176,12 +169,10 @@ export default function RoomPicDetailDialog({
           description: detail.description,
           picIds: detail.picIds.filter((pid) => pid !== userId),
         });
-        if (!result.ok) throw new Error(`Gagal memperbarui ruangan ${name}.`);
+        if (!result.ok) throw new Error(`Gagal memperbarui ruangan ${detail.name} (${detail.number}).`);
       }
 
-      for (const name of addedNames) {
-        const roomId = resolveRoomId(name);
-        if (!roomId) throw new Error(`Ruangan "${name}" tidak ditemukan.`);
+      for (const roomId of addedNames) {
         const raw = await getDetail(roomId);
         const detail = mapRoom(raw);
         if (!detail.picIds.includes(userId)) {
@@ -193,7 +184,7 @@ export default function RoomPicDetailDialog({
             description: detail.description,
             picIds: [...detail.picIds, userId],
           });
-          if (!result.ok) throw new Error(`Gagal memperbarui ruangan ${name}.`);
+          if (!result.ok) throw new Error(`Gagal memperbarui ruangan ${detail.name} (${detail.number}).`);
         }
       }
 
@@ -233,22 +224,22 @@ export default function RoomPicDetailDialog({
 
               {isEditing ? (
                 <div className="space-y-2">
-                  {localRoomNames.length ? (
+                  {localRoomIds.length ? (
                     <div className="space-y-1.5">
-                      {localRoomNames.map((name) => (
+                      {localRoomIds.map((roomId) => (
                         <div
-                          key={name}
+                          key={roomId}
                           className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                         >
                           <div className="flex items-center gap-2">
                             <DoorOpen className="h-4 w-4 shrink-0 text-slate-400" />
-                            <span>{resolveLabel(name)}</span>
+                            <span>{resolveLabel(roomId)}</span>
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleRemoveRoom(name)}
+                            onClick={() => handleRemoveRoom(roomId)}
                             className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                            aria-label={`Hapus ${name}`}
+                            aria-label={`Hapus ${resolveLabel(roomId)}`}
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -292,15 +283,15 @@ export default function RoomPicDetailDialog({
                     </Button>
                   </div>
                 </div>
-              ) : user.roomNames?.length ? (
+              ) : user.roomAssignments?.length ? (
                 <div className="space-y-1.5">
-                  {user.roomNames.map((roomName) => (
+                  {user.roomAssignments.map((roomAssignment) => (
                     <div
-                      key={roomName}
+                      key={roomAssignment.id}
                       className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                     >
                       <DoorOpen className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span>{resolveLabel(roomName)}</span>
+                      <span>{roomAssignment.label}</span>
                     </div>
                   ))}
                 </div>

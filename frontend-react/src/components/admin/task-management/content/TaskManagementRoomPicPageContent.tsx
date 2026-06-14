@@ -307,10 +307,58 @@ export default function TaskManagementRoomPicPage() {
           emptyMessage="Tidak ada PIC ruangan terdaftar."
           roomHeader="Ruangan"
           getRoomLabel={(user) => {
+            if (user.roomAssignments?.length) {
+              const visibleAssignments = user.roomAssignments.slice(0, 2);
+              const hiddenCount = user.roomAssignments.length - visibleAssignments.length;
+
+              return (
+                <div className="flex flex-wrap gap-1.5">
+                  {visibleAssignments.map((roomAssignment) => (
+                    <span
+                      key={roomAssignment.id}
+                      className="inline-flex max-w-full items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900"
+                      title={roomAssignment.label}
+                    >
+                      <span className="truncate">{roomAssignment.label}</span>
+                    </span>
+                  ))}
+                  {hiddenCount > 0 ? (
+                    <span
+                      className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                      title={user.roomAssignments.slice(2).map((roomAssignment) => roomAssignment.label).join(", ")}
+                    >
+                      +{hiddenCount} lagi
+                    </span>
+                  ) : null}
+                </div>
+              );
+            }
             if (!user.roomNames?.length) return "-";
-            return user.roomNames
-              .map((n) => rooms.find((r) => r.name === n)?.label ?? n)
-              .join(", ");
+
+            const visibleRoomNames = user.roomNames.slice(0, 2);
+            const hiddenCount = user.roomNames.length - visibleRoomNames.length;
+
+            return (
+              <div className="flex flex-wrap gap-1.5">
+                {visibleRoomNames.map((roomName) => (
+                  <span
+                    key={roomName}
+                    className="inline-flex max-w-full items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-900"
+                    title={roomName}
+                  >
+                    <span className="truncate">{roomName}</span>
+                  </span>
+                ))}
+                {hiddenCount > 0 ? (
+                  <span
+                    className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                    title={user.roomNames.slice(2).join(", ")}
+                  >
+                    +{hiddenCount} lagi
+                  </span>
+                ) : null}
+              </div>
+            );
           }}
           secondaryHeader="Role"
           getSecondaryLabel={(user) => user.role}

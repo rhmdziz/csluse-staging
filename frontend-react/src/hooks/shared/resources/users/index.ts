@@ -1,4 +1,5 @@
 export * from "./use-bulk-create-users";
+export * from "./use-bulk-assign-room-pics";
 export * from "./use-create-user";
 export * from "./use-delete-user";
 export * from "./use-assigned-pic-users";

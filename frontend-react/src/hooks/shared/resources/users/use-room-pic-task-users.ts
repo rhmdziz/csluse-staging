@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   usersService,
+  type RoomPicTaskAssignment,
   type RoomPicTaskUserRow,
   type RoomPicTaskUsersFilters as UseRoomPicTaskUsersFilters,
 } from "@/services/shared/resources";
 
-export type { RoomPicTaskUserRow };
+export type { RoomPicTaskAssignment, RoomPicTaskUserRow };
 
 export function useRoomPicTaskUsers(
   filters: UseRoomPicTaskUsersFilters = {},

@@ -373,6 +373,46 @@ class UserBulkDeleteSerializer(serializers.Serializer):
         return unique_ids
 
 
+class RoomPicBulkAssignSerializer(serializers.Serializer):
+    room_ids = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, trim_whitespace=True),
+        allow_empty=False,
+        error_messages={
+            "empty": "Pilih minimal satu ruangan.",
+        },
+    )
+    pic_ids = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, trim_whitespace=True),
+        allow_empty=False,
+        error_messages={
+            "empty": "Pilih minimal satu PIC.",
+        },
+    )
+
+    def _validate_unique_ids(self, value, label):
+        unique_ids = []
+        seen = set()
+
+        for item in value:
+            normalized = str(item).strip()
+            if not normalized:
+                raise serializers.ValidationError(f"Terdapat ID {label} yang kosong.")
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_ids.append(normalized)
+
+        if len(unique_ids) != len(value):
+            raise serializers.ValidationError(f"Terdapat ID {label} yang duplikat.")
+        return unique_ids
+
+    def validate_room_ids(self, value):
+        return self._validate_unique_ids(value, "ruangan")
+
+    def validate_pic_ids(self, value):
+        return self._validate_unique_ids(value, "PIC")
+
+
 # endregion Profile Serializers
 
 
@@ -428,6 +468,7 @@ class PicUserSerializer(serializers.ModelSerializer):
     department = serializers.CharField(read_only=True)
     id_number = serializers.CharField(read_only=True)
     room_names = serializers.SerializerMethodField()
+    room_assignments = serializers.SerializerMethodField()
     is_mentor = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -441,6 +482,7 @@ class PicUserSerializer(serializers.ModelSerializer):
             "department",
             "id_number",
             "room_names",
+            "room_assignments",
             "is_mentor",
         )
 
@@ -448,6 +490,22 @@ class PicUserSerializer(serializers.ModelSerializer):
         return list(
             obj.rooms_as_pic.order_by("name", "number").values_list("name", flat=True)
         )
+
+    def get_room_assignments(self, obj):
+        assignments = obj.rooms_as_pic.order_by("name", "number").values("id", "name", "number")
+        return [
+            {
+                "id": room["id"],
+                "name": room["name"],
+                "number": room["number"],
+                "label": (
+                    f'{room["name"]} ({room["number"]})'
+                    if room["number"]
+                    else room["name"]
+                ),
+            }
+            for room in assignments
+        ]
 
 
 class PicUserDropdownSerializer(serializers.ModelSerializer):
