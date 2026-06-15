@@ -1,4 +1,5 @@
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from allauth.account.models import EmailAddress
@@ -6,7 +7,7 @@ from allauth.core.exceptions import ImmediateHttpResponse
 from django.contrib.admin.models import DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseRedirect
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -14,6 +15,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from csluse.models import Booking, Borrow, Equipment, Pengujian, Room
 from csluse_auth.adapters import (
+    CustomAccountAdapter,
     CustomSocialAccountAdapter,
 )
 from csluse_auth.models import Profile
@@ -115,6 +117,26 @@ class ProfileModelTests(AuthBaseTestMixin, TestCase):
 
         self.assertEqual(profile.initials, "JDJ")
         self.assertIsNone(profile.institution)
+
+
+class CustomAccountAdapterTests(TestCase):
+    @override_settings(FRONTEND_URL="http://localhost:3000/")
+    def test_get_email_confirmation_url_avoids_double_slash(self):
+        adapter = CustomAccountAdapter()
+        emailconfirmation = SimpleNamespace(
+            key="ODQ:1wYviR:G6UZe7iiMR15USb_Oxuxq",
+            email_address=SimpleNamespace(email="guest@example.com"),
+        )
+
+        activation_url = adapter.get_email_confirmation_url(None, emailconfirmation)
+
+        self.assertEqual(
+            activation_url,
+            (
+                "http://localhost:3000/signup-guest/verify/"
+                "ODQ:1wYviR:G6UZe7iiMR15USb_Oxuxq/?email=guest%40example.com"
+            ),
+        )
 
 
 class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):

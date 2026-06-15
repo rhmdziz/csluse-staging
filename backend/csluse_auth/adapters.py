@@ -64,8 +64,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
         """
         Override to return frontend URL instead of backend URL
         """
-        # Frontend URL with the confirmation key
-        frontend_url = settings.FRONTEND_URL
+        frontend_url = settings.FRONTEND_URL.rstrip("/")
         key = emailconfirmation.key
         email = emailconfirmation.email_address.email
         encoded_email = quote(email)
