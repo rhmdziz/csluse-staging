@@ -161,6 +161,14 @@ export default function AdminMyProfilePage() {
     displayProfile.initials ||
     getInitialsFromNameOrEmail(displayProfile.name, profile.email);
   const roleLabel = formatRoleLabel(profile.role);
+  const canChangePassword =
+    String(profile.user_type || "").trim().toLowerCase() !== "internal";
+
+  useEffect(() => {
+    if (!canChangePassword) {
+      setShowPasswordForm(false);
+    }
+  }, [canChangePassword]);
 
   return (
     <section className="w-full min-w-0 space-y-4 overflow-x-hidden px-4 pb-6">
@@ -170,7 +178,13 @@ export default function AdminMyProfilePage() {
         icon={<UserCircle2 className="h-5 w-5 text-sky-200" />}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div
+        className={
+          canChangePassword
+            ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"
+            : "grid gap-4"
+        }
+      >
         <div className="min-w-0 rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-4 shadow-xs">
           <div className="mb-3 flex items-center gap-2">
             <UserCircle2 className="h-4 w-4 text-slate-600" />
@@ -325,150 +339,152 @@ export default function AdminMyProfilePage() {
           </form>
         </div>
 
-        <aside className="h-fit rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-4 shadow-xs">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-slate-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Keamanan Akun</h2>
-          </div>
-          {!showPasswordForm ? (
-            <div className="mt-3 space-y-3">
-              <p className="rounded-md bg-white text-sm text-slate-600">
-                Ubah password akun Anda secara berkala untuk menjaga keamanan.
-              </p>
-              <Button type="button" className="w-full" onClick={() => setShowPasswordForm(true)}>
-                Ganti Password
-              </Button>
+        {canChangePassword ? (
+          <aside className="h-fit rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-4 shadow-xs">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-slate-600" />
+              <h2 className="text-sm font-semibold text-slate-900">Keamanan Akun</h2>
             </div>
-          ) : (
-            <form className="mt-3 space-y-3 rounded-md bg-white" onSubmit={handlePasswordSubmit}>
-              <div className="space-y-1">
-                <label htmlFor="currentPassword" className="text-xs font-medium text-slate-600">
-                  Password Lama
-                </label>
-                <div className="relative">
-                  <Input
-                    id="currentPassword"
-                    name="currentPassword"
-                    type={showCurrentPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    value={passwordFormData.currentPassword}
-                    onChange={handlePasswordChange}
-                    className="border-slate-300 pr-10 focus-visible:border-slate-500 focus-visible:ring-slate-200"
-                  />
-                  <button
-                    type="button"
-                    aria-label={
-                      showCurrentPassword
-                        ? "Sembunyikan password lama"
-                        : "Lihat password lama"
-                    }
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
-                    onClick={() => setShowCurrentPassword((prev) => !prev)}
-                  >
-                    {showCurrentPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="newPassword" className="text-xs font-medium text-slate-600">
-                  Password Baru
-                </label>
-                <div className="relative">
-                  <Input
-                    id="newPassword"
-                    name="newPassword"
-                    type={showNewPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    value={passwordFormData.newPassword}
-                    onChange={handlePasswordChange}
-                    className="border-slate-300 pr-10 focus-visible:border-slate-500 focus-visible:ring-slate-200"
-                  />
-                  <button
-                    type="button"
-                    aria-label={
-                      showNewPassword
-                        ? "Sembunyikan password baru"
-                        : "Lihat password baru"
-                    }
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
-                    onClick={() => setShowNewPassword((prev) => !prev)}
-                  >
-                    {showNewPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="confirmPassword" className="text-xs font-medium text-slate-600">
-                  Konfirmasi Password Baru
-                </label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    value={passwordFormData.confirmPassword}
-                    onChange={handlePasswordChange}
-                    className="border-slate-300 pr-10 focus-visible:border-slate-500 focus-visible:ring-slate-200"
-                  />
-                  <button
-                    type="button"
-                    aria-label={
-                      showConfirmPassword
-                        ? "Sembunyikan konfirmasi password"
-                        : "Lihat konfirmasi password"
-                    }
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {passwordMessage ? (
-                <div
-                  className={`rounded-md border px-3 py-2 text-xs ${
-                    passwordStatus === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-destructive/20 bg-destructive/5 text-destructive"
-                  }`}
-                >
-                  {passwordMessage}
-                </div>
-              ) : null}
-
-              <div className="flex gap-2 pt-1">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowPasswordForm(false)}>
-                  Batal
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1"
-                  disabled={passwordStatus === "submitting"}
-                >
-                  {passwordStatus === "submitting"
-                    ? "Menyimpan..."
-                    : "Simpan"}
+            {!showPasswordForm ? (
+              <div className="mt-3 space-y-3">
+                <p className="rounded-md bg-white text-sm text-slate-600">
+                  Ubah password akun Anda secara berkala untuk menjaga keamanan.
+                </p>
+                <Button type="button" className="w-full" onClick={() => setShowPasswordForm(true)}>
+                  Ganti Password
                 </Button>
               </div>
-            </form>
-          )}
-        </aside>
+            ) : (
+              <form className="mt-3 space-y-3 rounded-md bg-white" onSubmit={handlePasswordSubmit}>
+                <div className="space-y-1">
+                  <label htmlFor="currentPassword" className="text-xs font-medium text-slate-600">
+                    Password Lama
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="currentPassword"
+                      name="currentPassword"
+                      type={showCurrentPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      value={passwordFormData.currentPassword}
+                      onChange={handlePasswordChange}
+                      className="border-slate-300 pr-10 focus-visible:border-slate-500 focus-visible:ring-slate-200"
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showCurrentPassword
+                          ? "Sembunyikan password lama"
+                          : "Lihat password lama"
+                      }
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
+                      onClick={() => setShowCurrentPassword((prev) => !prev)}
+                    >
+                      {showCurrentPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="newPassword" className="text-xs font-medium text-slate-600">
+                    Password Baru
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="newPassword"
+                      name="newPassword"
+                      type={showNewPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={passwordFormData.newPassword}
+                      onChange={handlePasswordChange}
+                      className="border-slate-300 pr-10 focus-visible:border-slate-500 focus-visible:ring-slate-200"
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showNewPassword
+                          ? "Sembunyikan password baru"
+                          : "Lihat password baru"
+                      }
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                    >
+                      {showNewPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="confirmPassword" className="text-xs font-medium text-slate-600">
+                    Konfirmasi Password Baru
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={passwordFormData.confirmPassword}
+                      onChange={handlePasswordChange}
+                      className="border-slate-300 pr-10 focus-visible:border-slate-500 focus-visible:ring-slate-200"
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showConfirmPassword
+                          ? "Sembunyikan konfirmasi password"
+                          : "Lihat konfirmasi password"
+                      }
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {passwordMessage ? (
+                  <div
+                    className={`rounded-md border px-3 py-2 text-xs ${
+                      passwordStatus === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-destructive/20 bg-destructive/5 text-destructive"
+                    }`}
+                  >
+                    {passwordMessage}
+                  </div>
+                ) : null}
+
+                <div className="flex gap-2 pt-1">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setShowPasswordForm(false)}>
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={passwordStatus === "submitting"}
+                  >
+                    {passwordStatus === "submitting"
+                      ? "Menyimpan..."
+                      : "Simpan"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </aside>
+        ) : null}
       </div>
     </section>
   );

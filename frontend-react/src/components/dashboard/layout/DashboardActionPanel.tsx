@@ -79,6 +79,7 @@ type DashboardActionPanelProps = {
   };
   menuParam: string | null;
   actionParam: string | null;
+  canChangePassword: boolean;
   getActionHref: (actionId: string) => string;
   getMenuHref: () => string;
   onClose: () => void;
@@ -234,6 +235,7 @@ export function DashboardActionPanel({
   menu,
   menuParam,
   actionParam,
+  canChangePassword,
   getActionHref,
   getMenuHref,
   onClose,
@@ -1278,7 +1280,9 @@ export function DashboardActionPanel({
               })
             : null}
 
-          {menu.id === "my-profile" && actionParam === "change-password" ? (
+          {menu.id === "my-profile" &&
+          actionParam === "change-password" &&
+          canChangePassword ? (
             <ProfileSecurityPanel />
           ) : null}
         </div>

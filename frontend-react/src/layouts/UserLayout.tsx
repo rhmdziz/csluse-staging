@@ -70,6 +70,8 @@ function DashboardShell({ children }: UserLayoutProps) {
   const { menu: menuParam, action: actionParam } = parseDashboardPath(pathname);
   const defaultMenuId = SIDEBAR_SHORTCUTS[0].id;
   const displayName = profile.name?.trim() || "User";
+  const canChangePassword =
+    String(profile.user_type || "").trim().toLowerCase() !== "internal";
   const sidebarShortcuts = useMemo(
     () =>
       SIDEBAR_SHORTCUTS.filter((item) =>
@@ -79,9 +81,17 @@ function DashboardShell({ children }: UserLayoutProps) {
         ),
       )
         .map((item) => {
-          const actions = item.actions.filter((action) =>
-            canAccessAction(profile.role, action),
-          );
+          const actions = item.actions.filter((action) => {
+            if (
+              item.id === "my-profile" &&
+              action.id === "change-password" &&
+              !canChangePassword
+            ) {
+              return false;
+            }
+
+            return canAccessAction(profile.role, action);
+          });
 
           return {
             ...item,
@@ -101,7 +111,7 @@ function DashboardShell({ children }: UserLayoutProps) {
             item.id === "notifications" ||
             item.id === "bebas-laboratorium",
         ),
-    [displayName, profile.role],
+    [canChangePassword, displayName, profile.role],
   );
   const visibleTopNavItems = useMemo(
     () => getVisibleTopNavItems(profile.role),
@@ -187,6 +197,7 @@ function DashboardShell({ children }: UserLayoutProps) {
               menu={activeMenu}
               menuParam={menuParam}
               actionParam={actionParam}
+              canChangePassword={canChangePassword}
               getActionHref={(actionId) =>
                 toMenuHref(sidebarShortcuts, profile.role, activeMenu.id, actionId)
               }
@@ -239,6 +250,7 @@ function DashboardShell({ children }: UserLayoutProps) {
             menu={activeMenu}
             menuParam={menuParam}
             actionParam={actionParam}
+            canChangePassword={canChangePassword}
             getActionHref={(actionId) =>
               toMenuHref(sidebarShortcuts, profile.role, activeMenu.id, actionId)
             }
