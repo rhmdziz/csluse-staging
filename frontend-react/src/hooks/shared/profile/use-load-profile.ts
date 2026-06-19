@@ -38,6 +38,7 @@ export type UserProfile = {
 const PROFILE_CACHE_KEY = "profile";
 const PROFILE_CACHE_TS_KEY = "profile_cached_at";
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+const PROFILE_CACHE_UPDATED_EVENT = "profile-cache-updated";
 
 let inMemoryProfile: UserProfile | null = null;
 let inMemoryProfileAt = 0;
@@ -52,6 +53,7 @@ export function clearProfileCache() {
 
   window.localStorage.removeItem(PROFILE_CACHE_KEY);
   window.localStorage.removeItem(PROFILE_CACHE_TS_KEY);
+  window.dispatchEvent(new CustomEvent(PROFILE_CACHE_UPDATED_EVENT, { detail: null }));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -156,6 +158,9 @@ export function persistProfileCache(profile: UserProfile) {
   window.localStorage.setItem(PROFILE_CACHE_TS_KEY, String(now));
   inMemoryProfile = profile;
   inMemoryProfileAt = now;
+  window.dispatchEvent(
+    new CustomEvent<UserProfile>(PROFILE_CACHE_UPDATED_EVENT, { detail: profile }),
+  );
 }
 
 export function useLoadProfile(user?: ProfileUserInput | null) {
@@ -252,6 +257,75 @@ export function useLoadProfile(user?: ProfileUserInput | null) {
     };
 
     void loadProfile();
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleProfileUpdated = (event: Event) => {
+      const nextProfile = (event as CustomEvent<UserProfile | null>).detail;
+      if (nextProfile) {
+        setProfile(nextProfile);
+        return;
+      }
+
+      setProfile({
+        id: user?.id,
+        name: user?.name || "User",
+        initials: user?.initials ?? null,
+        email: user?.email || "",
+        last_login: user?.last_login || null,
+        role: user?.role ?? null,
+        department: user?.department ?? null,
+        batch: user?.batch ?? null,
+        id_number: user?.id_number ?? null,
+        user_type: user?.user_type ?? null,
+        institution: user?.institution ?? null,
+        canResetPassword: true,
+      });
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== PROFILE_CACHE_KEY && event.key !== PROFILE_CACHE_TS_KEY) {
+        return;
+      }
+
+      const { profile: cachedProfile, fetchedAt } = getCachedProfile(user);
+      if (cachedProfile) {
+        inMemoryProfile = cachedProfile;
+        inMemoryProfileAt = fetchedAt ?? inMemoryProfileAt;
+        setProfile(cachedProfile);
+        return;
+      }
+
+      inMemoryProfile = null;
+      inMemoryProfileAt = 0;
+      setProfile({
+        id: user?.id,
+        name: user?.name || "User",
+        initials: user?.initials ?? null,
+        email: user?.email || "",
+        last_login: user?.last_login || null,
+        role: user?.role ?? null,
+        department: user?.department ?? null,
+        batch: user?.batch ?? null,
+        id_number: user?.id_number ?? null,
+        user_type: user?.user_type ?? null,
+        institution: user?.institution ?? null,
+        canResetPassword: true,
+      });
+    };
+
+    window.addEventListener(PROFILE_CACHE_UPDATED_EVENT, handleProfileUpdated as EventListener);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(
+        PROFILE_CACHE_UPDATED_EVENT,
+        handleProfileUpdated as EventListener,
+      );
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [user]);
 
   const initials = useMemo(() => {

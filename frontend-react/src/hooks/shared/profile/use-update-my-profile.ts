@@ -4,6 +4,10 @@ import { useState } from "react";
 
 import { API_AUTH_USER_PROFILE_DETAIL } from "@/constants/api";
 import { authFetch } from "@/lib/auth";
+import {
+  getCachedProfileSnapshot,
+  persistProfileCache,
+} from "@/hooks/shared/profile/use-load-profile";
 
 type UpdateMyProfilePayload = {
   full_name: string;
@@ -62,29 +66,21 @@ export function useUpdateMyProfile() {
         throw new Error(errorMessage);
       }
 
-      const cachedRaw =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("profile")
-          : null;
-      const cached = cachedRaw
-        ? (JSON.parse(cachedRaw) as Record<string, unknown>)
-        : {};
-
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          "profile",
-          JSON.stringify({
-            ...cached,
-            name: payload.full_name,
-            initials: payload.initials ?? null,
-            department: payload.department ?? null,
-            batch: payload.batch ?? null,
-            id_number: payload.id_number ?? null,
-            institution: payload.institution ?? null,
-          }),
-        );
-        window.localStorage.setItem("profile_cached_at", String(Date.now()));
-      }
+      const cached = getCachedProfileSnapshot();
+      persistProfileCache({
+        id: cached?.id ?? profileId,
+        name: payload.full_name,
+        initials: payload.initials ?? null,
+        email: cached?.email ?? "",
+        last_login: cached?.last_login ?? null,
+        role: cached?.role ?? null,
+        department: payload.department ?? null,
+        batch: payload.batch ?? null,
+        id_number: payload.id_number ?? null,
+        user_type: cached?.user_type ?? null,
+        institution: payload.institution ?? null,
+        canResetPassword: cached?.canResetPassword ?? true,
+      });
 
       setMessage("Profil berhasil diperbarui.");
       return true;
