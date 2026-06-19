@@ -14,13 +14,17 @@ export function useDeleteUser() {
     setErrorMessage("");
 
     try {
-      const result = await usersService.removeProfile(user.profileId);
+      const result = user.hasUser
+        ? await usersService.remove(user.userId ?? user.profileId)
+        : await usersService.removeProfile(user.profileId);
 
       if (result.ok || result.status === 204) {
         return { ok: true };
       }
 
-      let message = `Gagal menghapus profile (${result.status})`;
+      let message = user.hasUser
+        ? `Gagal menghapus akun/profile (${result.status})`
+        : `Gagal menghapus profile (${result.status})`;
       const data = (result.data ?? {}) as { detail?: string };
       if (typeof data.detail === "string" && data.detail.trim()) {
         message = data.detail;
