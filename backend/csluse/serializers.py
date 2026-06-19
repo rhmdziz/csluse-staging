@@ -583,34 +583,48 @@ class NotificationSerializer(serializers.ModelSerializer):
     target_path = serializers.SerializerMethodField()
 
     def _extract_identifier(self, value: str) -> Optional[str]:
-        match = re.search(r"\b(?:PR|PA|US|PS)\d{4}-\d{3}\b", value or "")
+        match = re.search(r"\b(?:PL|PJ|PR|PA|US|PS)\d{4}-?\d{3}\b", value or "")
         if match:
             return match.group(0)
         return None
 
     def get_target_path(self, obj):
+        stored_target_path = str(getattr(obj, "target_path", "") or "").strip()
+        if stored_target_path:
+            return stored_target_path
+
         title = str(getattr(obj, "title", "") or "")
         message = str(getattr(obj, "message", "") or "")
         combined = f"{title} {message}"
         identifier = self._extract_identifier(combined)
         lower_text = combined.lower()
-
-        if "pengujian" in lower_text:
-            return "/sample-testing"
+        is_approval_notification = (
+            "membutuhkan tindak lanjut" in lower_text
+            or "siap direview" in lower_text
+            or "menunggu approval" in lower_text
+        )
 
         if not identifier:
+            if "pengujian" in lower_text:
+                return "/sample-testing/approval" if is_approval_notification else "/sample-testing"
             return None
 
         booking = Booking.objects.filter(code=identifier).values_list("id", flat=True).first()
         if booking is not None:
+            if is_approval_notification:
+                return f"/booking-rooms/approval/{booking}"
             return f"/booking-rooms/{booking}"
 
         borrow = Borrow.objects.filter(code=identifier).values_list("id", flat=True).first()
         if borrow is not None:
+            if is_approval_notification:
+                return f"/borrow-equipment/approval/{borrow}"
             return f"/borrow-equipment/{borrow}"
 
         pengujian = Pengujian.objects.filter(code=identifier).values_list("id", flat=True).first()
         if pengujian is not None:
+            if is_approval_notification:
+                return f"/sample-testing/approval/{pengujian}"
             return "/sample-testing"
 
         return None

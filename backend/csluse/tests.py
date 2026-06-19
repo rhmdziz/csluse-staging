@@ -491,7 +491,14 @@ class CsluseWorkflowRegressionTests(APITestCase):
         end = start + timedelta(days=duration_days, hours=duration_hours)
         return start, end
 
-    def create_booking(self, requested_by, *, purpose="Penelitian", requester_mentor_profile=None):
+    def create_booking(
+        self,
+        requested_by,
+        *,
+        status="Pending",
+        purpose="Penelitian",
+        requester_mentor_profile=None,
+    ):
         start, end = self.future_window()
         return Booking.objects.create(
             requested_by=requested_by,
@@ -499,6 +506,7 @@ class CsluseWorkflowRegressionTests(APITestCase):
             start_time=start,
             end_time=end,
             attendee_count=1,
+            status=status,
             purpose=purpose,
             requester_mentor="Lecturer User" if requester_mentor_profile else None,
             requester_mentor_profile=requester_mentor_profile,
@@ -651,6 +659,8 @@ class CsluseWorkflowRegressionTests(APITestCase):
             ["admin@example.com", "admin2@example.com"],
         )
         self.assertIn("https://frontend.example.com/sample-testing", mail.outbox[0].body)
+        requester_notification = Notification.objects.get(recipient=self.student_profile)
+        self.assertEqual(requester_notification.target_path, "/sample-testing")
 
     def test_student_cannot_self_approve_booking(self):
         booking = self.create_booking(self.student_profile)
@@ -804,7 +814,8 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(Notification.objects.filter(recipient=self.student_profile, category="Approved").exists())
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["student@example.com"])
 
     def test_mentor_must_approve_booking_before_pic(self):
         booking = self.create_booking(
@@ -962,6 +973,13 @@ class CsluseWorkflowRegressionTests(APITestCase):
             ["admin@example.com", "admin2@example.com"],
         )
         self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.admin_profile,
+                title=f"Peminjaman Lab {booking.code} dibatalkan",
+                target_path=f"/booking-rooms/approval/{booking.id}",
+            ).exists()
+        )
 
     def test_requester_can_cancel_own_approved_borrow_before_handover(self):
         borrow = self.create_borrow(self.student_profile, status="Approved")
@@ -980,6 +998,13 @@ class CsluseWorkflowRegressionTests(APITestCase):
             ["admin@example.com", "admin2@example.com"],
         )
         self.assertEqual(mail.outbox[0].cc, ["student@example.com"])
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.admin_profile,
+                title=f"Peminjaman Alat {borrow.code} dibatalkan",
+                target_path=f"/borrow-equipment/approval/{borrow.id}",
+            ).exists()
+        )
 
     def test_requester_cannot_cancel_borrow_after_borrowed(self):
         borrow = self.create_borrow(
@@ -1186,9 +1211,23 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["lecturer@example.com"])
         self.assertIn(f"/booking-rooms/approval/{create_response.data['id']}", mail.outbox[0].body)
+        mentor_notification = Notification.objects.get(recipient=self.lecturer_profile)
+        self.assertEqual(mentor_notification.title, f"Pengajuan Peminjaman Lab baru {create_response.data['code']}")
+        self.assertEqual(
+            mentor_notification.target_path,
+            f"/booking-rooms/approval/{create_response.data['id']}",
+        )
+
+        self.client.force_authenticate(self.lecturer_user)
+        notification_response = self.client.get("/api/notifications/")
+        self.assertEqual(notification_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(notification_response.data["count"], 1)
+        self.assertEqual(
+            notification_response.data["results"][0]["target_path"],
+            f"/booking-rooms/approval/{create_response.data['id']}",
+        )
 
         mail.outbox = []
-        self.client.force_authenticate(self.lecturer_user)
         approve_response = self.client.post(
             f"/api/bookings/{create_response.data['id']}/approve/",
             {},
@@ -1199,6 +1238,48 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["admin@example.com"])
         self.assertIn(f"/booking-rooms/approval/{create_response.data['id']}", mail.outbox[0].body)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.admin_profile,
+                title=f"Pengajuan Peminjaman Lab siap direview {create_response.data['code']}",
+                target_path=f"/booking-rooms/approval/{create_response.data['id']}",
+            ).exists()
+        )
+
+    def test_booking_submission_for_thesis_notifies_standalone_mentor_profile_email(self):
+        standalone_mentor = Profile.objects.create(
+            email="standalone-mentor@example.com",
+            full_name="Standalone Mentor",
+            role="Lecturer",
+            is_mentor=True,
+            user_type="Internal",
+        )
+        start, end = self.future_window(days=3, start_hour=9)
+        self.client.force_authenticate(user=self.student_user)
+
+        response = self.client.post(
+            "/api/bookings/",
+            {
+                "room": str(self.room.id),
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "attendee_count": 1,
+                "purpose": "Skripsi/TA",
+                "requester_mentor_profile": str(standalone_mentor.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["standalone-mentor@example.com"])
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=standalone_mentor,
+                title=f"Pengajuan Peminjaman Lab baru {response.data['code']}",
+                target_path=f"/booking-rooms/approval/{response.data['id']}",
+            ).exists()
+        )
 
     def test_pengujian_submission_notifies_all_admins(self):
         self.client.force_authenticate(self.student_user)
@@ -1219,6 +1300,20 @@ class CsluseWorkflowRegressionTests(APITestCase):
             ["admin@example.com", "admin2@example.com"],
         )
         self.assertIn(f"/sample-testing/approval/{response.data['id']}", mail.outbox[0].body)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.admin_profile,
+                title=f"Pengajuan Pengujian Sampel baru {response.data['code']}",
+                target_path=f"/sample-testing/approval/{response.data['id']}",
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.second_admin_profile,
+                title=f"Pengajuan Pengujian Sampel baru {response.data['code']}",
+                target_path=f"/sample-testing/approval/{response.data['id']}",
+            ).exists()
+        )
 
     def test_notifications_endpoint_returns_current_user_notifications(self):
         booking = self.create_booking(self.student_profile)
@@ -1240,7 +1335,7 @@ class CsluseWorkflowRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
-        self.assertEqual(response.data["results"][0]["title"], f"Booking Ruangan {booking.code} disetujui")
+        self.assertEqual(response.data["results"][0]["title"], f"Peminjaman Lab {booking.code} disetujui")
         self.assertEqual(response.data["results"][0]["target_path"], f"/booking-rooms/{booking.id}")
 
     def test_notifications_endpoint_returns_null_target_for_unmapped_notification(self):

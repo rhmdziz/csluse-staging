@@ -555,9 +555,15 @@ class Notification(BaseModel):
     title = models.CharField(max_length=255)
     category = models.CharField(max_length=255, choices=CATEGORY_CHOICES, default="General")
     message = models.CharField(max_length=2000)
+    target_path = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"Notification for {self.recipient.user.email} - {self.title}"
+        recipient_email = (
+            getattr(getattr(self.recipient, "user", None), "email", None)
+            or getattr(self.recipient, "email", None)
+            or "unknown"
+        )
+        return f"Notification for {recipient_email} - {self.title}"
 
 
 # endregion Notification Models

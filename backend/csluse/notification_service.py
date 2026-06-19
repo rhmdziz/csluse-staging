@@ -5,6 +5,8 @@ from csluse_auth.models import Profile
 from csluse_auth.permissions import ADMINISTRATOR, SUPER_ADMINISTRATOR
 
 from .email_notifications import (
+    REQUEST_APPROVAL_PATHS,
+    REQUEST_DETAIL_PATHS,
     approval_cta_label,
     build_email_context,
     notification_cta_label,
@@ -51,7 +53,7 @@ def _profile_user(profile):
 
 def _profile_email(profile):
     user = _profile_user(profile)
-    email = getattr(user, "email", None)
+    email = getattr(user, "email", None) or getattr(profile, "email", None)
     return (email or "").strip() or None
 
 
@@ -86,17 +88,25 @@ def _approver_email(instance):
     return _profile_email(getattr(instance, "approved_by", None))
 
 
+def _approver_profile(instance):
+    return getattr(instance, "approved_by", None)
+
+
 def _mentor_email(instance):
     return _profile_email(getattr(instance, "requester_mentor_profile", None))
 
 
 def _admin_emails(exclude_emails=None):
+    return _profile_emails(_admin_profiles(exclude_emails=exclude_emails))
+
+
+def _admin_profiles(exclude_emails=None):
     exclude_emails = {
         str(email).strip().lower()
         for email in (exclude_emails or [])
         if str(email or "").strip()
     }
-    profiles = (
+    queryset = (
         Profile.objects
         .select_related("user")
         .filter(
@@ -106,13 +116,13 @@ def _admin_emails(exclude_emails=None):
         )
         .distinct()
     )
-    emails = []
-    for profile in profiles:
+    profiles = []
+    for profile in queryset:
         email = _profile_email(profile)
-        if not email or email.lower() in exclude_emails:
+        if email and email.lower() in exclude_emails:
             continue
-        emails.append(email)
-    return _distinct_emails(emails)
+        profiles.append(profile)
+    return profiles
 
 
 def _reviewer_profiles(instance, kind):
@@ -133,7 +143,39 @@ def _is_thesis_request(instance):
     return getattr(instance, "purpose", None) == "Skripsi/TA"
 
 
-def _create_notification(recipient, *, title, category, message):
+def _notification_target_path(kind, instance, audience="requester"):
+    path_template = (
+        REQUEST_APPROVAL_PATHS.get(kind, "/notifications")
+        if audience == "approval"
+        else REQUEST_DETAIL_PATHS.get(kind, "/notifications")
+    )
+    instance_id = getattr(instance, "pk", None)
+    if "{id}" in path_template:
+        if instance_id is None:
+            return "/notifications"
+        return path_template.format(id=instance_id)
+    return path_template
+
+
+def _distinct_profiles(*sources):
+    profiles = []
+    seen = set()
+    for source in sources:
+        if not source:
+            continue
+        items = [source] if isinstance(source, Profile) else list(source)
+        for profile in items:
+            if profile is None:
+                continue
+            profile_id = getattr(profile, "id", None)
+            if profile_id in seen:
+                continue
+            seen.add(profile_id)
+            profiles.append(profile)
+    return profiles
+
+
+def _create_notification(recipient, *, title, category, message, target_path=None):
     if recipient is None:
         return None
     return Notification.objects.create(
@@ -141,7 +183,30 @@ def _create_notification(recipient, *, title, category, message):
         title=title,
         category=category,
         message=message,
+        target_path=target_path,
     )
+
+
+def _create_notifications(recipients, *, title, category, message, target_path=None):
+    created = []
+    seen = set()
+    for recipient in recipients or []:
+        if recipient is None:
+            continue
+        recipient_id = getattr(recipient, "id", None)
+        if recipient_id in seen:
+            continue
+        seen.add(recipient_id)
+        created.append(
+            _create_notification(
+                recipient,
+                title=title,
+                category=category,
+                message=message,
+                target_path=target_path,
+            )
+        )
+    return created
 
 
 def _notification_recipient_name(instance, recipient):
@@ -333,18 +398,26 @@ def notify_request_status(instance, *, kind, status_value, actor_profile=None, r
         title=title,
         category=category,
         message=message,
+        target_path=_notification_target_path(kind, instance),
     )
     if status_value == "Canceled":
-        reviewer_emails = _distinct_emails(
-            [_approver_email(instance)],
-            _admin_emails(exclude_emails=[_requester_email(instance)]),
+        reviewer_profiles = _distinct_profiles(
+            [_approver_profile(instance)],
+            _admin_profiles(exclude_emails=[_requester_email(instance)]),
+        )
+        _create_notifications(
+            reviewer_profiles,
+            title=title,
+            category=category,
+            message=message,
+            target_path=_notification_target_path(kind, instance, audience="approval"),
         )
         _send_generic_request_email(
             instance,
             kind=kind,
             title=title,
             message=message,
-            to_emails=reviewer_emails,
+            to_emails=_profile_emails(reviewer_profiles),
             cc_emails=[_requester_email(instance)],
             audience="approval",
         )
@@ -388,6 +461,7 @@ def notify_lab_clearance_status(instance, *, status_value, actor_profile=None, r
         title=title,
         category=category,
         message=message,
+        target_path=_notification_target_path("lab_clearance", instance),
     )
 
     requester_email = _requester_email(instance)
@@ -441,6 +515,7 @@ def notify_borrow_overdue(instance, request=None):
         title=title,
         category="Reminder",
         message=message,
+        target_path=_notification_target_path("borrow", instance),
     )
     _send_borrow_overdue_email(
         instance,
@@ -462,34 +537,58 @@ def notify_new_request_submission(instance, *, kind):
     )
 
     if kind == "pengujian":
+        admin_profiles = _admin_profiles()
+        _create_notifications(
+            admin_profiles,
+            title=title,
+            category="General",
+            message=message,
+            target_path=_notification_target_path(kind, instance, audience="approval"),
+        )
         _send_generic_request_email(
             instance,
             kind=kind,
             title=title,
             message=message,
-            to_emails=_admin_emails(),
+            to_emails=_profile_emails(admin_profiles),
             audience="approval",
         )
         return
 
     if _is_thesis_request(instance):
+        mentor_profile = getattr(instance, "requester_mentor_profile", None)
+        _create_notification(
+            mentor_profile,
+            title=title,
+            category="General",
+            message=message,
+            target_path=_notification_target_path(kind, instance, audience="approval"),
+        )
         _send_generic_request_email(
             instance,
             kind=kind,
             title=title,
             message=message,
-            to_emails=[_mentor_email(instance)],
+            to_emails=_profile_emails([mentor_profile]),
             audience="approval",
             cta_label="Buka Pengajuan",
         )
         return
 
+    reviewer_profiles = _reviewer_profiles(instance, kind)
+    _create_notifications(
+        reviewer_profiles,
+        title=title,
+        category="General",
+        message=message,
+        target_path=_notification_target_path(kind, instance, audience="approval"),
+    )
     _send_generic_request_email(
         instance,
         kind=kind,
         title=title,
         message=message,
-        to_emails=_profile_emails(_reviewer_profiles(instance, kind)),
+        to_emails=_profile_emails(reviewer_profiles),
         audience="approval",
         cta_label="Buka Pengajuan",
     )
@@ -504,12 +603,20 @@ def notify_post_mentor_approval(instance, *, kind, actor_profile=None):
         f"Pengajuan {request_label} dengan ID {request_identifier} telah disetujui oleh "
         f"{actor_name} dan sekarang menunggu approval lanjutan dari PIC ruangan."
     )
+    reviewer_profiles = _reviewer_profiles(instance, kind)
+    _create_notifications(
+        reviewer_profiles,
+        title=title,
+        category="General",
+        message=message,
+        target_path=_notification_target_path(kind, instance, audience="approval"),
+    )
     _send_generic_request_email(
         instance,
         kind=kind,
         title=title,
         message=message,
-        to_emails=_profile_emails(_reviewer_profiles(instance, kind)),
+        to_emails=_profile_emails(reviewer_profiles),
         audience="approval",
         cta_label="Buka Halaman Approval",
     )
