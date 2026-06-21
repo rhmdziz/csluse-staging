@@ -19,6 +19,7 @@ export default function SampleTestingDocumentsDialog({
   viewerRole,
   onUploaded,
   allowActions = true,
+  allowAllDocumentTypes = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +27,7 @@ export default function SampleTestingDocumentsDialog({
   viewerRole: "approver" | "requester";
   onUploaded?: () => void;
   allowActions?: boolean;
+  allowAllDocumentTypes?: boolean;
 }) {
   const { sampleTesting, isLoading, error } = useSampleTestingDetail(sampleTestingId, {
     enabled: open && Boolean(sampleTestingId),
@@ -72,6 +74,7 @@ export default function SampleTestingDocumentsDialog({
               onUploaded={handleUploaded}
               embedded
               allowActions={allowActions}
+              allowAllDocumentTypes={allowAllDocumentTypes}
             />
           ) : (
             <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">

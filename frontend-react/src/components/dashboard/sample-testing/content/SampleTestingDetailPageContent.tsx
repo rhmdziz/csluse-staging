@@ -207,6 +207,7 @@ export default function SampleTestingDetailPage() {
               item={item}
               viewerRole="approver"
               onUploaded={() => setReloadKey((prev) => prev + 1)}
+              allowAllDocumentTypes
             />
 
             <SampleTestingSectionCard

@@ -91,12 +91,14 @@ export default function SampleTestingDocumentsSection({
   onUploaded,
   embedded = false,
   allowActions = true,
+  allowAllDocumentTypes = false,
 }: {
   item: SampleTestingRow;
   viewerRole: "approver" | "requester";
   onUploaded?: () => void;
   embedded?: boolean;
   allowActions?: boolean;
+  allowAllDocumentTypes?: boolean;
 }) {
   const { uploadDocument, pendingDocumentType } = useUploadSampleTestingDocument();
   const {
@@ -170,7 +172,8 @@ export default function SampleTestingDocumentsSection({
       <div className="space-y-3">
         {DOCUMENT_DEFINITIONS_DISPLAY.map((definition) => {
           const document = getDocumentByType(item.documents, definition.type);
-          const isOwner = viewerRole === definition.owner;
+          const isOwner =
+            allowAllDocumentTypes || viewerRole === definition.owner;
           const canUpload = allowActions && isOwner && canManageDocuments;
           const canReplace = canManageDocuments;
           const canDelete = canManageDocuments;

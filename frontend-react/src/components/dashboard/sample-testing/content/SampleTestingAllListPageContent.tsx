@@ -267,6 +267,7 @@ export default function SampleTestingAllListPage() {
         sampleTestingId={documentsSampleTestingId}
         viewerRole="approver"
         onUploaded={() => setReloadKey((prev) => prev + 1)}
+        allowAllDocumentTypes
       />
       <DashboardDetailReviewDialog
         open={Boolean(reviewSampleTestingId)}
