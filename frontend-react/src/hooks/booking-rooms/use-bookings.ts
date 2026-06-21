@@ -15,6 +15,7 @@ export type BookingFilters = {
   room?: string;
   createdAfter?: string;
   createdBefore?: string;
+  legacyMode?: "exclude" | "only" | "all";
 };
 
 export type BookingListScope = "default" | "my" | "all" | "admin-all";
@@ -433,6 +434,7 @@ export function useBookings(
     filters.room,
     filters.createdAfter,
     filters.createdBefore,
+    filters.legacyMode,
     reloadKey,
     scope,
     enabled,

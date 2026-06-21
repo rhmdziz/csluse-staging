@@ -12,7 +12,7 @@ import { DataPagination, TableActionIconButton } from "@/components/shared";
 
 import { useRooms } from "@/hooks/shared/resources/rooms";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 export default function RoomsListPage() {
   const router = useRouter();

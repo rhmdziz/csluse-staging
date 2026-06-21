@@ -12,6 +12,7 @@ export type SampleTestingFilters = {
   department?: string;
   createdAfter?: string;
   createdBefore?: string;
+  legacyMode?: "exclude" | "only" | "all";
 };
 
 export type SampleTestingListScope = "default" | "my" | "all" | "admin-all";
@@ -369,6 +370,7 @@ export function useSampleTestingList(
     filters.department,
     filters.createdAfter,
     filters.createdBefore,
+    filters.legacyMode,
     reloadKey,
     scope,
   ]);

@@ -47,7 +47,7 @@ import { toEndOfDay, toStartOfDay } from "@/lib/date";
 
 import { getSampleTestingProgressFlow } from "@/lib/request";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 function canShowDocumentAction(status: string) {
   const normalized = normalizeStatus(status);

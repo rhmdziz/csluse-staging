@@ -331,6 +331,8 @@ export default function MentorTaskManagementContent() {
             ? `${removeCandidate.name || removeCandidate.email} akan dilepas dari daftar dosen pembimbing.`
             : "Data akan diperbarui."
         }
+        confirmLabel="Lepaskan"
+        pendingLabel="Melepas..."
         isDeleting={isSubmitting}
         onOpenChange={(open) => {
           if (!open) setRemoveCandidate(null);
@@ -343,6 +345,8 @@ export default function MentorTaskManagementContent() {
         open={bulkRemoveOpen}
         title="Lepaskan dosen pembimbing terpilih?"
         description={`${selectedCount} dosen yang dipilih akan dilepas dari status dosen pembimbing.`}
+        confirmLabel="Lepaskan"
+        pendingLabel="Melepas..."
         isDeleting={isSubmitting}
         onOpenChange={setBulkRemoveOpen}
         onConfirm={() => {

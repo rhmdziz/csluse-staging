@@ -64,8 +64,8 @@ import {
   shouldShowReviewAction,
 } from "@/lib/request";
 
-const PAGE_SIZE = 10;
-const MENTOR_PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
+const MENTOR_PAGE_SIZE = 20;
 const TABLE_COLUMN_WIDTHS = [
   "10rem",
   "16rem",

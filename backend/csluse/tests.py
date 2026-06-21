@@ -1,6 +1,8 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -214,14 +216,55 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(booking.status, "Completed")
         self.assertEqual(booking.attendee_count, 12)
         self.assertEqual(booking.requester_name, "Peminjam Legacy")
-        self.assertTrue(booking.code.startswith("CSL"))
+        self.assertTrue(booking.code.startswith("EX-PL"))
+
+    def test_legacy_booking_import_bypasses_request_throttle(self):
+        rest_framework_settings = {
+            **settings.REST_FRAMEWORK,
+            "DEFAULT_THROTTLE_RATES": {
+                "anon": "1/minute",
+                "user": "1/minute",
+            },
+        }
+        start = timezone.now() - timedelta(days=30)
+        end = start + timedelta(hours=2)
+
+        with self.settings(REST_FRAMEWORK=rest_framework_settings):
+            cache.clear()
+            try:
+                self.client.force_authenticate(user=self.admin_user)
+                first_response = self.client.get("/api/bookings/all/")
+                self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+
+                import_response = self.client.post(
+                    "/api/bookings/legacy-bulk-import/",
+                    {
+                        "rows": [
+                            {
+                                "index": 2,
+                                "requester_name": "Throttle Bypass",
+                                "room_name": "Lab Legacy",
+                                "start_time": start.isoformat(),
+                                "end_time": end.isoformat(),
+                                "status": "Completed",
+                                "purpose": "Penelitian",
+                            }
+                        ]
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(import_response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(import_response.data["success_count"], 1)
+            finally:
+                cache.clear()
 
     def test_admin_legacy_booking_import_can_continue_past_999(self):
         self.client.force_authenticate(user=self.admin_user)
         start = timezone.now() - timedelta(days=30)
         end = start + timedelta(hours=2)
         Booking.objects.create(
-            code="CSL000000999",
+            code="EX-PL0000999",
             requester_name="Existing Legacy",
             room_name="Lab Legacy",
             start_time=start,
@@ -249,8 +292,111 @@ class CsluseWorkflowRegressionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        imported_booking = Booking.objects.exclude(code="CSL000000999").get()
-        self.assertEqual(imported_booking.code, "CSL000001000")
+        imported_booking = Booking.objects.exclude(code="EX-PL0000999").get()
+        self.assertEqual(imported_booking.code, "EX-PL0001000")
+
+    def test_booking_all_can_exclude_legacy_records(self):
+        self.client.force_authenticate(user=self.admin_user)
+        start = timezone.now() + timedelta(days=3)
+        end = start + timedelta(hours=2)
+        Booking.objects.create(
+            code="EX-PL0000124",
+            requested_by=self.student_profile,
+            room=self.room,
+            room_name=self.room.name,
+            start_time=start,
+            end_time=end,
+            status="Completed",
+            purpose="Penelitian",
+        )
+        active_booking = Booking.objects.create(
+            requested_by=self.student_profile,
+            room=self.room,
+            room_name=self.room.name,
+            start_time=start + timedelta(days=1),
+            end_time=end + timedelta(days=1),
+            status="Pending",
+            purpose="Penelitian",
+        )
+
+        response = self.client.get("/api/bookings/all/?exclude_legacy=1")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["aggregates"]["total"], 1)
+        self.assertEqual(response.data["aggregates"]["pending"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(str(response.data["results"][0]["id"]), str(active_booking.id))
+
+    def test_booking_all_can_show_only_legacy_records(self):
+        self.client.force_authenticate(user=self.admin_user)
+        start = timezone.now() + timedelta(days=3)
+        end = start + timedelta(hours=2)
+        legacy_booking = Booking.objects.create(
+            code="EX-PL0000124",
+            requested_by=self.student_profile,
+            room=self.room,
+            room_name=self.room.name,
+            start_time=start,
+            end_time=end,
+            status="Completed",
+            purpose="Penelitian",
+        )
+        Booking.objects.create(
+            requested_by=self.student_profile,
+            room=self.room,
+            room_name=self.room.name,
+            start_time=start + timedelta(days=1),
+            end_time=end + timedelta(days=1),
+            status="Pending",
+            purpose="Penelitian",
+        )
+
+        response = self.client.get("/api/bookings/all/?legacy_only=1")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["aggregates"]["total"], 1)
+        self.assertEqual(response.data["aggregates"]["completed"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(str(response.data["results"][0]["id"]), str(legacy_booking.id))
+
+    def test_room_bulk_create_bypasses_request_throttle(self):
+        rest_framework_settings = {
+            **settings.REST_FRAMEWORK,
+            "DEFAULT_THROTTLE_RATES": {
+                "anon": "1/minute",
+                "user": "1/minute",
+            },
+        }
+
+        with self.settings(REST_FRAMEWORK=rest_framework_settings):
+            cache.clear()
+            try:
+                self.client.force_authenticate(user=self.staff_user)
+                first_response = self.client.get("/api/rooms/")
+                self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+
+                bulk_response = self.client.post(
+                    "/api/rooms/bulk-create/",
+                    {
+                        "rows": [
+                            {
+                                "index": 1,
+                                "name": "Throttle Room",
+                                "capacity": 12,
+                                "number": "TR-01",
+                                "floor": 3,
+                            }
+                        ]
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(bulk_response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(bulk_response.data["success_count"], 1)
+            finally:
+                cache.clear()
 
     def test_admin_can_bulk_import_legacy_sample_testing_history(self):
         self.client.force_authenticate(user=self.admin_user)
@@ -276,12 +422,12 @@ class CsluseWorkflowRegressionTests(APITestCase):
         pengujian = Pengujian.objects.get()
         self.assertEqual(pengujian.name, "Legacy Requester")
         self.assertEqual(pengujian.status, "Completed")
-        self.assertTrue(pengujian.code.startswith("CSL"))
+        self.assertTrue(pengujian.code.startswith("EX-PS"))
 
     def test_admin_legacy_sample_testing_import_can_continue_past_999(self):
         self.client.force_authenticate(user=self.admin_user)
         Pengujian.objects.create(
-            code="CSL000000999",
+            code="EX-PS0000999",
             name="Existing Legacy",
             email="existing-legacy@example.com",
             sample_type="Air",
@@ -305,8 +451,130 @@ class CsluseWorkflowRegressionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        imported_pengujian = Pengujian.objects.exclude(code="CSL000000999").get()
-        self.assertEqual(imported_pengujian.code, "CSL000001000")
+        imported_pengujian = Pengujian.objects.exclude(code="EX-PS0000999").get()
+        self.assertEqual(imported_pengujian.code, "EX-PS0001000")
+
+    def test_sample_testing_all_can_exclude_legacy_records(self):
+        self.client.force_authenticate(user=self.admin_user)
+        Pengujian.objects.create(
+            requested_by=self.student_profile,
+            name="Legacy Requester",
+            email="legacy-list@example.com",
+            sample_type="Air",
+            status="Completed",
+            code="EX-PS0000123",
+        )
+        active_pengujian = Pengujian.objects.create(
+            requested_by=self.student_profile,
+            name="Active Requester",
+            email="active-list@example.com",
+            sample_type="Air",
+            status="Pending",
+        )
+
+        response = self.client.get("/api/pengujians/all/?exclude_legacy=1")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["aggregates"]["total"], 1)
+        self.assertEqual(response.data["aggregates"]["pending"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(str(response.data["results"][0]["id"]), str(active_pengujian.id))
+
+    def test_sample_testing_all_can_show_only_legacy_records(self):
+        self.client.force_authenticate(user=self.admin_user)
+        legacy_pengujian = Pengujian.objects.create(
+            requested_by=self.student_profile,
+            name="Legacy Requester",
+            email="legacy-list@example.com",
+            sample_type="Air",
+            status="Completed",
+            code="EX-PS0000123",
+        )
+        Pengujian.objects.create(
+            requested_by=self.student_profile,
+            name="Active Requester",
+            email="active-list@example.com",
+            sample_type="Air",
+            status="Pending",
+        )
+
+        response = self.client.get("/api/pengujians/all/?legacy_only=1")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["aggregates"]["total"], 1)
+        self.assertEqual(response.data["aggregates"]["completed"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(str(response.data["results"][0]["id"]), str(legacy_pengujian.id))
+
+    def test_dashboard_overview_excludes_legacy_sample_testing_for_admin(self):
+        self.client.force_authenticate(user=self.admin_user)
+        Pengujian.objects.create(
+            requested_by=self.student_profile,
+            approved_by=self.admin_profile,
+            name="Legacy Requester",
+            email="legacy-overview@example.com",
+            sample_type="Air",
+            status="Completed",
+            code="EX-PS0000456",
+        )
+        active_pengujian = Pengujian.objects.create(
+            requested_by=self.student_profile,
+            approved_by=self.admin_profile,
+            name="Active Requester",
+            email="active-overview@example.com",
+            sample_type="Air",
+            status="Pending",
+        )
+
+        response = self.client.get("/api/dashboard-overview/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["totals"]["total_requests"], 1)
+        self.assertEqual(response.data["totals"]["pending"], 1)
+        self.assertEqual(response.data["totals"]["completed"], 0)
+        self.assertEqual(len(response.data["recent_activities"]), 1)
+        self.assertEqual(
+            response.data["recent_activities"][0]["code"],
+            active_pengujian.code,
+        )
+
+    def test_dashboard_overview_excludes_legacy_bookings_for_admin(self):
+        self.client.force_authenticate(user=self.admin_user)
+        start = timezone.now() + timedelta(days=3)
+        end = start + timedelta(hours=2)
+        Booking.objects.create(
+            code="EX-PL0000457",
+            requested_by=self.student_profile,
+            room=self.room,
+            room_name=self.room.name,
+            start_time=start,
+            end_time=end,
+            status="Completed",
+            purpose="Penelitian",
+        )
+        active_booking = Booking.objects.create(
+            requested_by=self.student_profile,
+            room=self.room,
+            room_name=self.room.name,
+            start_time=start + timedelta(days=1),
+            end_time=end + timedelta(days=1),
+            status="Pending",
+            purpose="Penelitian",
+        )
+
+        response = self.client.get("/api/dashboard-overview/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["totals"]["total_requests"], 1)
+        self.assertEqual(response.data["totals"]["pending"], 1)
+        self.assertEqual(response.data["totals"]["completed"], 0)
+        self.assertEqual(len(response.data["recent_activities"]), 1)
+        self.assertEqual(
+            response.data["recent_activities"][0]["code"],
+            active_booking.code,
+        )
 
     def test_booking_request_can_cross_weekend_when_within_three_months(self):
         start, end = self.future_weekday_window(

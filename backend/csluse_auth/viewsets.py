@@ -42,6 +42,19 @@ from .serializers import (
 User = get_user_model()
 
 
+class AdminProvisioningThrottleBypassMixin:
+    """
+    Admin-only provisioning endpoints may be called repeatedly during imports.
+    """
+
+    throttle_exempt_actions = {"create"}
+
+    def get_throttles(self):
+        if getattr(self, "action", None) in self.throttle_exempt_actions:
+            return []
+        return super().get_throttles()
+
+
 # region Profile Viewsets
 
 
@@ -106,7 +119,7 @@ class MentorViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-class AdminProfileViewSet(viewsets.ModelViewSet):
+class AdminProfileViewSet(AdminProvisioningThrottleBypassMixin, viewsets.ModelViewSet):
     serializer_class = AdminProfileSerializer
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
     queryset = Profile.objects.select_related("user").all()
@@ -259,7 +272,7 @@ class AdminProfileViewSet(viewsets.ModelViewSet):
 # region User Management Viewsets
 
 
-class UserWithProfileViewSet(viewsets.ModelViewSet):
+class UserWithProfileViewSet(AdminProvisioningThrottleBypassMixin, viewsets.ModelViewSet):
     serializer_class = AdminProfileSerializer
     permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
     queryset = Profile.objects.select_related("user").all()

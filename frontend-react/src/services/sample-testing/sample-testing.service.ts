@@ -20,6 +20,7 @@ export type SampleTestingServiceFilters = {
   department?: string;
   createdAfter?: string;
   createdBefore?: string;
+  legacyMode?: "exclude" | "only" | "all";
 };
 
 export type SampleTestingServiceListScope = "default" | "my" | "all" | "admin-all";
@@ -110,6 +111,11 @@ export const sampleTestingService = {
           : API_PENGUJIANS;
     const url = new URL(listEndpoint, window.location.origin);
 
+    if (filters.legacyMode === "only") {
+      url.searchParams.set("legacy_only", "1");
+    } else if (filters.legacyMode === "exclude" || (scope !== "admin-all" && filters.legacyMode !== "all")) {
+      url.searchParams.set("exclude_legacy", "1");
+    }
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));
     if (filters.q) url.searchParams.set("q", filters.q);

@@ -1,6 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
+
+import { Loader2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -28,6 +30,7 @@ type ConfirmDeleteDialogProps = {
   footerClassName?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  pendingLabel?: string;
 };
 
 export default function ConfirmDeleteDialog({
@@ -44,7 +47,14 @@ export default function ConfirmDeleteDialog({
   footerClassName,
   confirmLabel = "Hapus",
   cancelLabel = "Batal",
+  pendingLabel = "Menghapus...",
 }: ConfirmDeleteDialogProps) {
+  const handleConfirm = (event: MouseEvent<HTMLButtonElement>) => {
+    // Keep the dialog open until the caller closes it explicitly after the async action finishes.
+    event.preventDefault();
+    onConfirm();
+  };
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       {trigger ? <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger> : null}
@@ -56,11 +66,19 @@ export default function ConfirmDeleteDialog({
         <AlertDialogFooter className={footerClassName}>
           <AlertDialogCancel disabled={isDeleting}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={handleConfirm}
             disabled={isDeleting}
             variant="destructive"
+            className="gap-2"
           >
-            {isDeleting ? "Menghapus..." : confirmLabel}
+            {isDeleting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {pendingLabel}
+              </>
+            ) : (
+              confirmLabel
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

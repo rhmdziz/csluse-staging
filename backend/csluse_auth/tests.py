@@ -4,8 +4,10 @@ from unittest.mock import MagicMock, patch
 
 from allauth.account.models import EmailAddress
 from allauth.core.exceptions import ImmediateHttpResponse
+from django.conf import settings
 from django.contrib.admin.models import DELETION, LogEntry
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.http import HttpResponseRedirect
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -256,6 +258,38 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             ["alice@example.com", "bob@example.com"],
         )
         self.assertNotIn("count", response.data[0])
+
+    def test_admin_profile_create_bypasses_request_throttle(self):
+        rest_framework_settings = {
+            **settings.REST_FRAMEWORK,
+            "DEFAULT_THROTTLE_RATES": {
+                "anon": "1/minute",
+                "user": "1/minute",
+            },
+        }
+
+        with self.settings(REST_FRAMEWORK=rest_framework_settings):
+            cache.clear()
+            try:
+                first_response = self.client.get("/api/admin/profile/")
+                self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+
+                create_response = self.client.post(
+                    "/api/admin/profile/",
+                    {
+                        "email": "throttle-profile@example.com",
+                        "full_name": "Throttle Profile",
+                        "role": "Guest",
+                        "institution": "External Lab",
+                        "user_type": "External",
+                    },
+                    format="json",
+                )
+
+                self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(create_response.data["email"], "throttle-profile@example.com")
+            finally:
+                cache.clear()
 
     def test_bulk_delete_skips_super_administrator_and_deletes_regular_profiles(self):
         deletable_user = self.create_user(

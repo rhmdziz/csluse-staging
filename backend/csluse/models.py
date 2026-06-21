@@ -405,7 +405,7 @@ class Pengujian(BaseModel):
         related_name="approved_pengujians",
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
-    code = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    code = models.CharField(max_length=13, unique=True, editable=False, null=True)
     approved_at = models.DateTimeField(blank=True, null=True)
     rejected_at = models.DateTimeField(blank=True, null=True)
     completed_at = models.DateTimeField(blank=True, null=True)

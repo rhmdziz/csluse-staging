@@ -63,6 +63,7 @@ import {
   mapBooking,
   useBookingDetail,
   useBookings,
+  type BookingAggregates,
   type BookingRow,
 } from "@/hooks/booking-rooms";
 
@@ -95,19 +96,15 @@ const ORDERING_OPTIONS = [
   { value: "newest", label: "Terbaru" },
   { value: "oldest", label: "Terlama" },
 ];
-
-function matchesSearch(booking: BookingRow, query: string) {
-  if (!query) return true;
-  const haystack = [
-    booking.code,
-    booking.roomName,
-    booking.requesterName,
-    booking.purpose,
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query.toLowerCase());
-}
+type HistoryDataTab = "active" | "legacy";
+const EMPTY_BOOKING_AGGREGATES: BookingAggregates = {
+  total: 0,
+  pending: 0,
+  approved: 0,
+  completed: 0,
+  rejected: 0,
+  expired: 0,
+};
 
 export default function AdminRoomBookingHistoryPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -122,6 +119,8 @@ export default function AdminRoomBookingHistoryPage() {
   const [ordering, setOrdering] = useState("newest");
   const [createdRange, setCreatedRange] = useState<DateRange | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [activeDataTab, setActiveDataTab] = useState<HistoryDataTab>("active");
+  const [showEmptySummary, setShowEmptySummary] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<BookingRow | null>(null);
   const [detailTarget, setDetailTarget] = useState<BookingRow | null>(null);
@@ -140,6 +139,7 @@ export default function AdminRoomBookingHistoryPage() {
       ? formatDateKey(createdRange.from)
       : "";
   const { deleteRecord, deleteRecords, isDeleting } = useDeleteRecord();
+  const legacyMode = activeDataTab === "legacy" ? "only" : "exclude";
   const { requesters } = useHistoryRequesterOptions(`${API_BOOKINGS_ALL_REQUESTERS}?unscoped=1`);
   const { rooms } = useRoomOptions();
   const {
@@ -158,6 +158,8 @@ export default function AdminRoomBookingHistoryPage() {
       room,
       created_after: createdAfter ? toStartOfDay(createdAfter) : "",
       created_before: createdBefore ? toEndOfDay(createdBefore) : "",
+      exclude_legacy: activeDataTab === "active" ? "1" : "",
+      legacy_only: activeDataTab === "legacy" ? "1" : "",
     },
     mapItem: mapBooking,
     title: "Riwayat Peminjaman Lab",
@@ -174,10 +176,16 @@ export default function AdminRoomBookingHistoryPage() {
     return () => clearTimeout(timeoutId);
   }, [search]);
 
+  useEffect(() => {
+    setPage(1);
+    setSelectedIds([]);
+  }, [activeDataTab]);
+
   const { bookings, totalCount, aggregates, isLoading, hasLoadedOnce, error } = useBookings(
     page,
     PAGE_SIZE,
     {
+      q: debouncedSearch,
       status,
       purpose,
       requestedBy,
@@ -185,6 +193,7 @@ export default function AdminRoomBookingHistoryPage() {
       room,
       createdAfter: createdAfter ? toStartOfDay(createdAfter) : "",
       createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
+      legacyMode,
     },
     reloadKey,
     "admin-all",
@@ -197,12 +206,14 @@ export default function AdminRoomBookingHistoryPage() {
     enabled: Boolean(detailTarget),
   });
 
-  const filteredBookings = useMemo(
-    () => bookings.filter((booking) => matchesSearch(booking, debouncedSearch)),
-    [bookings, debouncedSearch],
-  );
+  useEffect(() => {
+    if (!isLoading && !error) {
+      setShowEmptySummary(false);
+    }
+  }, [error, isLoading]);
+
   const visibleBookings = useMemo(() => {
-    const items = [...filteredBookings];
+    const items = [...bookings];
 
     if (ordering === "oldest") {
       items.sort(
@@ -215,16 +226,17 @@ export default function AdminRoomBookingHistoryPage() {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     return items;
-  }, [filteredBookings, ordering]);
+  }, [bookings, ordering]);
   const selectedRows = useMemo(() => {
     const selectedIdSet = new Set(selectedIds.map((id) => String(id)));
     return bookings.filter((item) => selectedIdSet.has(String(item.id)));
   }, [bookings, selectedIds]);
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || filteredBookings.length) / PAGE_SIZE)),
-    [totalCount, filteredBookings.length],
+    () => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
+    [totalCount],
   );
+  const summaryAggregates = showEmptySummary ? EMPTY_BOOKING_AGGREGATES : aggregates;
   const selectedCount = selectedIds.length;
   const allVisibleSelected =
     visibleBookings.length > 0 &&
@@ -369,14 +381,47 @@ export default function AdminRoomBookingHistoryPage() {
             icon={<Eye className="h-5 w-5 text-sky-200" />}
           />
 
+          <div className="rounded-xl border border-slate-200 bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmptySummary(true);
+                  setActiveDataTab("active");
+                }}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  activeDataTab === "active"
+                    ? "bg-gradient-to-r from-[#0052C7] via-[#0048B4] to-[#003C99] text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Data Aktif
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmptySummary(true);
+                  setActiveDataTab("legacy");
+                }}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  activeDataTab === "legacy"
+                    ? "bg-gradient-to-r from-[#0052C7] via-[#0048B4] to-[#003C99] text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Data Legacy
+              </button>
+            </div>
+          </div>
+
           <AdminHistorySummaryCards
             items={[
-              { label: "Total", value: aggregates.total, tone: "blue" },
-              { label: "Menunggu", value: aggregates.pending },
-              { label: "Disetujui", value: aggregates.approved },
-              { label: "Selesai", value: aggregates.completed },
-              { label: "Ditolak", value: aggregates.rejected },
-              { label: "Kedaluwarsa", value: aggregates.expired },
+              { label: "Total", value: summaryAggregates.total, tone: "blue" },
+              { label: "Menunggu", value: summaryAggregates.pending },
+              { label: "Disetujui", value: summaryAggregates.approved },
+              { label: "Selesai", value: summaryAggregates.completed },
+              { label: "Ditolak", value: summaryAggregates.rejected },
+              { label: "Kedaluwarsa", value: summaryAggregates.expired },
             ]}
           />
 
@@ -557,17 +602,19 @@ export default function AdminRoomBookingHistoryPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <p className="text-xs text-slate-500 sm:text-right">
-                Export mengikuti filter dan pencarian yang sedang aktif.
+                Export mengikuti tab, filter, dan pencarian yang sedang aktif.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2"
-                onClick={() => setIsLegacyImportOpen(true)}
-              >
-                <History className="h-4 w-4" />
-                Import Legacy
-              </Button>
+              {activeDataTab === "legacy" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setIsLegacyImportOpen(true)}
+                >
+                  <History className="h-4 w-4" />
+                  Import Legacy
+                </Button>
+              ) : null}
               <AdminHistoryExportActions
                 onExportExcel={exportExcel}
                 onExportPdf={exportPdf}
@@ -600,7 +647,11 @@ export default function AdminRoomBookingHistoryPage() {
             hasRows={visibleBookings.length > 0}
             isLoading={isLoading}
             hasLoadedOnce={hasLoadedOnce}
-            emptyMessage="Tidak ada data peminjaman ruangan."
+            emptyMessage={
+              activeDataTab === "legacy"
+                ? "Tidak ada data peminjaman lab legacy."
+                : "Tidak ada data peminjaman lab."
+            }
             allVisibleSelected={allVisibleSelected}
             onToggleSelectAll={toggleSelectAllVisible}
             selectAllRef={selectAllRef}
@@ -683,7 +734,7 @@ export default function AdminRoomBookingHistoryPage() {
           <DataPagination
             page={page}
             totalPages={totalPages}
-            totalCount={totalCount || filteredBookings.length}
+            totalCount={totalCount}
             pageSize={PAGE_SIZE}
             itemLabel="peminjaman lab"
             isLoading={isLoading}

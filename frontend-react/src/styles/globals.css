@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html {
+  @apply text-sm antialiased;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

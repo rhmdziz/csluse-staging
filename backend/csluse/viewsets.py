@@ -122,7 +122,11 @@ PENGUJIAN_APPROVER_DOCUMENT_TYPES = {
     "test_result_letter",
 }
 
-LEGACY_IMPORT_CODE_PREFIX = "CSL"
+LEGACY_COMPAT_CODE_PREFIX = "CSL"
+LEGACY_BOOKING_CODE_PREFIX = "EX-PL"
+LEGACY_BOOKING_CODE_WIDTH = 7
+LEGACY_PENGUJIAN_CODE_PREFIX = "EX-PS"
+LEGACY_PENGUJIAN_CODE_WIDTH = 7
 BORROW_ACTIVE_HOLD_STATUSES = [
     "Borrowed",
     "Returned Pending Inspection",
@@ -203,7 +207,7 @@ def _validate_legacy_code(candidate, used_codes, model_cls):
     return code
 
 
-def _generate_legacy_code(model_cls, used_codes, prefix=LEGACY_IMPORT_CODE_PREFIX):
+def _generate_legacy_code(model_cls, used_codes, prefix, min_suffix_width):
     normalized_prefix = _coerce_legacy_string(prefix).upper().replace(" ", "")
     code_field = model_cls._meta.get_field("code")
     max_length = code_field.max_length or 12
@@ -226,10 +230,10 @@ def _generate_legacy_code(model_cls, used_codes, prefix=LEGACY_IMPORT_CODE_PREFI
             next_seq = int(suffix) + 1
 
     max_seq = (10 ** max_suffix_width) - 1
-    min_suffix_width = min(3, max_suffix_width)
+    padded_suffix_width = min(min_suffix_width, max_suffix_width)
 
     while next_seq <= max_seq:
-        suffix_width = max(min_suffix_width, len(str(next_seq)))
+        suffix_width = max(padded_suffix_width, len(str(next_seq)))
         candidate = f"{normalized_prefix}{next_seq:0{suffix_width}d}"
         if candidate not in used_codes:
             used_codes.add(candidate)
@@ -249,6 +253,40 @@ def _resolve_profile_reference(row, id_key, email_key):
         return Profile.objects.select_related("user").filter(user__email__iexact=email).first()
 
     return None
+
+
+def _is_truthy_query_param(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _legacy_pengujians_q():
+    return (
+        Q(code__startswith=LEGACY_COMPAT_CODE_PREFIX)
+        | Q(code__startswith=LEGACY_PENGUJIAN_CODE_PREFIX)
+    )
+
+
+def _legacy_bookings_q():
+    return (
+        Q(code__startswith=LEGACY_COMPAT_CODE_PREFIX)
+        | Q(code__startswith=LEGACY_BOOKING_CODE_PREFIX)
+    )
+
+
+def _exclude_legacy_pengujians(qs):
+    return qs.exclude(_legacy_pengujians_q())
+
+
+def _exclude_legacy_bookings(qs):
+    return qs.exclude(_legacy_bookings_q())
+
+
+def _only_legacy_pengujians(qs):
+    return qs.filter(_legacy_pengujians_q())
+
+
+def _only_legacy_bookings(qs):
+    return qs.filter(_legacy_bookings_q())
 
 
 PENGUJIAN_REQUESTER_DOCUMENT_TYPES = {
@@ -324,6 +362,23 @@ class BulkDeleteMixin:
         )
 
 
+class BulkImportThrottleBypassMixin:
+    """
+    Skip DRF request throttling for explicit bulk-import style actions.
+
+    These endpoints are staff/admin-only and are expected to process many rows
+    in a single request, so the global per-request throttle becomes a false
+    positive during legitimate imports.
+    """
+
+    throttle_exempt_actions = {"bulk_create", "legacy_bulk_import"}
+
+    def get_throttles(self):
+        if getattr(self, "action", None) in self.throttle_exempt_actions:
+            return []
+        return super().get_throttles()
+
+
 def extract_announcement_image_refs(content: str | None) -> set[str]:
     if not content:
         return set()
@@ -382,7 +437,7 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 
 # region Inventory
-class RoomViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class RoomViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = Room.objects.prefetch_related('pics').order_by('-created_at')
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated]
@@ -579,7 +634,7 @@ class RoomViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return Response({'occupied': list(bookings)})
 
 
-class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class EquipmentViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Equipment.objects
         .select_related('room')
@@ -850,7 +905,7 @@ class EquipmentViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return Response({'occupied': occupied})
 
 
-class MaterialViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class MaterialViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Material.objects
         .select_related('room')
@@ -1009,7 +1064,7 @@ class MaterialViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class SoftwareViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class SoftwareViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Software.objects
         .select_related('equipment', 'equipment__room')
@@ -1171,7 +1226,7 @@ class SoftwareViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
 
 # region Booking Rooms
-class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class BookingViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Booking.objects
         .select_related(
@@ -1347,6 +1402,19 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         response.data["aggregates"] = aggregates
         return response
 
+    def _should_exclude_legacy_records(self):
+        return _is_truthy_query_param(self.request.query_params.get("exclude_legacy"))
+
+    def _should_only_include_legacy_records(self):
+        return _is_truthy_query_param(self.request.query_params.get("legacy_only"))
+
+    def _apply_legacy_filter(self, qs):
+        if self._should_only_include_legacy_records():
+            return _only_legacy_bookings(qs)
+        if self._should_exclude_legacy_records():
+            return _exclude_legacy_bookings(qs)
+        return qs
+
     def _delete_booking_instance(self, instance):
         log_admin_action(
             self.request.user,
@@ -1370,6 +1438,8 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("end_before", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
             OpenApiParameter("created_after", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
             OpenApiParameter("created_before", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
+            OpenApiParameter("exclude_legacy", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+            OpenApiParameter("legacy_only", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
         ]
     )
     def list(self, request, *args, **kwargs):
@@ -1389,6 +1459,7 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         end_before = self.request.query_params.get('end_before')
         created_after = self.request.query_params.get('created_after')
         created_before = self.request.query_params.get('created_before')
+        qs = self._apply_legacy_filter(qs)
 
         if query:
             qs = qs.filter(
@@ -1511,7 +1582,9 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='my')
     def my(self, request):
         self._auto_update_booking_statuses()
-        base_qs = super().get_queryset().filter(requested_by=getattr(request.user, "profile", None))
+        base_qs = self._apply_legacy_filter(
+            super().get_queryset().filter(requested_by=getattr(request.user, "profile", None))
+        )
         aggregates = build_status_aggregates(base_qs)
         qs = base_qs
         qs = self._apply_list_filters(qs, allow_requester_filter=False)
@@ -1640,7 +1713,12 @@ class BookingViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
                 code = _validate_legacy_code(row.get("code"), used_codes, Booking)
                 if not code:
-                    code = _generate_legacy_code(Booking, used_codes)
+                    code = _generate_legacy_code(
+                        Booking,
+                        used_codes,
+                        LEGACY_BOOKING_CODE_PREFIX,
+                        LEGACY_BOOKING_CODE_WIDTH,
+                    )
                 if code in existing_codes:
                     raise ValidationError({"code": "Kode sudah digunakan."})
                 existing_codes.add(code)
@@ -2785,7 +2863,7 @@ class AnnouncementViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
 
 # region Scheduling And Overview
-class ScheduleViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class ScheduleViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = Schedule.objects.select_related('room').order_by('start_time')
     serializer_class = ScheduleSerializer
     permission_classes = [IsAuthenticated]
@@ -3195,7 +3273,9 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
 
         if is_pic_scope_role:
             bookings = list(
-                Booking.objects
+                _exclude_legacy_bookings(
+                    Booking.objects
+                )
                 .filter(room__pics__id=profile.id)
                 .select_related("room", "requested_by")
                 .distinct()
@@ -3210,7 +3290,9 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
             )
             if is_administrator_or_above(request.user):
                 pengujians = list(
-                    Pengujian.objects
+                    _exclude_legacy_pengujians(
+                        Pengujian.objects
+                    )
                     .select_related("requested_by", "approved_by")
                     .order_by("-created_at")
                 )
@@ -3218,7 +3300,9 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 pengujians = []
         else:
             bookings = list(
-                Booking.objects
+                _exclude_legacy_bookings(
+                    Booking.objects
+                )
                 .filter(requested_by=profile)
                 .select_related("room")
                 .order_by("-created_at")
@@ -3230,7 +3314,9 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 .order_by("-created_at")
             )
             pengujians = list(
-                Pengujian.objects
+                _exclude_legacy_pengujians(
+                    Pengujian.objects
+                )
                 .filter(requested_by=profile)
                 .order_by("-created_at")
             )
@@ -3431,7 +3517,7 @@ class FAQViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
 
 # region Sample Testing
-class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
+class PengujianViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.ModelViewSet):
     queryset = (
         Pengujian.objects
         .select_related('requested_by', 'approved_by')
@@ -3467,6 +3553,19 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
     def _can_manage_sample_testing_approval(self):
         return is_administrator_or_above(self.request.user)
+
+    def _should_exclude_legacy_records(self):
+        return _is_truthy_query_param(self.request.query_params.get("exclude_legacy"))
+
+    def _should_only_include_legacy_records(self):
+        return _is_truthy_query_param(self.request.query_params.get("legacy_only"))
+
+    def _apply_legacy_filter(self, qs):
+        if self._should_only_include_legacy_records():
+            return _only_legacy_pengujians(qs)
+        if self._should_exclude_legacy_records():
+            return _exclude_legacy_pengujians(qs)
+        return qs
 
     def _current_profile(self):
         return getattr(self.request.user, "profile", None)
@@ -3621,6 +3720,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         approved_by = self.request.query_params.get('approved_by')
         created_after = self.request.query_params.get('created_after')
         created_before = self.request.query_params.get('created_before')
+        qs = self._apply_legacy_filter(qs)
 
         if query:
             qs = qs.filter(
@@ -3654,6 +3754,8 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
             OpenApiParameter("approved_by", OpenApiTypes.UUID, OpenApiParameter.QUERY),
             OpenApiParameter("created_after", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
             OpenApiParameter("created_before", OpenApiTypes.DATETIME, OpenApiParameter.QUERY),
+            OpenApiParameter("exclude_legacy", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+            OpenApiParameter("legacy_only", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
         ]
     )
     def list(self, request, *args, **kwargs):
@@ -3768,8 +3870,10 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='my')
     def my(self, request):
-        base_qs = super().get_queryset().filter(
-            requested_by=getattr(request.user, "profile", None)
+        base_qs = self._apply_legacy_filter(
+            super().get_queryset().filter(
+                requested_by=getattr(request.user, "profile", None)
+            )
         )
         aggregates = build_status_aggregates(base_qs)
         qs = self._apply_list_filters(base_qs, allow_requester_filter=False)
@@ -3784,7 +3888,7 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         if not self._can_manage_sample_testing_approval():
             raise PermissionDenied("Anda tidak memiliki akses untuk melihat seluruh data pengujian sampel.")
 
-        base_qs = super().get_queryset()
+        base_qs = self._apply_legacy_filter(super().get_queryset())
         aggregates = build_status_aggregates(base_qs)
         qs = self._apply_list_filters(base_qs, allow_requester_filter=True)
         page = self.paginate_queryset(qs)
@@ -3826,7 +3930,12 @@ class PengujianViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
 
                 code = _validate_legacy_code(row.get("code"), used_codes, Pengujian)
                 if not code:
-                    code = _generate_legacy_code(Pengujian, used_codes)
+                    code = _generate_legacy_code(
+                        Pengujian,
+                        used_codes,
+                        LEGACY_PENGUJIAN_CODE_PREFIX,
+                        LEGACY_PENGUJIAN_CODE_WIDTH,
+                    )
                 if code in existing_codes:
                     raise ValidationError({"code": "Kode sudah digunakan."})
                 existing_codes.add(code)

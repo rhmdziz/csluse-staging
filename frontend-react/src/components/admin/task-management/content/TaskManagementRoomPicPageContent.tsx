@@ -63,6 +63,7 @@ export default function TaskManagementRoomPicPage() {
   const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Array<number | string>>([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isRemoving, setIsRemoving] = useState(false);
   const { rooms } = useRoomOptions();
   const {
     users,
@@ -128,6 +129,8 @@ export default function TaskManagementRoomPicPage() {
     if (!removeCandidate?.id) return;
 
     try {
+      setIsRemoving(true);
+      setErrorMessage("");
       await removeRoomPicAssignments(removeCandidate.id);
       setUsers((prev) => prev.filter((item) => String(item.id) !== String(removeCandidate.id)));
       if (detailUser && String(detailUser.id) === String(removeCandidate.id)) {
@@ -140,6 +143,8 @@ export default function TaskManagementRoomPicPage() {
       setErrorMessage(
         removeError instanceof Error ? removeError.message : "Gagal melepas PIC ruangan.",
       );
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -147,6 +152,8 @@ export default function TaskManagementRoomPicPage() {
     if (!selectedIds.length) return;
 
     try {
+      setIsRemoving(true);
+      setErrorMessage("");
       const result = await bulkRemoveRoomPicAssignments(selectedIds);
       const removedIds = new Set((result.removed_ids ?? []).map((id) => String(id)));
       if (removedIds.size > 0) {
@@ -164,6 +171,8 @@ export default function TaskManagementRoomPicPage() {
           ? removeError.message
           : "Gagal melepas PIC ruangan terpilih.",
       );
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -255,7 +264,7 @@ export default function TaskManagementRoomPicPage() {
                 variant="outline"
                 size="sm"
                 className="gap-2"
-                disabled={selectedCount === 0}
+                disabled={selectedCount === 0 || isRemoving}
               >
                 Aksi Terpilih
                 {selectedCount ? ` (${selectedCount})` : ""}
@@ -265,7 +274,7 @@ export default function TaskManagementRoomPicPage() {
             <DropdownMenuContent side="bottom" align="start" className="w-56">
               <DropdownMenuItem
                 variant="destructive"
-                disabled={selectedCount === 0}
+                disabled={selectedCount === 0 || isRemoving}
                 onClick={() => setBulkRemoveOpen(true)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -301,7 +310,7 @@ export default function TaskManagementRoomPicPage() {
           onOpenDetail={(user) => { setDetailMode("view"); setDetailUser(user); }}
           onEdit={(user) => { setDetailMode("edit"); setDetailUser(user); }}
           onDelete={setRemoveCandidate}
-          isDeleting={false}
+          isDeleting={isRemoving}
           selectionLabel="PIC ruangan"
           removeLabel="Lepaskan PIC Ruangan"
           emptyMessage="Tidak ada PIC ruangan terdaftar."
@@ -389,7 +398,9 @@ export default function TaskManagementRoomPicPage() {
             ? `${removeCandidate.name || removeCandidate.email} akan dilepas dari semua penugasan PIC ruangan.`
             : "Data akan diperbarui."
         }
-        isDeleting={false}
+        confirmLabel="Lepaskan"
+        pendingLabel="Melepas..."
+        isDeleting={isRemoving}
         onOpenChange={(open) => {
           if (!open) setRemoveCandidate(null);
         }}
@@ -402,7 +413,9 @@ export default function TaskManagementRoomPicPage() {
         open={bulkRemoveOpen}
         title="Lepaskan PIC ruangan terpilih?"
         description={`${selectedCount} user yang dipilih akan dilepas dari semua penugasan PIC ruangan.`}
-        isDeleting={false}
+        confirmLabel="Lepaskan"
+        pendingLabel="Melepas..."
+        isDeleting={isRemoving}
         onOpenChange={setBulkRemoveOpen}
         onConfirm={() => {
           void handleBulkRemovePic();

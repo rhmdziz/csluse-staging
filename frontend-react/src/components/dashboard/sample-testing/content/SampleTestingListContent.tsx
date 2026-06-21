@@ -55,7 +55,7 @@ import {
   type SampleTestingListScope,
 } from "@/hooks/sample-testing";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 function canShowDocumentAction(status: string) {
   const normalized = normalizeStatus(status);

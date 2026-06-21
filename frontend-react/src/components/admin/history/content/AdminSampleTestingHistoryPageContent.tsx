@@ -59,6 +59,7 @@ import {
   mapSampleTesting,
   useSampleTestingDetail,
   useSampleTestingList,
+  type SampleTestingAggregates,
   type SampleTestingRow,
 } from "@/hooks/sample-testing";
 
@@ -84,6 +85,15 @@ const ORDERING_OPTIONS = [
   { value: "newest", label: "Terbaru" },
   { value: "oldest", label: "Terlama" },
 ];
+type HistoryDataTab = "active" | "legacy";
+const EMPTY_SAMPLE_TESTING_AGGREGATES: SampleTestingAggregates = {
+  total: 0,
+  pending: 0,
+  approved: 0,
+  diproses: 0,
+  completed: 0,
+  rejected: 0,
+};
 
 function canShowDocumentAction(status: string) {
   const normalized = normalizeStatus(status);
@@ -107,6 +117,8 @@ export default function AdminSampleTestingHistoryPage() {
   const [ordering, setOrdering] = useState(orderingParam);
   const [createdRange, setCreatedRange] = useState<DateRange | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [activeDataTab, setActiveDataTab] = useState<HistoryDataTab>("active");
+  const [showEmptySummary, setShowEmptySummary] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<SampleTestingRow | null>(null);
   const [detailTarget, setDetailTarget] = useState<SampleTestingRow | null>(null);
@@ -127,6 +139,7 @@ export default function AdminSampleTestingHistoryPage() {
       ? formatDateKey(createdRange.from)
       : "";
   const { deleteRecord, deleteRecords, isDeleting } = useDeleteRecord();
+  const legacyMode = activeDataTab === "legacy" ? "only" : "exclude";
   const { requesters } = useHistoryRequesterOptions(API_PENGUJIANS_ALL_REQUESTERS);
   const { exportPdf, exportExcel, isExportingPdf, isExportingExcel } =
     useAdminRecordExport({
@@ -138,6 +151,8 @@ export default function AdminSampleTestingHistoryPage() {
         department,
         created_after: createdAfter ? toStartOfDay(createdAfter) : "",
         created_before: createdBefore ? toEndOfDay(createdBefore) : "",
+        exclude_legacy: activeDataTab === "active" ? "1" : "",
+        legacy_only: activeDataTab === "legacy" ? "1" : "",
       },
       mapItem: mapSampleTesting,
       title: "Riwayat Pengujian Sampel",
@@ -153,6 +168,11 @@ export default function AdminSampleTestingHistoryPage() {
     const timeoutId = setTimeout(() => setDebouncedSearch(search.trim()), 500);
     return () => clearTimeout(timeoutId);
   }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+    setSelectedIds([]);
+  }, [activeDataTab]);
 
   useEffect(() => {
     setSearch(queryParam);
@@ -181,6 +201,7 @@ export default function AdminSampleTestingHistoryPage() {
       department,
       createdAfter: createdAfter ? toStartOfDay(createdAfter) : "",
       createdBefore: createdBefore ? toEndOfDay(createdBefore) : "",
+      legacyMode,
     },
     reloadKey,
     "admin-all",
@@ -192,6 +213,12 @@ export default function AdminSampleTestingHistoryPage() {
   } = useSampleTestingDetail(detailTarget?.id ?? null, reloadKey, {
     enabled: Boolean(detailTarget),
   });
+
+  useEffect(() => {
+    if (!isLoading && !error) {
+      setShowEmptySummary(false);
+    }
+  }, [error, isLoading]);
 
   const visibleItems = useMemo(() => {
     const items = [...sampleTestings];
@@ -217,6 +244,9 @@ export default function AdminSampleTestingHistoryPage() {
     () => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
     [totalCount],
   );
+  const summaryAggregates = showEmptySummary
+    ? EMPTY_SAMPLE_TESTING_AGGREGATES
+    : aggregates;
   const selectedCount = selectedIds.length;
   const allVisibleSelected =
     visibleItems.length > 0 &&
@@ -371,14 +401,47 @@ export default function AdminSampleTestingHistoryPage() {
             icon={<Eye className="h-5 w-5 text-sky-200" />}
           />
 
+          <div className="rounded-xl border border-slate-200 bg-white p-1 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmptySummary(true);
+                  setActiveDataTab("active");
+                }}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  activeDataTab === "active"
+                    ? "bg-gradient-to-r from-[#0052C7] via-[#0048B4] to-[#003C99] text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Data Aktif
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmptySummary(true);
+                  setActiveDataTab("legacy");
+                }}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                  activeDataTab === "legacy"
+                    ? "bg-gradient-to-r from-[#0052C7] via-[#0048B4] to-[#003C99] text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Data Legacy
+              </button>
+            </div>
+          </div>
+
           <AdminHistorySummaryCards
             items={[
-              { label: "Total", value: aggregates.total, tone: "blue" },
-              { label: "Menunggu", value: aggregates.pending },
-              { label: "Disetujui", value: aggregates.approved },
-              { label: "Diproses", value: aggregates.diproses },
-              { label: "Selesai", value: aggregates.completed },
-              { label: "Ditolak", value: aggregates.rejected },
+              { label: "Total", value: summaryAggregates.total, tone: "blue" },
+              { label: "Menunggu", value: summaryAggregates.pending },
+              { label: "Disetujui", value: summaryAggregates.approved },
+              { label: "Diproses", value: summaryAggregates.diproses },
+              { label: "Selesai", value: summaryAggregates.completed },
+              { label: "Ditolak", value: summaryAggregates.rejected },
             ]}
           />
 
@@ -519,17 +582,19 @@ export default function AdminSampleTestingHistoryPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <p className="text-xs text-slate-500 sm:text-right">
-                Export mengikuti filter dan pencarian yang sedang aktif.
+                Export mengikuti tab, filter, dan pencarian yang sedang aktif.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2"
-                onClick={() => setIsLegacyImportOpen(true)}
-              >
-                <History className="h-4 w-4" />
-                Import Legacy
-              </Button>
+              {activeDataTab === "legacy" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setIsLegacyImportOpen(true)}
+                >
+                  <History className="h-4 w-4" />
+                  Import Legacy
+                </Button>
+              ) : null}
               <AdminHistoryExportActions
                 onExportExcel={exportExcel}
                 onExportPdf={exportPdf}
@@ -558,7 +623,11 @@ export default function AdminSampleTestingHistoryPage() {
             hasRows={visibleItems.length > 0}
             isLoading={isLoading}
             hasLoadedOnce={hasLoadedOnce}
-            emptyMessage="Tidak ada data pengujian sampel."
+            emptyMessage={
+              activeDataTab === "legacy"
+                ? "Tidak ada data pengujian sampel legacy."
+                : "Tidak ada data pengujian sampel."
+            }
             allVisibleSelected={allVisibleSelected}
             onToggleSelectAll={toggleSelectAllVisible}
             selectAllRef={selectAllRef}
