@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   DataPagination,
@@ -71,6 +71,7 @@ export default function SampleTestingListContent({
   scope,
   emptyMessage,
 }: SampleTestingListContentProps) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -94,6 +95,7 @@ export default function SampleTestingListContent({
   const search = searchParams.get("q") ?? "";
   const createdAfter = searchParams.get("created_after") ?? "";
   const createdBefore = searchParams.get("created_before") ?? "";
+  const normalizedStatus = normalizeStatus(status);
 
   useEffect(() => {
     setPage(1);
@@ -163,6 +165,19 @@ export default function SampleTestingListContent({
     setReloadKey((prev) => prev + 1);
   };
 
+  const handleStatusCardClick = (nextStatus: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const normalizedNextStatus = normalizeStatus(nextStatus);
+
+    if (!normalizedNextStatus || normalizedNextStatus === normalizedStatus) {
+      params.delete("status");
+    } else {
+      params.set("status", nextStatus);
+    }
+
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  };
+
   return (
     <section className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -171,36 +186,48 @@ export default function SampleTestingListContent({
           value={aggregates.total}
           icon={<PackageSearch className="h-4 w-4" />}
           tone={getStatusSummaryTone("total")}
+          isActive={!normalizedStatus}
+          onClick={() => handleStatusCardClick("")}
         />
         <SampleTestingSummaryCard
           label="Menunggu"
           value={aggregates.pending}
           icon={<CalendarClock className="h-4 w-4" />}
           tone={getStatusSummaryTone("pending")}
+          isActive={normalizedStatus === "pending"}
+          onClick={() => handleStatusCardClick("pending")}
         />
         <SampleTestingSummaryCard
           label="Disetujui"
           value={aggregates.approved}
           icon={<CheckCircle2 className="h-4 w-4" />}
           tone={getStatusSummaryTone("approved")}
+          isActive={normalizedStatus === "approved"}
+          onClick={() => handleStatusCardClick("approved")}
         />
         <SampleTestingSummaryCard
           label="Diproses"
           value={aggregates.diproses}
           icon={<Settings2 className="h-4 w-4" />}
           tone={getStatusSummaryTone("Diproses")}
+          isActive={normalizedStatus === "diproses"}
+          onClick={() => handleStatusCardClick("diproses")}
         />
         <SampleTestingSummaryCard
           label="Selesai"
           value={aggregates.completed}
           icon={<FlaskConical className="h-4 w-4" />}
           tone={getStatusSummaryTone("completed")}
+          isActive={normalizedStatus === "completed"}
+          onClick={() => handleStatusCardClick("completed")}
         />
         <SampleTestingSummaryCard
           label="Ditolak"
           value={aggregates.rejected}
           icon={<RotateCcw className="h-4 w-4" />}
           tone={getStatusSummaryTone("rejected")}
+          isActive={normalizedStatus === "rejected"}
+          onClick={() => handleStatusCardClick("rejected")}
         />
       </div>
 

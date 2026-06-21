@@ -538,11 +538,11 @@ function BookingReviewPanel({
     reviewerMessage:
       "Pengajuan sudah disetujui. Tandai sebagai selesai setelah waktu booking benar-benar berakhir.",
     requesterMessage:
-      "Pengajuan sudah disetujui dan akan ditandai selesai oleh petugas setelah waktu booking berakhir.",
+      "Pengajuan sudah disetujui dan akan ditandai selesai oleh PIC setelah waktu booking berakhir.",
     reviewerIndicator:
       "Gunakan aksi Tandai Selesai setelah sesi peminjaman lab selesai.",
     requesterIndicator:
-      "Status akan diperbarui menjadi selesai oleh petugas setelah sesi peminjaman lab berakhir.",
+      "Status akan diperbarui menjadi selesai oleh PIC setelah sesi peminjaman lab berakhir.",
   });
 
   const handleBookingAction = async (rejectionNote?: string) => {

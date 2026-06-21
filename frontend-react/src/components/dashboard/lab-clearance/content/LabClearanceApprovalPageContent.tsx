@@ -17,7 +17,7 @@ import {
   ScrollText,
   UserRound,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { DashboardListTable } from "@/components/dashboard/shared";
@@ -112,6 +112,7 @@ function mapPreviewDocument(document: LabClearanceDocument) {
 }
 
 export function LabClearanceApprovalPageContent() {
+  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
@@ -148,8 +149,9 @@ export function LabClearanceApprovalPageContent() {
   const ordering = searchParams.get("ordering") ?? "newest";
   const createdAfter = searchParams.get("created_after") ?? "";
   const createdBefore = searchParams.get("created_before") ?? "";
+  const normalizedStatus = normalizeStatus(status);
   const emptyMessage =
-    normalizeStatus(status) === "active"
+    normalizedStatus === "active"
       ? "Tidak ada permohonan aktif surat bebas laboratorium yang perlu Anda proses."
       : "Belum ada permohonan surat bebas laboratorium yang perlu Anda proses.";
 
@@ -318,6 +320,19 @@ export function LabClearanceApprovalPageContent() {
     setReviewError("Gagal menolak permohonan. Coba lagi.");
   };
 
+  const handleStatusCardClick = (nextStatus: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const normalizedNextStatus = normalizeStatus(nextStatus);
+
+    if (!normalizedNextStatus || normalizedNextStatus === normalizedStatus) {
+      params.delete("status");
+    } else {
+      params.set("status", nextStatus);
+    }
+
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  };
+
   return (
     <section className="w-full min-w-0 space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -326,24 +341,32 @@ export function LabClearanceApprovalPageContent() {
           value={kpis.total}
           icon={<PackageSearch className="h-4 w-4" />}
           tone="slate"
+          isActive={!normalizedStatus}
+          onClick={() => handleStatusCardClick("")}
         />
         <SampleTestingSummaryCard
           label="Menunggu"
           value={kpis.pending}
           icon={<CalendarClock className="h-4 w-4" />}
           tone="amber"
+          isActive={normalizedStatus === "pending"}
+          onClick={() => handleStatusCardClick("pending")}
         />
         <SampleTestingSummaryCard
           label="Disetujui"
           value={kpis.approved}
           icon={<CheckCircle2 className="h-4 w-4" />}
           tone="emerald"
+          isActive={normalizedStatus === "approved"}
+          onClick={() => handleStatusCardClick("approved")}
         />
         <SampleTestingSummaryCard
           label="Ditolak"
           value={kpis.rejected}
           icon={<RotateCcw className="h-4 w-4" />}
           tone="rose"
+          isActive={normalizedStatus === "rejected"}
+          onClick={() => handleStatusCardClick("rejected")}
         />
       </div>
 

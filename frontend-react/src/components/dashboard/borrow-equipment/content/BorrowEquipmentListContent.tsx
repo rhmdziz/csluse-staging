@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { DashboardDetailReviewDialog } from "@/components/dashboard/layout";
 import { DashboardListTable } from "@/components/dashboard/shared";
@@ -64,7 +63,7 @@ import {
 } from "@/lib/request";
 
 const PAGE_SIZE = 20;
-const MENTOR_PAGE_SIZE = 20;
+const MENTOR_PAGE_SIZE = 5;
 const TABLE_COLUMN_WIDTHS = [
   "10rem",
   "14rem",
@@ -82,6 +81,8 @@ function SummaryCard({
   value,
   icon,
   tone,
+  isActive = false,
+  onClick,
 }: {
   label: string;
   value: number;
@@ -97,86 +98,165 @@ function SummaryCard({
     | "cyan"
     | "orange"
     | "red";
+  isActive?: boolean;
+  onClick?: () => void;
 }) {
   const toneClass =
     tone === "blue"
       ? {
           card: "border-blue-300 bg-blue-100/90",
+          activeCard:
+            "border-blue-600 bg-blue-600 shadow-[0_14px_28px_rgba(37,99,235,0.32)] ring-2 ring-blue-200/80 ring-offset-2",
           icon: "bg-white/80 text-blue-800",
+          activeIcon: "bg-white/20 text-white",
+          label: "text-slate-500",
+          activeLabel: "text-blue-50",
           value: "text-blue-900",
+          activeValue: "text-white",
         }
       : tone === "amber"
         ? {
             card: "border-amber-300 bg-amber-100/90",
+            activeCard:
+              "border-amber-500 bg-amber-400 shadow-[0_14px_28px_rgba(245,158,11,0.32)] ring-2 ring-amber-200/90 ring-offset-2",
             icon: "bg-white/80 text-amber-800",
+            activeIcon: "bg-white/25 text-slate-950",
+            label: "text-slate-500",
+            activeLabel: "text-amber-950/80",
             value: "text-amber-900",
+            activeValue: "text-slate-950",
           }
         : tone === "emerald"
           ? {
               card: "border-emerald-300 bg-emerald-100/90",
+              activeCard:
+                "border-emerald-600 bg-emerald-600 shadow-[0_14px_28px_rgba(5,150,105,0.32)] ring-2 ring-emerald-200/80 ring-offset-2",
               icon: "bg-white/80 text-emerald-800",
+              activeIcon: "bg-white/20 text-white",
+              label: "text-slate-500",
+              activeLabel: "text-emerald-50",
               value: "text-emerald-900",
+              activeValue: "text-white",
             }
           : tone === "sky"
             ? {
                 card: "border-sky-300 bg-sky-100/90",
+                activeCard:
+                  "border-sky-600 bg-sky-600 shadow-[0_14px_28px_rgba(2,132,199,0.3)] ring-2 ring-sky-200/80 ring-offset-2",
                 icon: "bg-white/80 text-sky-800",
+                activeIcon: "bg-white/20 text-white",
+                label: "text-slate-500",
+                activeLabel: "text-sky-50",
                 value: "text-sky-900",
+                activeValue: "text-white",
               }
             : tone === "rose"
               ? {
                   card: "border-rose-300 bg-rose-100/90",
+                  activeCard:
+                    "border-rose-600 bg-rose-600 shadow-[0_14px_28px_rgba(225,29,72,0.3)] ring-2 ring-rose-200/80 ring-offset-2",
                   icon: "bg-white/80 text-rose-800",
+                  activeIcon: "bg-white/20 text-white",
+                  label: "text-slate-500",
+                  activeLabel: "text-rose-50",
                   value: "text-rose-900",
+                  activeValue: "text-white",
                 }
               : tone === "indigo"
                 ? {
                     card: "border-indigo-300 bg-indigo-100/90",
+                    activeCard:
+                      "border-indigo-600 bg-indigo-600 shadow-[0_14px_28px_rgba(79,70,229,0.32)] ring-2 ring-indigo-200/80 ring-offset-2",
                     icon: "bg-white/80 text-indigo-800",
+                    activeIcon: "bg-white/20 text-white",
+                    label: "text-slate-500",
+                    activeLabel: "text-indigo-50",
                     value: "text-indigo-900",
+                    activeValue: "text-white",
                   }
                 : tone === "cyan"
                   ? {
                       card: "border-cyan-300 bg-cyan-100/90",
+                      activeCard:
+                        "border-cyan-600 bg-cyan-600 shadow-[0_14px_28px_rgba(8,145,178,0.3)] ring-2 ring-cyan-200/80 ring-offset-2",
                       icon: "bg-white/80 text-cyan-800",
+                      activeIcon: "bg-white/20 text-white",
+                      label: "text-slate-500",
+                      activeLabel: "text-cyan-50",
                       value: "text-cyan-900",
+                      activeValue: "text-white",
                     }
                   : tone === "orange"
                     ? {
                         card: "border-orange-300 bg-orange-100/90",
+                        activeCard:
+                          "border-orange-600 bg-orange-500 shadow-[0_14px_28px_rgba(234,88,12,0.32)] ring-2 ring-orange-200/80 ring-offset-2",
                         icon: "bg-white/80 text-orange-800",
+                        activeIcon: "bg-white/20 text-white",
+                        label: "text-slate-500",
+                        activeLabel: "text-orange-50",
                         value: "text-orange-900",
+                        activeValue: "text-white",
                       }
                     : tone === "red"
                       ? {
                           card: "border-red-300 bg-red-100/90",
+                          activeCard:
+                            "border-red-600 bg-red-600 shadow-[0_14px_28px_rgba(220,38,38,0.3)] ring-2 ring-red-200/80 ring-offset-2",
                           icon: "bg-white/80 text-red-800",
+                          activeIcon: "bg-white/20 text-white",
+                          label: "text-slate-500",
+                          activeLabel: "text-red-50",
                           value: "text-red-900",
+                          activeValue: "text-white",
                         }
-              : {
-                  card: "border-slate-300 bg-slate-100/90",
-                  icon: "bg-white/80 text-slate-800",
-                  value: "text-slate-900",
-                };
+                      : {
+                          card: "border-slate-300 bg-slate-100/90",
+                          activeCard:
+                            "border-slate-700 bg-slate-700 shadow-[0_14px_28px_rgba(51,65,85,0.28)] ring-2 ring-slate-200/80 ring-offset-2",
+                          icon: "bg-white/80 text-slate-800",
+                          activeIcon: "bg-white/15 text-white",
+                          label: "text-slate-500",
+                          activeLabel: "text-slate-100",
+                          value: "text-slate-900",
+                          activeValue: "text-white",
+                        };
 
   return (
-    <div
-      className={`rounded-xl border p-3 shadow-[0_4px_14px_rgba(15,23,42,0.08)] ${toneClass.card}`}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={isActive}
+      className={`w-full cursor-pointer rounded-xl border p-3 text-left shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.14)] ${
+        isActive ? toneClass.activeCard : toneClass.card
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-h-14 flex-col justify-between">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p
+            className={`text-xs font-medium uppercase tracking-wide ${
+              isActive ? toneClass.activeLabel : toneClass.label
+            }`}
+          >
             {label}
           </p>
           <p
-            className={`text-2xl font-semibold leading-none ${toneClass.value}`}
+            className={`text-2xl font-semibold leading-none ${
+              isActive ? toneClass.activeValue : toneClass.value
+            }`}
           >
             {value}
           </p>
         </div>
-        <div className={`rounded-lg p-2 ${toneClass.icon}`}>{icon}</div>
+        <div
+          className={`rounded-lg p-2 ${
+            isActive ? toneClass.activeIcon : toneClass.icon
+          }`}
+        >
+          {icon}
+        </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -187,6 +267,7 @@ export default function BorrowEquipmentListContent({
   scope: "my" | "all";
   emptyMessage: string;
 }) {
+  const pathname = usePathname();
   const router = useRouter();
   const { profile } = useLoadProfile();
   const searchParams = useSearchParams();
@@ -212,6 +293,7 @@ export default function BorrowEquipmentListContent({
   const requestedBy = searchParams.get("requested_by") ?? "";
   const createdAfter = searchParams.get("created_after") ?? "";
   const createdBefore = searchParams.get("created_before") ?? "";
+  const normalizedStatus = normalizeStatus(status);
   const isActiveFilter = scope === "all" && status === "active";
   const resolvedEmptyMessage = isActiveFilter
     ? "Tidak ada pengajuan aktif peminjaman alat yang menjadi tanggung jawab Anda."
@@ -336,7 +418,9 @@ export default function BorrowEquipmentListContent({
       return false;
     }
 
-    const isMentor = currentProfileId !== "" && item.requesterMentorProfileId === currentProfileId;
+    const isMentor =
+      currentProfileId !== "" &&
+      item.requesterMentorProfileId === currentProfileId;
     const isPic = item.roomPicIds.includes(currentProfileId);
 
     // Jika hanya dosen pembimbing (bukan PIC) → sembunyikan, ditangani di seksi mentor.
@@ -378,6 +462,21 @@ export default function BorrowEquipmentListContent({
     setReloadKey((prev) => prev + 1);
   };
 
+  const handleStatusCardClick = (nextStatus: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const normalizedNextStatus = normalizeStatus(nextStatus);
+
+    if (!normalizedNextStatus || normalizedNextStatus === normalizedStatus) {
+      params.delete("status");
+    } else {
+      params.set("status", nextStatus);
+    }
+
+    router.replace(
+      params.toString() ? `${pathname}?${params.toString()}` : pathname,
+    );
+  };
+
   return (
     <section className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -386,60 +485,80 @@ export default function BorrowEquipmentListContent({
           value={aggregates.total}
           icon={<Package className="h-4 w-4" />}
           tone={getStatusSummaryTone("total")}
+          isActive={!normalizedStatus}
+          onClick={() => handleStatusCardClick("")}
         />
         <SummaryCard
           label="Menunggu"
           value={aggregates.pending}
           icon={<CalendarClock className="h-4 w-4" />}
           tone={getStatusSummaryTone("pending")}
+          isActive={normalizedStatus === "pending"}
+          onClick={() => handleStatusCardClick("pending")}
         />
         <SummaryCard
           label="Disetujui"
           value={aggregates.approved}
           icon={<CheckCircle2 className="h-4 w-4" />}
           tone={getStatusSummaryTone("approved")}
+          isActive={normalizedStatus === "approved"}
+          onClick={() => handleStatusCardClick("approved")}
         />
         <SummaryCard
           label="Dipinjam"
           value={aggregates.borrowed}
           icon={<Truck className="h-4 w-4" />}
           tone="indigo"
+          isActive={normalizedStatus === "borrowed"}
+          onClick={() => handleStatusCardClick("borrowed")}
         />
         <SummaryCard
           label="Menunggu Inspeksi"
           value={aggregates.returned_pending_inspection}
           icon={<ShieldCheck className="h-4 w-4" />}
           tone="cyan"
+          isActive={normalizedStatus === "returned_pending_inspection"}
+          onClick={() => handleStatusCardClick("returned_pending_inspection")}
         />
         <SummaryCard
           label="Dikembalikan"
           value={aggregates.returned}
           icon={<Undo2 className="h-4 w-4" />}
           tone={getStatusSummaryTone("returned")}
+          isActive={normalizedStatus === "returned"}
+          onClick={() => handleStatusCardClick("returned")}
         />
         <SummaryCard
           label="Ditolak"
           value={aggregates.rejected}
           icon={<RotateCcw className="h-4 w-4" />}
           tone={getStatusSummaryTone("rejected")}
+          isActive={normalizedStatus === "rejected"}
+          onClick={() => handleStatusCardClick("rejected")}
         />
         <SummaryCard
           label="Kedaluwarsa"
           value={aggregates.expired}
           icon={<Hourglass className="h-4 w-4" />}
           tone={getStatusSummaryTone("expired")}
+          isActive={normalizedStatus === "expired"}
+          onClick={() => handleStatusCardClick("expired")}
         />
         <SummaryCard
           label="Terlambat"
           value={aggregates.overdue}
           icon={<CalendarClock className="h-4 w-4" />}
           tone="orange"
+          isActive={normalizedStatus === "overdue"}
+          onClick={() => handleStatusCardClick("overdue")}
         />
         <SummaryCard
           label="Hilang/Rusak"
           value={aggregates.lost_damaged}
           icon={<X className="h-4 w-4" />}
           tone="red"
+          isActive={normalizedStatus === "lost_damaged"}
+          onClick={() => handleStatusCardClick("lost_damaged")}
         />
       </div>
 
@@ -456,27 +575,44 @@ export default function BorrowEquipmentListContent({
               Approval Dosen Pembimbing
             </h2>
             <p className="text-xs text-slate-600">
-              Pengajuan Skripsi/TA peminjaman alat yang ditujukan kepada Anda sebagai dosen pembimbing.
+              Pengajuan Skripsi/TA peminjaman alat yang ditujukan kepada Anda
+              sebagai dosen pembimbing.
             </p>
           </div>
-          <div className="max-h-[28rem] w-full max-w-full overflow-auto rounded-xl border border-amber-200 bg-white">
+          <div className="max-h-[28rem] w-full max-w-full overflow-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full min-w-[1120px]">
               <colgroup>
                 {TABLE_COLUMN_WIDTHS.map((width) => (
                   <col key={width} style={{ width }} />
                 ))}
               </colgroup>
-              <thead className="border-b border-amber-300 bg-amber-100">
+              <thead className="border-b border-slate-800 bg-slate-900">
                 <tr className="text-left text-sm">
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Kode</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Alat</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Pemohon</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Tujuan</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Jumlah</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Waktu Mulai</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Waktu Selesai</th>
-                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">Status</th>
-                  <th className="sticky right-0 z-20 bg-amber-100 px-3 py-3 text-center font-medium whitespace-nowrap text-slate-900 shadow-[-1px_0_0_0_rgba(251,191,36,0.5)]">
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Kode
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Alat
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Pemohon
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Tujuan
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Jumlah
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Waktu Mulai
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Waktu Selesai
+                  </th>
+                  <th className="px-3 py-3 font-medium whitespace-nowrap text-slate-50">
+                    Status
+                  </th>
+                  <th className="sticky right-0 z-20 bg-slate-900 px-3 py-3 text-center font-medium whitespace-nowrap text-slate-50 shadow-[-1px_0_0_0_rgba(51,65,85,1)]">
                     Aksi
                   </th>
                 </tr>
@@ -484,7 +620,10 @@ export default function BorrowEquipmentListContent({
               <tbody className="text-sm">
                 {isMentorLoading || !hasLoadedMentorOnce ? (
                   <tr>
-                    <td colSpan={9} className="px-3 py-5 text-center text-slate-500">
+                    <td
+                      colSpan={9}
+                      className="px-3 py-5 text-center text-slate-500"
+                    >
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Memuat data...
@@ -493,14 +632,25 @@ export default function BorrowEquipmentListContent({
                   </tr>
                 ) : mentorBorrows.length ? (
                   mentorBorrows.map((item) => (
-                    <tr key={`mentor-${String(item.id)}`} className="border-b last:border-b-0">
+                    <tr
+                      key={`mentor-${String(item.id)}`}
+                      className="border-b last:border-b-0"
+                    >
                       <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
                         {item.code}
                       </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{item.equipmentName}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{item.requesterName}</td>
-                      <td className="px-3 py-2.5 text-slate-700">{item.purpose}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{item.quantity}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {item.equipmentName}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {item.requesterName}
+                      </td>
+                      <td className="px-3 py-2.5 text-slate-700">
+                        {item.purpose}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {item.quantity}
+                      </td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
                         {formatDateTimeWib(item.startTime)}
                       </td>
@@ -521,7 +671,7 @@ export default function BorrowEquipmentListContent({
                           {getBorrowStatusDisplayLabel(item.status)}
                         </button>
                       </td>
-                      <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(254,243,199,1)]">
+                      <td className="sticky right-0 z-10 bg-white px-3 py-2.5 text-center shadow-[-1px_0_0_0_rgba(226,232,240,1)]">
                         <div className="flex items-center justify-center gap-2">
                           {isWaitingForMentorApproval(item) &&
                           canCurrentUserReviewPendingRequest(
@@ -542,7 +692,11 @@ export default function BorrowEquipmentListContent({
                             label="Lihat detail"
                             icon={<Eye className="h-3.5 w-3.5" />}
                             className="w-8 rounded-md border border-slate-200 bg-slate-50 p-0 text-slate-700 shadow-none hover:bg-slate-100"
-                            onClick={() => router.push(`/borrow-equipment/approval/${item.id}`)}
+                            onClick={() =>
+                              router.push(
+                                `/borrow-equipment/approval/${item.id}`,
+                              )
+                            }
                           />
                         </div>
                       </td>
@@ -550,8 +704,12 @@ export default function BorrowEquipmentListContent({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-3 py-5 text-center text-slate-500">
-                      Belum ada pengajuan Skripsi/TA pada tabel dosen pembimbing Anda.
+                    <td
+                      colSpan={9}
+                      className="px-3 py-5 text-center text-slate-500"
+                    >
+                      Belum ada pengajuan Skripsi/TA pada tabel dosen pembimbing
+                      Anda.
                     </td>
                   </tr>
                 )}
@@ -601,9 +759,11 @@ export default function BorrowEquipmentListContent({
         tableClassName="min-w-[1120px]"
         colGroup={
           <colgroup>
-            {TABLE_COLUMN_WIDTHS.slice(0, showRequesterColumn ? 9 : 8).map((width) => (
-              <col key={width} style={{ width }} />
-            ))}
+            {TABLE_COLUMN_WIDTHS.slice(0, showRequesterColumn ? 9 : 8).map(
+              (width) => (
+                <col key={width} style={{ width }} />
+              ),
+            )}
           </colgroup>
         }
       >
@@ -612,9 +772,13 @@ export default function BorrowEquipmentListContent({
             <td className="px-3 py-2.5 font-medium whitespace-nowrap text-slate-800">
               {item.code}
             </td>
-            <td className="px-3 py-2.5 whitespace-nowrap">{item.equipmentName}</td>
+            <td className="px-3 py-2.5 whitespace-nowrap">
+              {item.equipmentName}
+            </td>
             {showRequesterColumn ? (
-              <td className="px-3 py-2.5 whitespace-nowrap">{item.requesterName}</td>
+              <td className="px-3 py-2.5 whitespace-nowrap">
+                {item.requesterName}
+              </td>
             ) : null}
             <td className="px-3 py-2.5 text-slate-700">{item.purpose}</td>
             <td className="px-3 py-2.5 whitespace-nowrap">{item.quantity}</td>
@@ -656,7 +820,9 @@ export default function BorrowEquipmentListContent({
                       label="Edit"
                       icon={<Pencil className="h-3.5 w-3.5" />}
                       className="w-8 rounded-md border border-amber-200 bg-amber-50 p-0 text-amber-700 shadow-none hover:bg-amber-100"
-                      onClick={() => router.push(`/borrow-equipment/${item.id}/edit`)}
+                      onClick={() =>
+                        router.push(`/borrow-equipment/${item.id}/edit`)
+                      }
                     />
                     <TableActionIconButton
                       type="button"

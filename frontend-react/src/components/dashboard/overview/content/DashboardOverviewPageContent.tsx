@@ -274,35 +274,35 @@ export default function DashboardOverviewPage() {
           helper="Seluruh permohonan yang pernah tercatat pada akun ini."
         />
         <SummaryCard
-          label="Pending"
+          label={getStatusDisplayLabel("Pending")}
           value={overview.totals.pending}
           icon={<CalendarClock className="h-5 w-5" />}
           tone={getStatusSummaryTone("Pending")}
           helper="Masih menunggu persetujuan atau tindak lanjut reviewer."
         />
         <SummaryCard
-          label="Approved"
+          label={getStatusDisplayLabel("Approved")}
           value={overview.totals.approved}
           icon={<CheckCircle2 className="h-5 w-5" />}
           tone={getStatusSummaryTone("Approved")}
           helper="Sudah disetujui dan masih berada dalam alur layanan aktif."
         />
         <SummaryCard
-          label="Completed"
+          label={getStatusDisplayLabel("Completed")}
           value={overview.totals.completed}
           icon={<Package className="h-5 w-5" />}
           tone={getStatusSummaryTone("Completed")}
           helper="Pengajuan yang proses layanannya sudah selesai sepenuhnya."
         />
         <SummaryCard
-          label="Rejected"
+          label={getStatusDisplayLabel("Rejected")}
           value={overview.totals.rejected}
           icon={<OctagonX className="h-5 w-5" />}
           tone={getStatusSummaryTone("Rejected")}
-          helper="Permohonan yang tidak lolos review atau ditolak oleh petugas."
+          helper="Permohonan yang tidak lolos review atau ditolak oleh PIC."
         />
         <SummaryCard
-          label="Expired"
+          label={getStatusDisplayLabel("Expired")}
           value={overview.totals.expired}
           icon={<X className="h-5 w-5" />}
           tone={getStatusSummaryTone("Expired")}
