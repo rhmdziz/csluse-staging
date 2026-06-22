@@ -7,11 +7,11 @@ import { Eye, EyeOff, UserPlus } from "lucide-react";
 
 import { toast } from "sonner";
 
-import { AdminDetailDialogShell, InlineErrorAlert } from "@/components/shared";
+import { AdminDetailDialogShell, BatchInput, InlineErrorAlert } from "@/components/shared";
 
 import { Button, Input, DialogFooter } from "@/components/ui";
 
-import { BATCH_VALUES } from "@/constants/batches";
+import { BATCH_OPTIONS } from "@/constants/batches";
 
 import { DEPARTMENT_VALUES } from "@/constants/departments";
 
@@ -223,18 +223,13 @@ export default function CreateUserDialog({
             {visibleFields.batch ? (
               <div className="space-y-1">
                 <label className="text-xs font-medium">Batch</label>
-                <select
+                <BatchInput
                   value={form.batch}
-                  onChange={(event) => setForm((prev) => ({ ...prev, batch: event.target.value }))}
-                  className="h-9 w-full rounded-md border border-sky-300 bg-sky-50/60 px-3 text-sm shadow-sm outline-none focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-200"
-                >
-                  <option value="">Pilih batch</option>
-                  {BATCH_VALUES.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setForm((prev) => ({ ...prev, batch: value }))}
+                  options={BATCH_OPTIONS}
+                  placeholder="Pilih atau ketik batch"
+                  className="border-sky-300 bg-sky-50/60 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
+                />
               </div>
             ) : null}
 

@@ -6,12 +6,11 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldCheck, UserCircle2 } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/shared";
+import { BatchInput } from "@/components/shared";
 
 import { Button, Input } from "@/components/ui";
 
 import { API_AUTH_USER_PROFILE_DETAIL } from "@/constants/api";
-
-import { BATCH_OPTIONS } from "@/constants/batches";
 
 import { DEPARTMENT_VALUES } from "@/constants/departments";
 
@@ -257,19 +256,13 @@ export default function AdminMyProfilePage() {
               )}
               {isEditing ? (
                 <EditRow label="Batch">
-                  <select
+                  <BatchInput
                     name="batch"
                     value={formData.batch}
-                    onChange={handleChange}
-                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none shadow-xs focus-visible:border-slate-500 focus-visible:ring-[3px] focus-visible:ring-slate-200"
-                  >
-                    <option value="">Pilih batch</option>
-                    {BATCH_OPTIONS.map((batch) => (
-                      <option key={batch} value={batch}>
-                        {batch}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setFormData((prev) => ({ ...prev, batch: value }))}
+                    placeholder="Pilih atau ketik batch"
+                    className="border-slate-300 bg-white shadow-xs focus-visible:border-slate-500 focus-visible:ring-slate-200"
+                  />
                 </EditRow>
               ) : (
                 <ProfileRow label="Batch" value={displayProfile.batch ? String(displayProfile.batch) : "-"} />

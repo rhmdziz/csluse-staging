@@ -21,7 +21,7 @@ import {
   AdminHistorySummaryCards as AdminRecordSummaryCards,
 } from "@/components/admin/history";
 
-import { ConfirmDeleteDialog, InlineErrorAlert, DataPagination } from "@/components/shared";
+import { BatchInput, ConfirmDeleteDialog, InlineErrorAlert, DataPagination } from "@/components/shared";
 
 import {
   BulkCreateDialog,
@@ -269,15 +269,18 @@ export default function UserManagementContent({
                     setPage(1);
                   }}
                 />
-                <SelectField
-                  label="Batch"
-                  value={filters.batch}
-                  options={BATCH_OPTIONS}
-                  onChange={(value) => {
-                    setFilters((prev) => ({ ...prev, batch: value }));
-                    setPage(1);
-                  }}
-                />
+                <AdminFilterField label="Batch">
+                  <BatchInput
+                    value={filters.batch}
+                    onChange={(value) => {
+                      setFilters((prev) => ({ ...prev, batch: value }));
+                      setPage(1);
+                    }}
+                    options={BATCH_OPTIONS}
+                    placeholder="Semua atau ketik batch"
+                    className={ADMIN_FILTER_INPUT_CLASS}
+                  />
+                </AdminFilterField>
                 <SelectField
                   label="Status"
                   value={filters.status}

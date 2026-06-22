@@ -5,9 +5,9 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { usePathname, useRouter } from "next/navigation";
 
-import { Button, Input } from "@/components/ui";
+import { BatchInput } from "@/components/shared";
 
-import { BATCH_OPTIONS } from "@/constants/batches";
+import { Button, Input } from "@/components/ui";
 
 import { DEPARTMENT_VALUES } from "@/constants/departments";
 
@@ -220,19 +220,13 @@ export default function MyProfilePage() {
             {visibleFields.batch &&
               (isEditing ? (
                 <EditRow label="Batch">
-                  <select
+                  <BatchInput
                     name="batch"
                     value={formData.batch}
-                    onChange={handleChange}
-                    className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm outline-none focus-visible:border-slate-500 focus-visible:ring-[3px] focus-visible:ring-slate-200"
-                  >
-                    <option value="">Pilih batch</option>
-                    {BATCH_OPTIONS.map((batch) => (
-                      <option key={batch} value={batch}>
-                        {batch}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setFormData((prev) => ({ ...prev, batch: value }))}
+                    placeholder="Pilih atau ketik batch"
+                    className="border-slate-300 bg-white focus-visible:border-slate-500 focus-visible:ring-slate-200"
+                  />
                 </EditRow>
               ) : (
                 <ProfileRow

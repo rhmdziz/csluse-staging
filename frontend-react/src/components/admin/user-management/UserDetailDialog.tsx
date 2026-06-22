@@ -6,7 +6,7 @@ import { CheckCircle2, UserRound, XCircle } from "lucide-react";
 
 import { toast } from "sonner";
 
-import { AdminDetailActions, AdminDetailDialogShell } from "@/components/shared";
+import { AdminDetailActions, AdminDetailDialogShell, BatchInput } from "@/components/shared";
 
 import {
   AlertDialog,
@@ -20,8 +20,6 @@ import {
   Button,
   Input,
 } from "@/components/ui";
-
-import { BATCH_VALUES } from "@/constants/batches";
 
 import { DEPARTMENT_VALUES } from "@/constants/departments";
 
@@ -269,11 +267,9 @@ export default function UserDetailDialog({
                 />
               ) : null}
               {visibleFields.batch ? (
-                <DetailSelect
-                  label="Batch"
+                <DetailBatchField
                   value={form.batch}
                   editable={isEditing && canManageUsers}
-                  options={BATCH_VALUES.map((value) => ({ value, label: value }))}
                   onChange={(value) => setForm((prev) => ({ ...prev, batch: value }))}
                 />
               ) : null}
@@ -419,6 +415,34 @@ function DetailSelect({
             </option>
           ))}
         </select>
+      ) : (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          {value || "-"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailBatchField({
+  value,
+  editable,
+  onChange,
+}: {
+  value: string;
+  editable: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-slate-700">Batch</label>
+      {editable ? (
+        <BatchInput
+          value={value}
+          onChange={onChange}
+          placeholder="Pilih atau ketik batch"
+          className="border-sky-300 bg-sky-50/60 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
+        />
       ) : (
         <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           {value || "-"}

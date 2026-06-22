@@ -291,6 +291,62 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             finally:
                 cache.clear()
 
+    def test_admin_profile_create_accepts_manual_batch_year(self):
+        response = self.client.post(
+            "/api/admin/profile/",
+            {
+                "email": "manual-batch@example.com",
+                "full_name": "Manual Batch",
+                "role": "Student",
+                "department": "Digital Business Technology",
+                "batch": "2035",
+                "id_number": "STD-2035",
+                "user_type": "Internal",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["batch"], "2035")
+
+    def test_admin_profile_update_accepts_manual_batch_year(self):
+        profile = self.create_profile(
+            email="manual-batch-update@example.com",
+            full_name="Manual Batch Update",
+            role="Student",
+            department="Digital Business Technology",
+            batch="2024",
+            id_number="STD-2024",
+            user_type="Internal",
+        )
+
+        response = self.client.patch(
+            f"/api/admin/profile/{profile.id}/",
+            {"batch": "2035"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["batch"], "2035")
+
+    def test_admin_profile_rejects_non_year_batch(self):
+        response = self.client.post(
+            "/api/admin/profile/",
+            {
+                "email": "invalid-batch@example.com",
+                "full_name": "Invalid Batch",
+                "role": "Student",
+                "department": "Digital Business Technology",
+                "batch": "20A4",
+                "id_number": "STD-INVALID",
+                "user_type": "Internal",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("batch", response.data)
+
     def test_bulk_delete_skips_super_administrator_and_deletes_regular_profiles(self):
         deletable_user = self.create_user(
             email="deletable@example.com",

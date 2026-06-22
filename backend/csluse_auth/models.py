@@ -61,18 +61,6 @@ class Profile(BaseModel):
         ("S3 Manajemen dan Kewirausahaan", "S3 Manajemen dan Kewirausahaan"),
         ("Lainnya", "Lainnya"),
     ]
-    BATCH_CHOICES = [
-        ("2022", "2022"),
-        ("2023", "2023"),
-        ("2024", "2024"),
-        ("2025", "2025"),
-        ("2026", "2026"),
-        ("2027", "2027"),
-        ("2028", "2028"),
-        ("2029", "2029"),
-        ("2030", "2030"),
-    ]
-
     user = models.OneToOneField(
         get_user_model(),
         on_delete=models.SET_NULL,
@@ -87,7 +75,7 @@ class Profile(BaseModel):
     is_mentor = models.BooleanField(default=False)
     department = models.CharField(max_length=40, choices=DEPARTMENT_CHOICE, blank=True, null=True)
     id_number = models.CharField(max_length=40, blank=True, null=True)
-    batch = models.CharField(max_length=4, choices=BATCH_CHOICES, blank=True, null=True)
+    batch = models.CharField(max_length=4, blank=True, null=True)
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default="External")
     institution = models.CharField(max_length=255, blank=True, null=True)
 

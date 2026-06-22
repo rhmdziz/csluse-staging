@@ -31,6 +31,25 @@ USER_TYPE_NORMALIZATION_MAP = {
     "INTERNAL": "Internal",
     "EXTERNAL": "External",
 }
+BATCH_MIN_YEAR = 2000
+BATCH_MAX_YEAR = 2100
+
+
+def _validate_batch_year(value):
+    if value in (None, ""):
+        return None if value == "" else value
+
+    normalized = str(value).strip()
+    if not re.fullmatch(r"\d{4}", normalized):
+        raise serializers.ValidationError("Batch harus berupa tahun 4 digit.")
+
+    year = int(normalized)
+    if year < BATCH_MIN_YEAR or year > BATCH_MAX_YEAR:
+        raise serializers.ValidationError(
+            f"Batch harus berada antara {BATCH_MIN_YEAR} dan {BATCH_MAX_YEAR}."
+        )
+
+    return normalized
 
 
 # region Authentication Serializers
@@ -107,11 +126,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         required=False,
         allow_null=True,
     )
-    batch = serializers.ChoiceField(
-        choices=[choice[0] for choice in Profile.BATCH_CHOICES],
-        required=False,
-        allow_null=True,
-    )
+    batch = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=4)
     id_number = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     user_type = serializers.ChoiceField(
         choices=[choice[0] for choice in Profile.USER_TYPE_CHOICES],
@@ -146,12 +161,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         return value
 
     def validate_batch(self, value):
-        if value in (None, ""):
-            return None if value == "" else value
-        valid_batches = {choice[0] for choice in Profile.BATCH_CHOICES}
-        if value not in valid_batches:
-            raise serializers.ValidationError("Batch tidak valid.")
-        return value
+        return _validate_batch_year(value)
 
     def validate(self, data):
         data = super().validate(data)
@@ -300,12 +310,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         return value
 
     def validate_batch(self, value):
-        if value in (None, ""):
-            return None if value == "" else value
-        valid_batches = {choice[0] for choice in Profile.BATCH_CHOICES}
-        if value not in valid_batches:
-            raise serializers.ValidationError("Batch harus sesuai dengan opsi yang tersedia.")
-        return value
+        return _validate_batch_year(value)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

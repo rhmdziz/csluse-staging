@@ -11,7 +11,7 @@ import { Button } from "@/components/ui";
 
 import { BulkImportDialogShell, InlineErrorAlert } from "@/components/shared";
 
-import { BATCH_VALUES } from "@/constants/batches";
+import { BATCH_MAX_YEAR, BATCH_MIN_YEAR, isValidBatchValue } from "@/constants/batches";
 
 import { DEPARTMENT_VALUES } from "@/constants/departments";
 
@@ -118,7 +118,12 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
       `Harus sama persis dengan salah satu opsi department yang tersedia: ${DEPARTMENT_VALUES.join(", ")}.`,
       DEPARTMENT_VALUES[0],
     ],
-    ["batch", "Tidak", "Umumnya dipakai untuk Student.", "2024"],
+    [
+      "batch",
+      "Tidak",
+      `Umumnya dipakai untuk Student. Gunakan tahun 4 digit antara ${BATCH_MIN_YEAR} sampai ${BATCH_MAX_YEAR}.`,
+      "2024",
+    ],
     ["id number", "Tidak", "Dipakai untuk role yang memerlukan nomor identitas.", "12345678"],
     ["institution", "Tidak", "Dipakai untuk role Guest.", "PT Contoh Institusi"],
     [],
@@ -259,8 +264,8 @@ export default function BulkCreateDialog({
         if (department && !DEPARTMENT_VALUES.includes(department)) {
           reasons.push("department tidak sesuai opsi");
         }
-        if (batch && !BATCH_VALUES.includes(batch)) {
-          reasons.push("batch tidak sesuai opsi");
+        if (batch && !isValidBatchValue(batch)) {
+          reasons.push("batch harus berupa tahun 4 digit yang valid");
         }
 
         if (reasons.length) {

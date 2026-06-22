@@ -17,7 +17,7 @@ import {
 
 import Link from "next/link";
 
-import { MonthCalendar } from "@/components/shared";
+import { BatchInput, MonthCalendar } from "@/components/shared";
 
 import { Button, DateRangePicker, Input } from "@/components/ui";
 
@@ -1068,20 +1068,13 @@ export function DashboardActionPanel({
                           ) : showLabClearanceFilters ? (
                             <>
                               <FilterField label="Angkatan">
-                                <select
+                                <BatchInput
                                   value={labClearanceBatch}
-                                  onChange={(event) =>
-                                    updateLabClearanceFilter("batch", event.target.value)
-                                  }
+                                  onChange={(value) => updateLabClearanceFilter("batch", value)}
+                                  options={BATCH_OPTIONS}
+                                  placeholder="Semua atau ketik angkatan"
                                   className={FILTER_CONTROL_CLASS}
-                                >
-                                  <option value="">Semua Angkatan</option>
-                                  {BATCH_OPTIONS.map((batchOption) => (
-                                    <option key={batchOption} value={batchOption}>
-                                      {batchOption}
-                                    </option>
-                                  ))}
-                                </select>
+                                />
                               </FilterField>
                               <FilterField label="Urutkan">
                                 <select

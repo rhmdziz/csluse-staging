@@ -1,4 +1,5 @@
 export * from "./ActionTooltip";
+export { default as BatchInput } from "./BatchInput";
 export * from "./DashboardFormFields";
 export { default as MonthCalendar } from "./MonthCalendar";
 export * from "./ProgressSteps";
