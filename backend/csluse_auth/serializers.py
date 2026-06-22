@@ -9,6 +9,7 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import LoginSerializer as BaseLoginSerializer
 from rest_framework import serializers
 
+from .adapters import is_campus_email, normalize_email
 from .audit import log_admin_action
 from .models import Profile
 
@@ -433,12 +434,16 @@ class AdminProfileSerializer(ProfileSerializer):
         read_only_fields = ("id", "user_id", "is_verified", "has_user", "status")
 
     def validate_email(self, value):
-        normalized = str(value or "").strip().lower()
+        normalized = normalize_email(value)
         queryset = Profile.objects.filter(email__iexact=normalized)
         if self.instance is not None:
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
             raise serializers.ValidationError("Email profile sudah digunakan.")
+        if self.instance is None and not is_campus_email(normalized):
+            raise serializers.ValidationError(
+                "Email non-domain kampus harus dibuat sebagai akun dengan password."
+            )
         return normalized
 
     def create(self, validated_data):

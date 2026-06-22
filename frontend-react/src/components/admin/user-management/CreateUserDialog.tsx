@@ -22,6 +22,8 @@ import { useCreateUser } from "@/hooks/shared/resources/users";
 import {
   createEmptyUserForm,
   getVisibleUserFields,
+  isCampusEmail,
+  requiresUserPassword,
   toCreateProfilePayload,
   toCreateUserPayload,
   USER_MODAL_WIDTH_CLASS,
@@ -53,7 +55,9 @@ export default function CreateUserDialog({
   const { createUser, createProfile, isSubmitting, errorMessage, setErrorMessage } = useCreateUser();
 
   const visibleFields = getVisibleUserFields(form.role);
-  const isGuestRole = form.role === ROLE_VALUES.GUEST;
+  const passwordRequired = requiresUserPassword({ email, role: form.role });
+  const useDirectUserProvisioning = passwordRequired;
+  const isCampusDomain = isCampusEmail(email);
 
   const resetState = () => {
     setShowPassword(false);
@@ -69,9 +73,11 @@ export default function CreateUserDialog({
 
     if (!form.full_name.trim()) return setErrorMessage("Nama wajib diisi.");
     if (!email.trim()) return setErrorMessage("Email wajib diisi.");
-    if (isGuestRole && !password) return setErrorMessage("Password wajib diisi.");
+    if (passwordRequired && !password) {
+      return setErrorMessage("Password wajib diisi untuk email non-domain kampus.");
+    }
 
-    const result = isGuestRole
+    const result = useDirectUserProvisioning
       ? await createUser(toCreateUserPayload({ email, password, form }) as never)
       : await createProfile(toCreateProfilePayload({ email, form }) as never);
     if (!result.ok) return;
@@ -80,8 +86,8 @@ export default function CreateUserDialog({
     onOpenChange(false);
     resetState();
     toast.success(
-      isGuestRole
-        ? "User berhasil dibuat."
+      useDirectUserProvisioning
+        ? "Akun berhasil dibuat."
         : "Profile internal berhasil dibuat. User akan terhubung saat login Microsoft pertama.",
     );
   };
@@ -91,11 +97,11 @@ export default function CreateUserDialog({
       open={open}
       onOpenChange={onOpenChange}
       onCloseReset={resetState}
-      title={isGuestRole ? "Buat User" : "Buat Profile Internal"}
+      title={useDirectUserProvisioning ? "Buat Akun" : "Buat Profile Internal"}
       description={
-        isGuestRole
-          ? "Tambahkan user baru dan lengkapi informasi akun yang dibutuhkan."
-          : "Siapkan profile internal terlebih dahulu. User akan dibuat saat login Microsoft pertama."
+        useDirectUserProvisioning
+          ? "Tambahkan akun baru dan lengkapi password awal yang dibutuhkan."
+          : "Siapkan profile terlebih dahulu. User akan dibuat saat login Microsoft pertama."
       }
       icon={<UserPlus className="h-5 w-5" />}
       contentClassName={`${USER_MODAL_WIDTH_CLASS} gap-0 p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
@@ -136,29 +142,34 @@ export default function CreateUserDialog({
               />
             </div>
 
-            {isGuestRole ? (
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Password</label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Minimal 8 karakter"
-                    className="border-sky-300 bg-sky-50/60 pr-10 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Password</label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={isCampusDomain ? "Password tidak diperlukan" : "Minimal 8 karakter"}
+                  className="border-sky-300 bg-sky-50/60 pr-10 shadow-sm focus-visible:border-sky-600 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-70"
+                  required={passwordRequired}
+                  disabled={isCampusDomain}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground disabled:pointer-events-none disabled:opacity-50"
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  disabled={isCampusDomain}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-            ) : null}
+              {isCampusDomain ? (
+                <p className="text-[11px] text-slate-500">
+                  Akun akan terhubung dengan akun outlook internal.
+                </p>
+              ) : null}
+            </div>
 
             <div className="space-y-1">
               <label className="text-xs font-medium">Role</label>
@@ -251,7 +262,7 @@ export default function CreateUserDialog({
         <DialogFooter>
           <Button type="submit" disabled={isSubmitting} className="gap-2">
             <UserPlus className="h-4 w-4" />
-            {isSubmitting ? "Menyimpan..." : isGuestRole ? "Buat User" : "Buat Profile"}
+            {isSubmitting ? "Menyimpan..." : useDirectUserProvisioning ? "Buat Akun" : "Buat Profile"}
           </Button>
         </DialogFooter>
       </form>

@@ -277,25 +277,51 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
                 create_response = self.client.post(
                     "/api/admin/profile/",
                     {
-                        "email": "throttle-profile@example.com",
+                        "email": "throttle-profile@student.prasetiyamulya.ac.id",
                         "full_name": "Throttle Profile",
-                        "role": "Guest",
-                        "institution": "External Lab",
-                        "user_type": "External",
+                        "role": "Student",
+                        "department": "Digital Business Technology",
+                        "batch": "2024",
+                        "id_number": "STD-THROTTLE",
+                        "user_type": "Internal",
                     },
                     format="json",
                 )
 
                 self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
-                self.assertEqual(create_response.data["email"], "throttle-profile@example.com")
+                self.assertEqual(
+                    create_response.data["email"],
+                    "throttle-profile@student.prasetiyamulya.ac.id",
+                )
             finally:
                 cache.clear()
+
+    def test_admin_profile_create_rejects_non_campus_email_without_password(self):
+        response = self.client.post(
+            "/api/admin/profile/",
+            {
+                "email": "gmail-user@gmail.com",
+                "full_name": "Gmail User",
+                "role": "Student",
+                "department": "Digital Business Technology",
+                "batch": "2024",
+                "id_number": "STD-GMAIL",
+                "user_type": "Internal",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["email"][0],
+            "Email non-domain kampus harus dibuat sebagai akun dengan password.",
+        )
 
     def test_admin_profile_create_accepts_manual_batch_year(self):
         response = self.client.post(
             "/api/admin/profile/",
             {
-                "email": "manual-batch@example.com",
+                "email": "manual-batch@student.prasetiyamulya.ac.id",
                 "full_name": "Manual Batch",
                 "role": "Student",
                 "department": "Digital Business Technology",
@@ -333,7 +359,7 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
         response = self.client.post(
             "/api/admin/profile/",
             {
-                "email": "invalid-batch@example.com",
+                "email": "invalid-batch@student.prasetiyamulya.ac.id",
                 "full_name": "Invalid Batch",
                 "role": "Student",
                 "department": "Digital Business Technology",

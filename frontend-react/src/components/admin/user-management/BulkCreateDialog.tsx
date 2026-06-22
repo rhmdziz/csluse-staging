@@ -22,6 +22,7 @@ import { useBulkCreateUsers, type BulkRow } from "@/hooks/shared/resources/users
 import {
   USER_MODAL_WIDTH_CLASS,
   getVisibleUserFields,
+  requiresUserPassword,
 } from "@/components/admin/user-management";
 
 const HEADER_MAP: Record<
@@ -58,12 +59,10 @@ function normalizeHeader(value: unknown) {
 }
 
 function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
-  const roleForTemplate = hasRoleScope ? scopedRole : "";
-  const passwordRequired = roleForTemplate ? roleForTemplate === ROLE_VALUES.GUEST : true;
   const headers = [
     "nama lengkap",
     "email",
-    ...(passwordRequired ? ["password"] : []),
+    "password",
     ...(hasRoleScope ? [] : ["role"]),
     "initials",
     "department",
@@ -75,7 +74,7 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     [
       "Aziz Rahmad",
       "aziz@student.prasetiyamulya.ac.id",
-      ...(passwordRequired ? [""] : []),
+      "",
       ...(hasRoleScope ? [] : [ROLE_VALUES.STUDENT]),
       "AZR",
       DEPARTMENT_VALUES[0],
@@ -86,7 +85,7 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     [
       "Dina Guest",
       "dina.guest@example.com",
-      ...(passwordRequired ? ["Password123"] : []),
+      "Password123",
       ...(hasRoleScope ? [] : [ROLE_VALUES.GUEST]),
       "DGT",
       "",
@@ -100,9 +99,12 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     ["Field", "Wajib", "Aturan", "Contoh"],
     ["nama lengkap", "Ya", "Isi nama lengkap user.", "Aziz Rahmad"],
     ["email", "Ya", "Gunakan email unik yang valid.", "aziz@student.prasetiyamulya.ac.id"],
-    ...(passwordRequired
-      ? [["password", scopedRole === ROLE_VALUES.GUEST ? "Ya" : "Khusus Guest", "Gunakan password awal untuk akun Guest. Internal tidak memerlukan password.", "Password123"]]
-      : []),
+    [
+      "password",
+      "Kondisional",
+      "Wajib untuk email non-domain kampus. Boleh kosong untuk email domain kampus yang akan login via Microsoft.",
+      "Password123",
+    ],
     [
       "role",
       hasRoleScope ? "Tidak" : "Ya",
@@ -219,11 +221,14 @@ export default function BulkCreateDialog({
         const lineNumber = index + 2;
         const rawRole = normalizeRoleValue(String(row[headerIndexes.role ?? -1] || "").trim());
         const normalizedRole = normalizedRoleParam || rawRole;
-        const requiresPassword = normalizedRole === ROLE_VALUES.GUEST;
-        const visibleFields = getVisibleUserFields(normalizedRole);
         const full_name = String(row[headerIndexes.full_name ?? -1] || "").trim();
         const email = String(row[headerIndexes.email ?? -1] || "").trim();
         const password = String(row[headerIndexes.password ?? -1] || "").trim();
+        const requiresPassword = requiresUserPassword({
+          email,
+          role: normalizedRole,
+        });
+        const visibleFields = getVisibleUserFields(normalizedRole);
         const initials = String(row[headerIndexes.initials ?? -1] || "")
           .trim()
           .slice(0, 3);
@@ -351,7 +356,7 @@ export default function BulkCreateDialog({
       description={
         <>
           Upload file Excel dengan kolom wajib: nama lengkap, email
-          {hasRoleScope ? "." : ", role."} Password hanya wajib untuk guest. Kolom opsional: initials,
+          {hasRoleScope ? "." : ", role."} Password wajib untuk email non-domain kampus. Kolom opsional: initials,
           department, batch, id number, institution.
         </>
       }
@@ -427,7 +432,9 @@ export default function BulkCreateDialog({
                     <td className="px-2 py-2 text-muted-foreground">{row.email}</td>
                     <td className="px-2 py-2">{row.initials || "-"}</td>
                     <td className="px-2 py-2">
-                      {row.role === ROLE_VALUES.GUEST ? row.password || "-" : "-"}
+                      {requiresUserPassword({ email: row.email, role: row.role })
+                        ? row.password || "-"
+                        : "-"}
                     </td>
                     <td className="px-2 py-2">{row.role || "-"}</td>
                     <td className="px-2 py-2">{row.department || "-"}</td>

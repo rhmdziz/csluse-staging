@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import {
+  requiresUserPassword,
   toCreateProfilePayload,
   toCreateUserPayload,
   type UserFormState,
 } from "@/components/admin/user-management";
-import { ROLE_VALUES } from "@/constants/roles";
 import {
   usersService,
   type CreateProfilePayload,
@@ -35,8 +35,11 @@ export function useBulkCreateUsers() {
     try {
       for (const row of rows) {
         try {
-          const isGuestRole = row.role === ROLE_VALUES.GUEST;
-          const result = isGuestRole
+          const requiresPassword = requiresUserPassword({
+            email: row.email,
+            role: row.role,
+          });
+          const result = requiresPassword
             ? await usersService.create(
                 toCreateUserPayload({
                   email: row.email,

@@ -4,6 +4,7 @@ import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 import { USER_TYPE_VALUES } from "@/constants/user-types";
 import type { UserRow } from "@/hooks/shared/resources/users";
 
+export const CAMPUS_EMAIL_DOMAIN = "prasetiyamulya.ac.id";
 export const USER_MODAL_WIDTH_CLASS =
   "w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:w-[50vw] sm:max-w-[960px] sm:min-w-[720px] sm:max-w-none";
 
@@ -19,6 +20,21 @@ export type UserFormState = {
   id_number: string;
   institution: string;
 };
+
+export function normalizeUserEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export function isCampusEmail(email: string) {
+  const normalized = normalizeUserEmail(email);
+  if (!normalized.includes("@")) return false;
+  const domain = normalized.split("@", 2)[1] || "";
+  return domain === CAMPUS_EMAIL_DOMAIN || domain.endsWith(`.${CAMPUS_EMAIL_DOMAIN}`);
+}
+
+export function requiresUserPassword(args: { email: string; role: string | null | undefined }) {
+  return !isCampusEmail(args.email);
+}
 
 export function getVisibleUserFields(role: string | null | undefined) {
   const normalizedRole = normalizeRoleValue(role || "");
