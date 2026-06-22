@@ -17,7 +17,7 @@ import {
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { DashboardDetailReviewDialog } from "@/components/dashboard/layout/DashboardDetailReviewDialog";
+import { DashboardDetailReviewDialog } from "@/components/dashboard/layout";
 import { DashboardListTable } from "@/components/dashboard/shared";
 
 import {

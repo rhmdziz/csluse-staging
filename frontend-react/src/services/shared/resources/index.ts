@@ -1,3 +1,4 @@
+export * from "./departments.service";
 export * from "./equipments.service";
 export * from "./materials.service";
 export * from "./rooms.service";

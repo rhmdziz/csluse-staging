@@ -55,9 +55,8 @@ import {
   API_BOOKINGS_BULK_DELETE,
 } from "@/constants/api";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { useHistoryRequesterOptions } from "@/hooks/admin/history";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import {
   mapBooking,
@@ -108,6 +107,7 @@ const EMPTY_BOOKING_AGGREGATES: BookingAggregates = {
 
 export default function AdminRoomBookingHistoryPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const { departmentNames } = useDepartmentOptions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -524,7 +524,7 @@ export default function AdminRoomBookingHistoryPage() {
                   className="h-8 w-full rounded-md border border-slate-400 bg-white px-2 text-xs outline-none shadow-xs focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-100"
                 >
                   <option value="">Semua prodi</option>
-                  {DEPARTMENT_VALUES.map((option) => (
+                  {departmentNames.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>

@@ -152,6 +152,9 @@ const UserManagementStaffPage = lazyWithReload(
 const UserManagementGuestPage = lazyWithReload(
   () => import("@/pages/admin/user-management/UserManagementGuestPage"),
 );
+const UserManagementDepartmentPage = lazyWithReload(
+  () => import("@/pages/admin/user-management/UserManagementDepartmentPage"),
+);
 const TaskManagementAdvisorPage = lazyWithReload(
   () => import("@/pages/admin/task-management/TaskManagementAdvisorPage"),
 );
@@ -556,6 +559,11 @@ export const router = createBrowserRouter([
           { path: "role/admin", element: renderPage(UserManagementAdminPage) },
           { path: "role/staff", element: renderPage(UserManagementStaffPage) },
           { path: "role/guest", element: renderPage(UserManagementGuestPage) },
+          {
+            path: "role/department",
+            element: <Navigate to="/admin/user-management/department" replace />,
+          },
+          { path: "department", element: renderPage(UserManagementDepartmentPage) },
           {
             path: "task/dosen-pembimbing",
             element: <Navigate to="/admin/task-management/dosen-pembimbing" replace />,

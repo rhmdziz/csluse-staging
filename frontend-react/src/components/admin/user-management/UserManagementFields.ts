@@ -41,7 +41,8 @@ export function getVisibleUserFields(role: string | null | undefined) {
   return {
     department:
       normalizedRole === ROLE_VALUES.STUDENT ||
-      normalizedRole === ROLE_VALUES.LECTURER,
+      normalizedRole === ROLE_VALUES.LECTURER ||
+      normalizedRole === ROLE_VALUES.ADMIN,
     batch: normalizedRole === ROLE_VALUES.STUDENT,
     idNumber:
       normalizedRole === ROLE_VALUES.STUDENT ||

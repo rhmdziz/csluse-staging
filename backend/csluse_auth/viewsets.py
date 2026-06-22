@@ -18,7 +18,7 @@ from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room,
 from csluse.viewsets import DefaultPagination
 
 from .audit import log_admin_action
-from .models import Profile
+from .models import Department, Profile
 from .permissions import (
     ADMINISTRATOR,
     SUPER_ADMINISTRATOR,
@@ -28,8 +28,10 @@ from .permissions import (
 )
 from .serializers import (
     AdminActionSerializer,
+    AdminDepartmentSerializer,
     AdminDashboardKpisSerializer,
     AdminProfileSerializer,
+    DepartmentSerializer,
     LabClearanceSerializer,
     PicUserDropdownSerializer,
     RoomPicBulkAssignSerializer,
@@ -117,6 +119,118 @@ class MentorViewSet(viewsets.ViewSet):
         )
         serializer = PicUserDropdownSerializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = DepartmentSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Department.objects.all().order_by("name", "pk")
+    http_method_names = ["get"]
+    pagination_class = None
+
+
+class AdminDepartmentViewSet(viewsets.ModelViewSet):
+    serializer_class = AdminDepartmentSerializer
+    permission_classes = [IsAuthenticated, IsAdministratorOrAbove]
+    queryset = Department.objects.all().order_by("name", "pk")
+    pagination_class = None
+    http_method_names = ["get", "post", "patch", "delete"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_term = self.request.query_params.get("search") or self.request.query_params.get("q")
+        if search_term:
+            queryset = queryset.filter(name__icontains=search_term)
+        return queryset
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_admin_action(
+            self.request.user,
+            instance,
+            CHANGE,
+            "Created department via CSL Admin (user management).",
+        )
+
+    def perform_update(self, serializer):
+        previous_name = serializer.instance.name
+        with transaction.atomic():
+            instance = serializer.save()
+            if previous_name != instance.name:
+                Profile.objects.filter(department=previous_name).update(department=instance.name)
+        log_admin_action(
+            self.request.user,
+            instance,
+            CHANGE,
+            "Updated department via CSL Admin (user management).",
+        )
+
+    def perform_destroy(self, instance):
+        usage_count = Profile.objects.filter(department=instance.name).count()
+        if usage_count > 0:
+            raise ValidationError(
+                {
+                    "detail": (
+                        "Department tidak bisa dihapus karena masih dipakai profile."
+                    ),
+                    "profile_count": usage_count,
+                }
+            )
+
+        log_admin_action(
+            self.request.user,
+            instance,
+            DELETION,
+            "Deleted department via CSL Admin (user management).",
+        )
+        instance.delete()
+
+    @extend_schema(request=UserBulkDeleteSerializer)
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        serializer = UserBulkDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        requested_ids = serializer.validated_data["ids"]
+        queryset = self.get_queryset()
+        departments_by_id = {
+            str(department.pk): department
+            for department in queryset.filter(pk__in=requested_ids)
+        }
+
+        deleted_ids = []
+        failed_ids = []
+
+        for department_id in requested_ids:
+            department = departments_by_id.get(str(department_id))
+            if department is None:
+                failed_ids.append(department_id)
+                continue
+
+            usage_count = Profile.objects.filter(department=department.name).count()
+            if usage_count > 0:
+                failed_ids.append(department_id)
+                continue
+
+            log_admin_action(
+                request.user,
+                department,
+                DELETION,
+                "Deleted department via CSL Admin (user management bulk).",
+            )
+            department.delete()
+            deleted_ids.append(str(department.pk))
+
+        response_status = status.HTTP_200_OK if deleted_ids else status.HTTP_400_BAD_REQUEST
+        return Response(
+            {
+                "deleted_count": len(deleted_ids),
+                "failed_count": len(failed_ids),
+                "deleted_ids": deleted_ids,
+                "failed_ids": failed_ids,
+            },
+            status=response_status,
+        )
 
 
 class AdminProfileViewSet(AdminProvisioningThrottleBypassMixin, viewsets.ModelViewSet):

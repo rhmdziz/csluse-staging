@@ -20,7 +20,7 @@ from csluse_auth.adapters import (
     CustomAccountAdapter,
     CustomSocialAccountAdapter,
 )
-from csluse_auth.models import Profile
+from csluse_auth.models import Department, Profile
 from csluse_auth.audit import log_admin_action
 from csluse_auth.permissions import ADMINISTRATOR, SUPER_ADMINISTRATOR, assign_role
 
@@ -119,6 +119,107 @@ class ProfileModelTests(AuthBaseTestMixin, TestCase):
 
         self.assertEqual(profile.initials, "JDJ")
         self.assertIsNone(profile.institution)
+
+
+class DepartmentViewSetTests(AuthBaseTestMixin, APITestCase):
+    def setUp(self):
+        self.admin = self.create_user(
+            email="department-admin@example.com",
+            full_name="Department Admin",
+            role="Admin",
+        )
+        assign_role(self.admin, ADMINISTRATOR)
+        self.client.force_authenticate(user=self.admin)
+
+    def test_authenticated_user_can_list_departments(self):
+        response = self.client.get("/api/users/departments/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 1)
+        self.assertIn("name", response.data[0])
+
+    def test_admin_can_create_department(self):
+        response = self.client.post(
+            "/api/admin/departments/",
+            {"name": "Department Baru"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Department.objects.filter(name="Department Baru").exists())
+
+    def test_admin_rename_department_syncs_existing_profiles(self):
+        self.create_user(
+            email="student-department@example.com",
+            full_name="Student Department",
+            role="Student",
+            department="Digital Business Technology",
+            batch="2024",
+            user_type="Internal",
+        )
+        department = Department.objects.get(name="Digital Business Technology")
+
+        response = self.client.patch(
+            f"/api/admin/departments/{department.id}/",
+            {"name": "Digital Business and Innovation"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Department.objects.filter(name="Digital Business and Innovation").exists())
+        self.assertFalse(Department.objects.filter(name="Digital Business Technology").exists())
+        self.assertEqual(
+            Profile.objects.filter(department="Digital Business and Innovation").count(),
+            1,
+        )
+
+    def test_admin_cannot_delete_department_when_still_used(self):
+        self.create_user(
+            email="lecturer-department@example.com",
+            full_name="Lecturer Department",
+            role="Lecturer",
+            department="Business Mathematics",
+            user_type="Internal",
+        )
+        department = Department.objects.get(name="Business Mathematics")
+
+        response = self.client.delete(f"/api/admin/departments/{department.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"],
+            "Department tidak bisa dihapus karena masih dipakai profile.",
+        )
+        self.assertTrue(Department.objects.filter(pk=department.pk).exists())
+
+    def test_admin_bulk_delete_departments_skips_used_department(self):
+        removable = Department.objects.create(name="Department Disposable")
+        self.create_user(
+            email="used-department@example.com",
+            full_name="Used Department",
+            role="Student",
+            department="Business Mathematics",
+            batch="2024",
+            user_type="Internal",
+        )
+        used_department = Department.objects.get(name="Business Mathematics")
+
+        response = self.client.post(
+            "/api/admin/departments/bulk-delete/",
+            {"ids": [str(removable.id), str(used_department.id), "missing-department-id"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["deleted_count"], 1)
+        self.assertEqual(response.data["failed_count"], 2)
+        self.assertEqual(response.data["deleted_ids"], [str(removable.id)])
+        self.assertCountEqual(
+            response.data["failed_ids"],
+            [str(used_department.id), "missing-department-id"],
+        )
+        self.assertFalse(Department.objects.filter(pk=removable.pk).exists())
+        self.assertTrue(Department.objects.filter(pk=used_department.pk).exists())
 
 
 class CustomAccountAdapterTests(TestCase):
@@ -354,6 +455,25 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["batch"], "2035")
+
+    def test_admin_profile_update_allows_department_for_admin_role(self):
+        profile = self.create_profile(
+            email="admin-department-update@example.com",
+            full_name="Admin Department Update",
+            role="Admin",
+            user_type="Internal",
+        )
+
+        response = self.client.patch(
+            f"/api/admin/profile/{profile.id}/",
+            {"department": "Digital Business Technology"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["department"], "Digital Business Technology")
+        profile.refresh_from_db()
+        self.assertEqual(profile.department, "Digital Business Technology")
 
     def test_admin_profile_rejects_non_year_batch(self):
         response = self.client.post(

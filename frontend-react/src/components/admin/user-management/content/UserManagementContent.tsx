@@ -37,13 +37,12 @@ import { API_AUTH_ADMIN_PROFILE_EXPORT } from "@/constants/api";
 
 import { BATCH_OPTIONS } from "@/constants/batches";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { ROLE_FILTER_OPTIONS, isPrivilegedRole, normalizeRoleValue } from "@/constants/roles";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
 import { useLoadProfile } from "@/hooks/shared/profile";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import { useUserManagementActions } from "@/hooks/shared/resources/users";
 
@@ -85,6 +84,7 @@ export default function UserManagementContent({
   const isRoleScoped = Boolean(roleParam);
 
   const { profile } = useLoadProfile();
+  const { departmentNames } = useDepartmentOptions();
   const canManageUsers = isPrivilegedRole(profile?.role);
 
   const [page, setPage] = useState(1);
@@ -254,7 +254,7 @@ export default function UserManagementContent({
                 <SelectField
                   label="Department"
                   value={filters.department}
-                  options={DEPARTMENT_VALUES}
+                  options={departmentNames}
                   onChange={(value) => {
                     setFilters((prev) => ({ ...prev, department: value }));
                     setPage(1);

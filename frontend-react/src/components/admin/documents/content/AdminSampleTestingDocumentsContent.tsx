@@ -17,11 +17,10 @@ import { DataPagination, DocumentPreviewDialog, InlineErrorAlert } from "@/compo
 
 import { Button, DateRangePicker, Input } from "@/components/ui";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { useAdminSampleTestingDocuments } from "@/hooks/admin/documents";
 
 import { useHistoryRequesterOptions } from "@/hooks/admin/history";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import {
   type SampleTestingDocument,
@@ -66,6 +65,7 @@ export default function AdminSampleTestingDocumentsContent({
 }) {
   const router = useRouter();
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const { departmentNames } = useDepartmentOptions();
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Array<string | number>>([]);
   const [search, setSearch] = useState("");
@@ -314,7 +314,7 @@ export default function AdminSampleTestingDocumentsContent({
                   className="h-8 w-full rounded-md border border-slate-400 bg-white px-2 text-xs outline-none shadow-xs focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-100"
                 >
                   <option value="">Semua prodi</option>
-                  {DEPARTMENT_VALUES.map((option) => (
+                  {departmentNames.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>

@@ -58,7 +58,7 @@ import { formatDateKey, formatDateTimeWib, toEndOfDay, toStartOfDay } from "@/li
 import { getStatusBadgeClass, getStatusDisplayLabel, normalizeStatus } from "@/lib/request";
 import {
   DialogReview,
-} from "@/components/dashboard/lab-clearance/content/LabClearanceApprovalPageContent";
+} from "@/components/dashboard/lab-clearance/content";
 import {
   labClearanceService as adminLabClearanceService,
   type LabClearanceResult,

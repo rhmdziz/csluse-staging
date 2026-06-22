@@ -13,11 +13,10 @@ import { Button, Input, DialogFooter } from "@/components/ui";
 
 import { BATCH_OPTIONS } from "@/constants/batches";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { ROLE_FILTER_OPTIONS, ROLE_OPTIONS, ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
 import { useCreateUser } from "@/hooks/shared/resources/users";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import {
   createEmptyUserForm,
@@ -53,6 +52,7 @@ export default function CreateUserDialog({
   const [password, setPassword] = useState("");
   const [form, setForm] = useState(() => createEmptyUserForm(normalizedRoleParam));
   const { createUser, createProfile, isSubmitting, errorMessage, setErrorMessage } = useCreateUser();
+  const { departments } = useDepartmentOptions();
 
   const visibleFields = getVisibleUserFields(form.role);
   const passwordRequired = requiresUserPassword({ email, role: form.role });
@@ -222,9 +222,9 @@ export default function CreateUserDialog({
                   className="h-9 w-full rounded-md border border-sky-300 bg-sky-50/60 px-3 text-sm shadow-sm outline-none focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-200"
                 >
                   <option value="">Pilih department</option>
-                  {DEPARTMENT_VALUES.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
+                  {departments.map((opt) => (
+                    <option key={opt.id} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>

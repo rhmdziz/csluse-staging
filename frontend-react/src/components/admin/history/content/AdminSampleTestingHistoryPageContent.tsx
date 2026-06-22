@@ -51,9 +51,8 @@ import {
   API_PENGUJIANS_EXPORT,
 } from "@/constants/api";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { useHistoryRequesterOptions } from "@/hooks/admin/history";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import {
   mapSampleTesting,
@@ -103,6 +102,7 @@ function canShowDocumentAction(status: string) {
 export default function AdminSampleTestingHistoryPage() {
   const searchParams = useSearchParams();
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const { departmentNames } = useDepartmentOptions();
   const queryParam = searchParams.get("q") ?? "";
   const statusParam = searchParams.get("status") ?? "";
   const requestedByParam = searchParams.get("requested_by") ?? "";
@@ -524,7 +524,7 @@ export default function AdminSampleTestingHistoryPage() {
                   className="h-8 w-full rounded-md border border-slate-400 bg-white px-2 text-xs outline-none shadow-xs focus-visible:border-sky-600 focus-visible:ring-[3px] focus-visible:ring-sky-100"
                 >
                   <option value="">Semua prodi</option>
-                  {DEPARTMENT_VALUES.map((option) => (
+                  {departmentNames.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>

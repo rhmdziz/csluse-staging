@@ -166,6 +166,7 @@ const adminMenuConfig: MenuConfig[] = [
           { label: "Guest", href: "/admin/user-management/role/guest" },
         ],
       },
+      { label: "Department", href: "/admin/user-management/department" },
     ],
   },
   {

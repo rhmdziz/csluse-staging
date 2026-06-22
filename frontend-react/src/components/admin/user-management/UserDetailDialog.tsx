@@ -21,13 +21,12 @@ import {
   Input,
 } from "@/components/ui";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { ROLE_OPTIONS, normalizeRoleValue } from "@/constants/roles";
 
 import { USER_TYPE_LABELS } from "@/constants/user-types";
 
 import { useUpdateUserProfile } from "@/hooks/shared/resources/users";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import { getUserInitials, type UserRow } from "@/hooks/shared/resources/users";
 import { usersService } from "@/services/shared/resources";
@@ -90,6 +89,7 @@ export default function UserDetailDialog({
   onUserUpdated,
 }: UserDetailDialogProps) {
   const { updateUserProfile, isSubmitting, message, setMessage } = useUpdateUserProfile();
+  const { departments } = useDepartmentOptions();
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingUser, setIsConfirmingUser] = useState(false);
   const [confirmUserOpen, setConfirmUserOpen] = useState(false);
@@ -262,7 +262,10 @@ export default function UserDetailDialog({
                   label="Department"
                   value={form.department}
                   editable={isEditing && canManageUsers}
-                  options={DEPARTMENT_VALUES.map((value) => ({ value, label: value }))}
+                  options={departments.map((department) => ({
+                    value: department.value,
+                    label: department.label,
+                  }))}
                   onChange={(value) => setForm((prev) => ({ ...prev, department: value }))}
                 />
               ) : null}

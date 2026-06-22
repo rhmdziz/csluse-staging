@@ -13,10 +13,9 @@ import { BulkImportDialogShell, InlineErrorAlert } from "@/components/shared";
 
 import { BATCH_MAX_YEAR, BATCH_MIN_YEAR, isValidBatchValue } from "@/constants/batches";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 import { useBulkCreateUsers, type BulkRow } from "@/hooks/shared/resources/users";
 
 import {
@@ -58,7 +57,12 @@ function normalizeHeader(value: unknown) {
     .replace(/\s+/g, " ");
 }
 
-function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
+function buildTemplateWorkbook(
+  hasRoleScope: boolean,
+  scopedRole: string,
+  departmentNames: string[],
+) {
+  const sampleDepartment = departmentNames[0] ?? "";
   const headers = [
     "nama lengkap",
     "email",
@@ -77,7 +81,7 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
       "",
       ...(hasRoleScope ? [] : [ROLE_VALUES.STUDENT]),
       "AZR",
-      DEPARTMENT_VALUES[0],
+      sampleDepartment,
       "2024",
       "12345678",
       "",
@@ -117,8 +121,10 @@ function buildTemplateWorkbook(hasRoleScope: boolean, scopedRole: string) {
     [
       "department",
       "Tidak",
-      `Harus sama persis dengan salah satu opsi department yang tersedia: ${DEPARTMENT_VALUES.join(", ")}.`,
-      DEPARTMENT_VALUES[0],
+      departmentNames.length
+        ? `Harus sama persis dengan salah satu opsi department yang tersedia: ${departmentNames.join(", ")}.`
+        : "Harus sama persis dengan salah satu opsi department yang tersedia di sistem.",
+      sampleDepartment,
     ],
     [
       "batch",
@@ -164,6 +170,7 @@ export default function BulkCreateDialog({
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [results, setResults] = useState<{ index: number; status: "success" | "error"; message: string }[]>([]);
+  const { departmentNames } = useDepartmentOptions();
   const { createUsers, isSubmitting } = useBulkCreateUsers();
 
   const resetState = () => {
@@ -266,7 +273,7 @@ export default function BulkCreateDialog({
         if (!hasRoleScope && !normalizedRole) reasons.push("role wajib diisi");
         if (!hasRoleScope && rawRole && !normalizedRole) reasons.push("role tidak valid");
         if (requiresPassword && !password) reasons.push("password wajib diisi untuk guest");
-        if (department && !DEPARTMENT_VALUES.includes(department)) {
+        if (department && departmentNames.length > 0 && !departmentNames.includes(department)) {
           reasons.push("department tidak sesuai opsi");
         }
         if (batch && !isValidBatchValue(batch)) {
@@ -313,7 +320,10 @@ export default function BulkCreateDialog({
   };
 
   const handleDownloadTemplate = () => {
-    XLSX.writeFile(buildTemplateWorkbook(hasRoleScope, normalizedRoleParam), "template-bulk-user.xlsx");
+    XLSX.writeFile(
+      buildTemplateWorkbook(hasRoleScope, normalizedRoleParam, departmentNames),
+      "template-bulk-user.xlsx",
+    );
   };
 
   const handleSubmitBulk = async () => {

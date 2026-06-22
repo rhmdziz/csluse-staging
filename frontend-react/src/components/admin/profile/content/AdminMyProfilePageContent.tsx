@@ -12,14 +12,13 @@ import { Button, Input } from "@/components/ui";
 
 import { API_AUTH_USER_PROFILE_DETAIL } from "@/constants/api";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { useChangePassword } from "@/hooks/auth";
 
 import {
   persistProfileCache,
   useLoadProfile,
 } from "@/hooks/shared/profile";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import { authFetch } from "@/lib/auth";
 
@@ -31,6 +30,7 @@ import { toast } from "sonner";
 
 export default function AdminMyProfilePage() {
   const { profile } = useLoadProfile();
+  const { departments } = useDepartmentOptions();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const {
     formData: passwordFormData,
@@ -244,9 +244,9 @@ export default function AdminMyProfilePage() {
                     className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none shadow-xs focus-visible:border-slate-500 focus-visible:ring-[3px] focus-visible:ring-slate-200"
                   >
                     <option value="">Pilih department</option>
-                    {DEPARTMENT_VALUES.map((department) => (
-                      <option key={department} value={department}>
-                        {department}
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.value}>
+                        {department.label}
                       </option>
                     ))}
                   </select>

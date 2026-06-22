@@ -9,9 +9,8 @@ import { BatchInput } from "@/components/shared";
 
 import { Button, Input } from "@/components/ui";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { useLoadProfile } from "@/hooks/shared/profile";
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 
 import { useUpdateMyProfile } from "@/hooks/shared/profile";
 
@@ -41,7 +40,7 @@ function getVisibleProfileFields(role: string | null | undefined) {
     return { department: false, batch: false, idNumber: true };
   }
   if (normalizedRole === "admin") {
-    return { department: false, batch: false, idNumber: false };
+    return { department: true, batch: false, idNumber: true };
   }
   if (normalizedRole === "guest") {
     return { department: false, batch: false, idNumber: false };
@@ -54,6 +53,7 @@ export default function MyProfilePage() {
   const pathname = usePathname();
   const router = useRouter();
   const { profile } = useLoadProfile();
+  const { departments } = useDepartmentOptions();
   const { updateMyProfile, isSubmitting, message, setMessage } =
     useUpdateMyProfile();
 
@@ -203,9 +203,9 @@ export default function MyProfilePage() {
                     className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm outline-none focus-visible:border-slate-500 focus-visible:ring-[3px] focus-visible:ring-slate-200"
                   >
                     <option value="">Pilih department</option>
-                    {DEPARTMENT_VALUES.map((department) => (
-                      <option key={department} value={department}>
-                        {department}
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.value}>
+                        {department.label}
                       </option>
                     ))}
                   </select>

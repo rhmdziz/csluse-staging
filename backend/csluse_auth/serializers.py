@@ -11,7 +11,7 @@ from rest_framework import serializers
 
 from .adapters import is_campus_email, normalize_email
 from .audit import log_admin_action
-from .models import Profile
+from .models import Department, Profile
 
 
 User = get_user_model()
@@ -25,7 +25,7 @@ ROLE_NORMALIZATION_MAP = {
     "GUEST": "Guest",
     "OTHER": "Guest",
 }
-ROLE_WITH_DEPARTMENT = {"Student", "Lecturer"}
+ROLE_WITH_DEPARTMENT = {"Student", "Lecturer", "Admin"}
 ROLE_WITH_BATCH = {"Student"}
 ROLE_WITH_ID_NUMBER = {"Student", "Lecturer", "Staff", "Admin"}
 USER_TYPE_NORMALIZATION_MAP = {
@@ -34,6 +34,17 @@ USER_TYPE_NORMALIZATION_MAP = {
 }
 BATCH_MIN_YEAR = 2000
 BATCH_MAX_YEAR = 2100
+
+
+def _resolve_department_name(value):
+    if value in (None, ""):
+        return None if value == "" else value
+
+    normalized = re.sub(r"\s+", " ", str(value or "")).strip()
+    department = Department.objects.filter(name__iexact=normalized).first()
+    if department is None:
+        raise serializers.ValidationError("Department harus sesuai dengan opsi yang tersedia.")
+    return department.name
 
 
 def _validate_batch_year(value):
@@ -122,11 +133,7 @@ class CustomRegisterSerializer(RegisterSerializer):
     initials = serializers.CharField(required=False, allow_blank=True, max_length=3)
     role = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     institution = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    department = serializers.ChoiceField(
-        choices=[choice[0] for choice in Profile.DEPARTMENT_CHOICE],
-        required=False,
-        allow_null=True,
-    )
+    department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     batch = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=4)
     id_number = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     user_type = serializers.ChoiceField(
@@ -154,12 +161,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         return Profile.normalize_initials(value)
 
     def validate_department(self, value):
-        if value in (None, ""):
-            return None if value == "" else value
-        valid_departments = {choice[0] for choice in Profile.DEPARTMENT_CHOICE}
-        if value not in valid_departments:
-            raise serializers.ValidationError("Department tidak valid.")
-        return value
+        return _resolve_department_name(value)
 
     def validate_batch(self, value):
         return _validate_batch_year(value)
@@ -250,6 +252,38 @@ class CustomRegisterSerializer(RegisterSerializer):
 # region Profile Serializers
 
 
+class DepartmentSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = Department
+        fields = ("id", "name", "created_at", "updated_at")
+        read_only_fields = ("id", "created_at", "updated_at")
+
+    def validate_name(self, value):
+        normalized = re.sub(r"\s+", " ", str(value or "")).strip()
+        if not normalized:
+            raise serializers.ValidationError("Nama department wajib diisi.")
+
+        queryset = Department.objects.filter(name__iexact=normalized)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("Nama department sudah digunakan.")
+        return normalized
+
+
+class AdminDepartmentSerializer(DepartmentSerializer):
+    profile_count = serializers.SerializerMethodField()
+
+    class Meta(DepartmentSerializer.Meta):
+        fields = DepartmentSerializer.Meta.fields + ("profile_count",)
+        read_only_fields = ("id", "profile_count")
+
+    def get_profile_count(self, obj):
+        return Profile.objects.filter(department=obj.name).count()
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     email = serializers.EmailField(read_only=True)
@@ -303,12 +337,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         return Profile.normalize_initials(value)
 
     def validate_department(self, value):
-        if value in (None, ""):
-            return None if value == "" else value
-        valid_departments = {choice[0] for choice in Profile.DEPARTMENT_CHOICE}
-        if value not in valid_departments:
-            raise serializers.ValidationError("Department harus sesuai dengan opsi yang tersedia.")
-        return value
+        return _resolve_department_name(value)
 
     def validate_batch(self, value):
         return _validate_batch_year(value)
@@ -648,7 +677,7 @@ def _apply_role_field_rules(attrs, instance=None):
 
     if department is not serializers.empty and role not in ROLE_WITH_DEPARTMENT and department:
         raise serializers.ValidationError(
-            {"department": "Department hanya boleh diisi untuk Student atau Lecturer."}
+            {"department": "Department hanya boleh diisi untuk Student, Lecturer, atau Admin."}
         )
 
     if batch is not serializers.empty and role not in ROLE_WITH_BATCH and batch:

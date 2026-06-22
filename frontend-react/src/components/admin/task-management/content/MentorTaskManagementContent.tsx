@@ -30,12 +30,10 @@ import {
   Input,
 } from "@/components/ui";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { isPrivilegedRole } from "@/constants/roles";
 
 import { useLoadProfile } from "@/hooks/shared/profile";
-
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 import { useUpdateUserProfile } from "@/hooks/shared/resources/users";
 
 import { useUsers, type UserRow } from "@/hooks/shared/resources/users";
@@ -45,6 +43,7 @@ const PAGE_SIZE = 20;
 export default function MentorTaskManagementContent() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const { profile } = useLoadProfile();
+  const { departmentNames } = useDepartmentOptions();
   const canManageUsers = isPrivilegedRole(profile?.role);
 
   const [page, setPage] = useState(1);
@@ -222,7 +221,7 @@ export default function MentorTaskManagementContent() {
                 }}
               >
                 <option value="">Semua</option>
-                {DEPARTMENT_VALUES.map((option) => (
+                {departmentNames.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>

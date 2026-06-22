@@ -23,6 +23,20 @@ class BaseModel(models.Model):
 # region Profile Models
 
 
+class Department(BaseModel):
+    name = models.CharField(max_length=466, unique=True)
+
+    class Meta:
+        ordering = ("name",)
+
+    def save(self, *args, **kwargs):
+        self.name = re.sub(r"\s+", " ", str(self.name or "")).strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
 class Profile(BaseModel):
     USER_TYPE_CHOICES = [
         ("Internal", "Internal"),
@@ -34,32 +48,6 @@ class Profile(BaseModel):
         ("Admin", "Admin"),
         ("Staff", "Staff"),
         ("Guest", "Guest"),
-    ]
-    DEPARTMENT_CHOICE = [
-        ("Accounting", "Accounting"),
-        ("Business", "Business"),
-        ("Event", "Event"),
-        ("Finance & Banking", "Finance & Banking"),
-        ("Branding", "Branding"),
-        ("Renewable Energy Engineering", "Renewable Energy Engineering"),
-        ("Energy Business and Technology", "Energy Business and Technology"),
-        ("Digital Business Technology", "Digital Business Technology"),
-        ("Food Business Technology", "Food Business Technology"),
-        ("Business Mathematics", "Business Mathematics"),
-        ("Computer Systems Engineering", "Computer Systems Engineering"),
-        ("Business Economics", "Business Economics"),
-        ("Hospitality Business", "Hospitality Business"),
-        ("International Business Law", "International Business Law"),
-        ("Product Design Innovation", "Product Design Innovation"),
-        ("Artificial Inteligence and Robotic", "Artificial Inteligence and Robotic"),
-        ("Hukum Bisnis Internasional", "Hukum Bisnis Internasional"),
-        ("S2 Manajemen Pemasaran dan Keuangan", "S2 Manajemen Pemasaran dan Keuangan"),
-        ("S2 Bisnis Analitik Terapan", "S2 Bisnis Analitik Terapan"),
-        ("S2 Inovasi Bisnis Baru", "S2 Inovasi Bisnis Baru"),
-        ("S2 Manajemen Bisnis", "S2 Manajemen Bisnis"),
-        ("S2 Manajemen Stratejik", "S2 Manajemen Stratejik"),
-        ("S3 Manajemen dan Kewirausahaan", "S3 Manajemen dan Kewirausahaan"),
-        ("Lainnya", "Lainnya"),
     ]
     user = models.OneToOneField(
         get_user_model(),
@@ -73,7 +61,7 @@ class Profile(BaseModel):
     initials = models.CharField(max_length=3, blank=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, blank=True, null=True)
     is_mentor = models.BooleanField(default=False)
-    department = models.CharField(max_length=40, choices=DEPARTMENT_CHOICE, blank=True, null=True)
+    department = models.CharField(max_length=120, blank=True, null=True)
     id_number = models.CharField(max_length=40, blank=True, null=True)
     batch = models.CharField(max_length=4, blank=True, null=True)
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default="External")

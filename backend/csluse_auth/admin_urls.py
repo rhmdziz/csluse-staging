@@ -3,6 +3,7 @@ from rest_framework.routers import SimpleRouter
 
 from .viewsets import (
     AdminActionViewSet,
+    AdminDepartmentViewSet,
     AdminDashboardViewSet,
     AdminProfileViewSet,
     LabClearanceViewSet,
@@ -12,6 +13,7 @@ from .viewsets import (
 
 router = SimpleRouter()
 router.register(r"profile", AdminProfileViewSet, basename="admin-profile")
+router.register(r"departments", AdminDepartmentViewSet, basename="admin-departments")
 router.register(r"users", UserWithProfileViewSet, basename="users")
 router.register(r"pic-users", PicUserViewSet, basename="pic-users")
 router.register(r"actions", AdminActionViewSet, basename="admin-actions")

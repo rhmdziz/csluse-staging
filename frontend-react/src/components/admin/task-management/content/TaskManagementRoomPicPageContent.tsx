@@ -34,10 +34,9 @@ import {
   Input,
 } from "@/components/ui";
 
-import { DEPARTMENT_VALUES } from "@/constants/departments";
-
 import { ROLE_OPTIONS } from "@/constants/roles";
 
+import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
 import {
@@ -64,6 +63,7 @@ export default function TaskManagementRoomPicPage() {
   const [selectedIds, setSelectedIds] = useState<Array<number | string>>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isRemoving, setIsRemoving] = useState(false);
+  const { departmentNames } = useDepartmentOptions();
   const { rooms } = useRoomOptions();
   const {
     users,
@@ -215,7 +215,7 @@ export default function TaskManagementRoomPicPage() {
                 className={ADMIN_FILTER_SELECT_CLASS}
               >
                 <option value="">Semua</option>
-                {DEPARTMENT_VALUES.map((option) => (
+                {departmentNames.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
