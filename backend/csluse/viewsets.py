@@ -5263,8 +5263,6 @@ class SuratBebasLabViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
         attachment_name = f"surat-bebas-lab-{instance.code}.pdf"
         pdf_bytes = pdf_file.read()
 
-        frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
-        cta_url = f"{frontend_url}/lab-clearance" if frontend_url else ""
         context = build_email_context(
             request=request,
             extra_context={
@@ -5275,8 +5273,6 @@ class SuratBebasLabViewSet(BulkDeleteMixin, viewsets.ModelViewSet):
                 ),
                 "user_display": requester_name,
                 "request_identifier": instance.code,
-                "cta_url": cta_url,
-                "cta_label": "Buka Halaman Surat Bebas Lab",
             },
         )
 

@@ -390,7 +390,7 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.getenv("EMAIL_HOST_USER")
+DEFAULT_FROM_EMAIL = f"Prasetiya Mulya Laboratories <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else "Prasetiya Mulya Laboratories <no-reply.csl@prasetiyamulya.ac.id>"
 
 
 # endregion Email Settings

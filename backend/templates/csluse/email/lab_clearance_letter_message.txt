@@ -4,9 +4,6 @@ Halo {{ user_display }},
 
 Nomor pengajuan: {{ request_identifier }}
 
-Silakan buka tautan berikut untuk melihat halaman surat bebas lab:
-{{ cta_url }}
-
 Terima kasih,
 
 CSL USE
