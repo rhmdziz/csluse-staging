@@ -318,7 +318,7 @@ function mapPicUser(user: ApiPicUser): PicUser | null {
 }
 
 function mapRoomPicUser(item: ApiRoomPicUser): RoomPicTaskUserRow {
-  const rawId = item.id ?? item.email ?? "user";
+  const rawId = item.profile_id ?? item.id ?? item.email ?? "user";
   const roomAssignments = Array.isArray(item.room_assignments)
     ? item.room_assignments
         .filter((room): room is NonNullable<ApiRoomPicUser["room_assignments"]>[number] => Boolean(room?.id))
@@ -337,7 +337,7 @@ function mapRoomPicUser(item: ApiRoomPicUser): RoomPicTaskUserRow {
   return {
     id: rawId,
     uid: rawId,
-    profileId: item.profile_id ?? null,
+    profileId: item.profile_id ? String(item.profile_id) : null,
     userId: item.id ?? null,
     name: String(item.full_name ?? item.email ?? "-"),
     initials: "",
@@ -555,14 +555,14 @@ export const usersService = {
   },
 
   async bulkRemoveRoomPicAssignments(ids: Array<number | string>) {
-    const numericIds = ids
-      .map((id) => Number(id))
-      .filter((id) => Number.isInteger(id) && id > 0);
+    const normalizedIds = ids
+      .map((id) => String(id).trim())
+      .filter((id) => Boolean(id));
 
     const response = await authFetch(API_AUTH_PIC_USERS_BULK_REMOVE_ASSIGNMENTS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: numericIds }),
+      body: JSON.stringify({ ids: normalizedIds }),
     });
     if (!response.ok) {
       throw new Error(`Gagal melepas PIC ruangan terpilih (${response.status})`);

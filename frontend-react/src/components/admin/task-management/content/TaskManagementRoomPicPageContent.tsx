@@ -126,12 +126,13 @@ export default function TaskManagementRoomPicPage() {
   };
 
   const handleRemovePic = async () => {
-    if (!removeCandidate?.id) return;
+    const targetId = removeCandidate?.profileId ?? removeCandidate?.id;
+    if (!targetId || !removeCandidate?.id) return;
 
     try {
       setIsRemoving(true);
       setErrorMessage("");
-      await removeRoomPicAssignments(removeCandidate.id);
+      await removeRoomPicAssignments(targetId);
       setUsers((prev) => prev.filter((item) => String(item.id) !== String(removeCandidate.id)));
       if (detailUser && String(detailUser.id) === String(removeCandidate.id)) {
         setDetailUser(null);

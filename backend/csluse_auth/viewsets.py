@@ -723,13 +723,7 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="remove-assignments")
     def remove_assignments(self, request, pk=None):
-        user = self.get_object()
-        profile = getattr(user, "profile", None)
-        if profile is None:
-            return Response(
-                {"detail": "Profile user tidak ditemukan."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        profile = self.get_object()
 
         removed_count = profile.rooms_as_pic.count()
         profile.rooms_as_pic.clear()
@@ -748,16 +742,15 @@ class PicUserViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         requested_ids = serializer.validated_data["ids"]
-        users = self.get_queryset().filter(pk__in=requested_ids).select_related("profile")
-        users_by_id = {user.pk: user for user in users}
+        profiles = self.get_queryset().filter(pk__in=requested_ids)
+        profiles_by_id = {str(profile.pk): profile for profile in profiles}
 
         removed_ids = []
         failed_ids = []
 
         for user_id in requested_ids:
-            user = users_by_id.get(user_id)
-            profile = getattr(user, "profile", None) if user else None
-            if user is None or profile is None:
+            profile = profiles_by_id.get(str(user_id))
+            if profile is None:
                 failed_ids.append(user_id)
                 continue
 

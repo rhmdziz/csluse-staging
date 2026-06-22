@@ -972,6 +972,55 @@ class PicUserViewSetTests(AuthBaseTestMixin, APITestCase):
         returned_ids = {item["id"] for item in response.data}
         self.assertIn(str(standalone_admin.id), returned_ids)
 
+    def test_remove_assignments_clears_rooms_for_profile_pic(self):
+        lecturer = self.create_user(
+            email="room-pic@example.com",
+            full_name="Room PIC",
+            role="Lecturer",
+        )
+        first_room = Room.objects.create(name="Lab C", number="103")
+        second_room = Room.objects.create(name="Lab D", number="104")
+        first_room.pics.add(lecturer.profile)
+        second_room.pics.add(lecturer.profile)
+
+        response = self.client.post(
+            f"/api/admin/pic-users/{lecturer.profile.id}/remove-assignments/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["removed_count"], 2)
+        lecturer.profile.refresh_from_db()
+        self.assertEqual(lecturer.profile.rooms_as_pic.count(), 0)
+
+    def test_bulk_remove_assignments_clears_rooms_for_profiles(self):
+        first_lecturer = self.create_user(
+            email="bulk-room-pic-1@example.com",
+            full_name="Bulk Room PIC 1",
+            role="Lecturer",
+        )
+        second_profile = self.create_profile(
+            email="bulk-room-pic-2@example.com",
+            full_name="Bulk Room PIC 2",
+            role="Lecturer",
+        )
+        first_room = Room.objects.create(name="Lab E", number="105")
+        second_room = Room.objects.create(name="Lab F", number="106")
+        first_room.pics.add(first_lecturer.profile, second_profile)
+        second_room.pics.add(second_profile)
+
+        response = self.client.post(
+            "/api/admin/pic-users/bulk-remove-assignments/",
+            {"ids": [str(first_lecturer.profile.id), str(second_profile.id)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["removed_count"], 2)
+        first_lecturer.profile.refresh_from_db()
+        second_profile.refresh_from_db()
+        self.assertEqual(first_lecturer.profile.rooms_as_pic.count(), 0)
+        self.assertEqual(second_profile.rooms_as_pic.count(), 0)
+
     def test_mentor_dropdown_includes_standalone_mentor_profile(self):
         standalone_mentor = self.create_profile(
             email="standalone-mentor@example.com",
