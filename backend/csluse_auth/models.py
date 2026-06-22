@@ -24,7 +24,7 @@ class BaseModel(models.Model):
 
 
 class Department(BaseModel):
-    name = models.CharField(max_length=466, unique=True)
+    name = models.CharField(max_length=400, unique=True)
 
     class Meta:
         ordering = ("name",)
