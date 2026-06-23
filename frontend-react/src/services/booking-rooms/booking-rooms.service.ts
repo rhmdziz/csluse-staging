@@ -223,7 +223,7 @@ export const bookingRoomsService = {
     return parseMutationResponse(response);
   },
 
-  async legacyBulkImport(rows: LegacyBookingImportRow[]) {
+  async legacyBulkImport(rows: LegacyBookingImportRow[], signal?: AbortSignal) {
     const body = {
       rows: rows.map((row) => ({
         index: row.index,
@@ -262,6 +262,7 @@ export const bookingRoomsService = {
     const response = await authFetch(API_BOOKINGS_LEGACY_BULK_IMPORT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify(body),
     });
 

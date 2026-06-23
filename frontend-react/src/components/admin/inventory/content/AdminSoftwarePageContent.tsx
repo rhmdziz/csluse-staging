@@ -39,6 +39,7 @@ import {
 } from "@/components/ui";
 
 import { API_SOFTWARES_EXPORT } from "@/constants/api";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
@@ -56,11 +57,10 @@ import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { SOFTWARE_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
-const PAGE_SIZE = 20;
-
 export default function AdminSoftwarePage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [equipment, setEquipment] = useState("");
@@ -97,7 +97,7 @@ export default function AdminSoftwarePage() {
   const { softwares, totalCount, isLoading, hasLoadedOnce, error } =
     useSoftwares(
       page,
-      PAGE_SIZE,
+      pageSize,
       {
         equipment,
         pic,
@@ -108,8 +108,8 @@ export default function AdminSoftwarePage() {
 
   const totalSoftwares = totalCount || softwares.length;
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || softwares.length) / PAGE_SIZE)),
-    [totalCount, softwares.length],
+    () => Math.max(1, Math.ceil((totalCount || softwares.length) / pageSize)),
+    [pageSize, totalCount, softwares.length],
   );
 
   const selectedCount = selectedIds.length;
@@ -452,10 +452,15 @@ export default function AdminSoftwarePage() {
             page={page}
             totalPages={totalPages}
             totalCount={totalSoftwares}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="software"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
         </div>
       </div>

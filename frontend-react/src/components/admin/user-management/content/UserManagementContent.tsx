@@ -36,8 +36,9 @@ import { Button, Input } from "@/components/ui";
 import { API_AUTH_ADMIN_PROFILE_EXPORT } from "@/constants/api";
 
 import { BATCH_OPTIONS } from "@/constants/batches";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
-import { ROLE_FILTER_OPTIONS, isPrivilegedRole, normalizeRoleValue } from "@/constants/roles";
+import { ROLE_FILTER_OPTIONS, ROLE_LABELS, isPrivilegedRole, normalizeRoleValue } from "@/constants/roles";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
@@ -57,8 +58,6 @@ type FiltersState = {
   status: string;
 };
 
-const PAGE_SIZE = 20;
-
 type UserManagementContentProps = {
   forcedRole?: string;
   title?: string;
@@ -71,23 +70,29 @@ type UserManagementContentProps = {
 
 export default function UserManagementContent({
   forcedRole,
-  title = "Akun dan Profile",
+  title,
   description,
   showExportActions = true,
   showImportButton = true,
   showCreateButton = true,
-  createButtonLabel = "Tambah Akun/Profile",
+  createButtonLabel,
 }: UserManagementContentProps) {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const searchParams = useSearchParams();
   const roleParam = forcedRole ?? searchParams.get("role");
   const isRoleScoped = Boolean(roleParam);
+  const normalizedRoleParam = roleParam ? normalizeRoleValue(roleParam) : "";
+  const scopedRoleLabel =
+    normalizedRoleParam && normalizedRoleParam in ROLE_LABELS
+      ? ROLE_LABELS[normalizedRoleParam as keyof typeof ROLE_LABELS]
+      : "";
 
   const { profile } = useLoadProfile();
   const { departmentNames } = useDepartmentOptions();
   const canManageUsers = isPrivilegedRole(profile?.role);
 
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState<FiltersState>({
@@ -127,7 +132,7 @@ export default function UserManagementContent({
     setError,
   } = useUsers(
     page,
-    PAGE_SIZE,
+    pageSize,
     {
       ...effectiveFilters,
         search: debouncedSearch,
@@ -185,9 +190,20 @@ export default function UserManagementContent({
 
   const totalUsers = totalCount || users.length;
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || users.length) / PAGE_SIZE)),
-    [totalCount, users.length],
+    () => Math.max(1, Math.ceil((totalCount || users.length) / pageSize)),
+    [pageSize, totalCount, users.length],
   );
+  const resolvedTitle = title ?? (scopedRoleLabel ? `Semua ${scopedRoleLabel}` : "Akun dan Profile");
+  const resolvedDescription =
+    description
+    ?? (scopedRoleLabel
+      ? `Daftar seluruh ${scopedRoleLabel.toLowerCase()} yang terdaftar di sistem.`
+      : `Total ${totalUsers} akun/profile terdaftar.`);
+  const resolvedCreateButtonLabel =
+    createButtonLabel ?? (scopedRoleLabel ? `Tambah ${scopedRoleLabel}` : "Tambah Akun/Profile");
+  const resolvedImportButtonLabel = scopedRoleLabel
+    ? `Import ${scopedRoleLabel}`
+    : "Import Akun/Profile";
 
   const columnCount = isRoleScoped
     ? canManageUsers
@@ -209,8 +225,8 @@ export default function UserManagementContent({
       <div className="flex min-w-0 items-start gap-4">
         <div className="min-w-0 flex-1 space-y-4">
           <AdminPageHeader
-            title={title}
-            description={description ?? `Total ${totalUsers} akun/profile terdaftar.`}
+            title={resolvedTitle}
+            description={resolvedDescription}
             icon={<UserPlus className="h-5 w-5 text-sky-200" />}
           />
 
@@ -341,13 +357,13 @@ export default function UserManagementContent({
                       onClick={() => setBulkOpen(true)}
                     >
                       <FileUp className="h-4 w-4" />
-                      Import Akun/Profile
+                      {resolvedImportButtonLabel}
                     </Button>
                   ) : null}
                   {showCreateButton ? (
                     <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
                       <Plus className="h-4 w-4" />
-                      {createButtonLabel}
+                      {resolvedCreateButtonLabel}
                     </Button>
                   ) : null}
                 </>
@@ -375,21 +391,28 @@ export default function UserManagementContent({
             page={page}
             totalPages={totalPages}
             totalCount={totalCount}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="profile"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
         </div>
       </div>
 
-      <CreateUserDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        roleParam={roleParam}
-        onCreated={() => setReloadKey((prev) => prev + 1)}
-      />
-      {showImportButton ? (
+      {createOpen ? (
+        <CreateUserDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          roleParam={roleParam}
+          onCreated={() => setReloadKey((prev) => prev + 1)}
+        />
+      ) : null}
+      {showImportButton && bulkOpen ? (
         <BulkCreateDialog
           open={bulkOpen}
           onOpenChange={setBulkOpen}
@@ -397,24 +420,26 @@ export default function UserManagementContent({
           onCompleted={() => setReloadKey((prev) => prev + 1)}
         />
       ) : null}
-      <UserDetailDialog
-        open={Boolean(actions.detailState.user)}
-        user={actions.detailState.user}
-        mode={actions.detailState.mode}
-        canManageUsers={canManageUsers}
-        onOpenChange={(open) => {
-          if (!open) actions.closeDetail();
-        }}
-        onDeleteRequest={actions.setDeleteCandidate}
-        onUserUpdated={(updatedUser) => {
-          setUsers((prev) =>
-            prev.map((item) =>
-              String(item.id) === String(updatedUser.id) ? updatedUser : item,
-            ),
-          );
-          actions.openDetail(updatedUser, actions.detailState.mode);
-        }}
-      />
+      {actions.detailState.user ? (
+        <UserDetailDialog
+          open={Boolean(actions.detailState.user)}
+          user={actions.detailState.user}
+          mode={actions.detailState.mode}
+          canManageUsers={canManageUsers}
+          onOpenChange={(open) => {
+            if (!open) actions.closeDetail();
+          }}
+          onDeleteRequest={actions.setDeleteCandidate}
+          onUserUpdated={(updatedUser) => {
+            setUsers((prev) =>
+              prev.map((item) =>
+                String(item.id) === String(updatedUser.id) ? updatedUser : item,
+              ),
+            );
+            actions.openDetail(updatedUser, actions.detailState.mode);
+          }}
+        />
+      ) : null}
       <ConfirmDeleteDialog
         open={Boolean(actions.deleteCandidate)}
         title={actions.deleteCandidate?.hasUser ? "Hapus akun dan profile?" : "Hapus profile?"}

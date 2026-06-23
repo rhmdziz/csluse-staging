@@ -233,7 +233,7 @@ export const sampleTestingService = {
     return parseMutationResponse(response);
   },
 
-  async legacyBulkImport(rows: LegacySampleTestingImportRow[]) {
+  async legacyBulkImport(rows: LegacySampleTestingImportRow[], signal?: AbortSignal) {
     const body = {
       rows: rows.map((row) => ({
         index: row.index,
@@ -267,6 +267,7 @@ export const sampleTestingService = {
     const response = await authFetch(API_PENGUJIANS_LEGACY_BULK_IMPORT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify(body),
     });
 

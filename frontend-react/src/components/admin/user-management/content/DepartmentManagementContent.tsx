@@ -15,7 +15,7 @@ import {
   InlineErrorAlert,
 } from "@/components/shared";
 import { Button, DialogFooter, Input } from "@/components/ui";
-import { useDepartments, useDepartmentOptions } from "@/hooks/shared/resources/departments";
+import { useDepartments } from "@/hooks/shared/resources/departments";
 import { departmentsService, type DepartmentRow } from "@/services/shared/resources";
 import { extractApiErrorMessage } from "@/lib/core";
 import {
@@ -120,13 +120,12 @@ export default function DepartmentManagementContent() {
   const [deleteError, setDeleteError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Array<string | number>>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const { departments, isLoading, hasLoadedOnce, error } = useDepartments(
+  const { departments, totalCount, isLoading, hasLoadedOnce, error } = useDepartments(
     1,
     1000,
     { search: debouncedSearch },
     reloadKey,
   );
-  const { departmentNames } = useDepartmentOptions(reloadKey);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(search.trim()), 400);
@@ -330,7 +329,11 @@ export default function DepartmentManagementContent() {
     <section className="w-full min-w-0 space-y-4 overflow-x-hidden px-4 pb-6">
       <AdminPageHeader
         title="Department"
-        description={`Kelola master department. Saat ini tersedia ${departmentNames.length} department.`}
+        description={
+          debouncedSearch
+            ? `Kelola master department. Ditemukan ${totalCount} department untuk pencarian ini.`
+            : `Kelola master department. Saat ini tersedia ${totalCount} department.`
+        }
         icon={<Building2 className="h-5 w-5 text-sky-200" />}
       />
 

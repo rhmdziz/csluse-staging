@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { extractApiErrorMessage } from "@/lib/core";
 import {
   softwaresService,
@@ -12,15 +12,18 @@ export type { BulkSoftwareResult, BulkSoftwareRow };
 
 export function useBulkCreateSoftwares() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const createSoftwares = async (
     rows: BulkSoftwareRow[],
     onProgress?: (results: BulkSoftwareResult[]) => void,
   ) => {
     setIsSubmitting(true);
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
-      const result = await softwaresService.bulkCreate(rows);
+      const result = await softwaresService.bulkCreate(rows, abortController.signal);
 
       const data = (result.data ?? {}) as {
         results?: { index?: number; status?: "success" | "error"; message?: unknown }[];
@@ -52,6 +55,9 @@ export function useBulkCreateSoftwares() {
       onProgress?.(results);
       return results;
     } catch (error) {
+      if (abortController.signal.aborted) {
+        return [];
+      }
       const message =
         error instanceof Error ? error.message : "Terjadi kesalahan.";
       const results = rows.map((row) => ({
@@ -62,11 +68,18 @@ export function useBulkCreateSoftwares() {
       onProgress?.(results);
       return results;
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsSubmitting(false);
     }
   };
 
-  return { createSoftwares, isSubmitting };
+  const cancelCreateSoftwares = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  return { createSoftwares, cancelCreateSoftwares, isSubmitting };
 }
 
 export default useBulkCreateSoftwares;

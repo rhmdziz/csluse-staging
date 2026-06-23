@@ -38,6 +38,7 @@ import {
 } from "@/components/ui";
 
 import { MATERIAL_CATEGORY_OPTIONS, MATERIAL_STATUS_OPTIONS } from "@/constants/materials";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { API_MATERIALS_EXPORT } from "@/constants/api";
 
@@ -54,8 +55,6 @@ import {
 import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 
 import { MATERIAL_EXPORT_COLUMNS } from "@/lib/admin/export-config";
-
-const PAGE_SIZE = 20;
 
 function FilterSelectField({
   label,
@@ -89,6 +88,7 @@ function FilterSelectField({
 export default function AdminMaterialPageContent() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -117,7 +117,7 @@ export default function AdminMaterialPageContent() {
 
   const { materials, totalCount, isLoading, hasLoadedOnce, error } = useMaterials(
     page,
-    PAGE_SIZE,
+    pageSize,
     {
       search: debouncedSearch,
       status,
@@ -129,8 +129,8 @@ export default function AdminMaterialPageContent() {
 
   const totalMaterials = totalCount || materials.length;
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || materials.length) / PAGE_SIZE)),
-    [totalCount, materials.length],
+    () => Math.max(1, Math.ceil((totalCount || materials.length) / pageSize)),
+    [pageSize, totalCount, materials.length],
   );
 
   const selectedCount = selectedIds.length;
@@ -464,10 +464,15 @@ export default function AdminMaterialPageContent() {
             page={page}
             totalPages={totalPages}
             totalCount={totalMaterials}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="bahan"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
         </div>
       </div>

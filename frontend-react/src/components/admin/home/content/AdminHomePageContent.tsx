@@ -550,12 +550,12 @@ const ROLE_COLOR_CSS: Record<string, string> = {
   Guest: "#fb7185",
 };
 
-const ROLE_LABEL_ID: Record<string, string> = {
+const ROLE_LABELS: Record<string, string> = {
   Admin: "Admin",
   Staff: "Staff",
-  Lecturer: "Dosen",
-  Student: "Mahasiswa",
-  Guest: "Tamu",
+  Lecturer: "Lecturer",
+  Student: "Student",
+  Guest: "Guest",
 };
 
 function getRoleColor(role: string): string {
@@ -563,7 +563,7 @@ function getRoleColor(role: string): string {
 }
 
 function getRoleLabel(role: string): string {
-  return ROLE_LABEL_ID[role] ?? role;
+  return ROLE_LABELS[role] ?? role;
 }
 
 function RolePieChart({

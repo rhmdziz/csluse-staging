@@ -13,7 +13,7 @@ import { BulkImportDialogShell, InlineErrorAlert } from "@/components/shared";
 
 import { BATCH_MAX_YEAR, BATCH_MIN_YEAR, isValidBatchValue } from "@/constants/batches";
 
-import { ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
+import { ROLE_LABELS, ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
 import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
 import { useBulkCreateUsers, type BulkRow } from "@/hooks/shared/resources/users";
@@ -55,6 +55,16 @@ function normalizeHeader(value: unknown) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ");
+}
+
+function normalizeDepartmentSpacing(value: unknown) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeDepartmentLookup(value: unknown) {
+  return normalizeDepartmentSpacing(value).toLowerCase();
 }
 
 function buildTemplateWorkbook(
@@ -122,8 +132,8 @@ function buildTemplateWorkbook(
       "department",
       "Tidak",
       departmentNames.length
-        ? `Harus sama persis dengan salah satu opsi department yang tersedia: ${departmentNames.join(", ")}.`
-        : "Harus sama persis dengan salah satu opsi department yang tersedia di sistem.",
+        ? `Hanya dipakai untuk Student, Lecturer, atau Admin. Nilainya harus cocok dengan master department di sistem: ${departmentNames.join(", ")}. Huruf besar/kecil diabaikan dan spasi berlebih akan dirapikan. Kosongkan untuk Staff atau Guest.`
+        : "Hanya dipakai untuk Student, Lecturer, atau Admin. Nilainya harus cocok dengan master department di sistem. Huruf besar/kecil diabaikan dan spasi berlebih akan dirapikan. Kosongkan untuk Staff atau Guest.",
       sampleDepartment,
     ],
     [
@@ -164,14 +174,25 @@ export default function BulkCreateDialog({
 }: BulkCreateDialogProps) {
   const normalizedRoleParam = normalizeRoleValue(roleParam);
   const hasRoleScope = Boolean(normalizedRoleParam);
+  const scopedRoleLabel =
+    normalizedRoleParam && normalizedRoleParam in ROLE_LABELS
+      ? ROLE_LABELS[normalizedRoleParam as keyof typeof ROLE_LABELS]
+      : "";
+  const resolvedBulkTitle = scopedRoleLabel ? `Bulk Tambah ${scopedRoleLabel}` : "Bulk Tambah Akun/Profile";
+  const resolvedBulkSubmitLabel = scopedRoleLabel ? `Buat ${scopedRoleLabel}` : "Buat Akun/Profile";
   const [previewRows, setPreviewRows] = useState<BulkRow[]>([]);
   const [skippedRows, setSkippedRows] = useState<SkippedPreviewRow[]>([]);
   const [selectedRowIndexes, setSelectedRowIndexes] = useState<number[]>([]);
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [results, setResults] = useState<{ index: number; status: "success" | "error"; message: string }[]>([]);
+  const [results, setResults] = useState<{
+    index: number;
+    email: string;
+    status: "success" | "error";
+    message: string;
+  }[]>([]);
   const { departmentNames } = useDepartmentOptions();
-  const { createUsers, isSubmitting } = useBulkCreateUsers();
+  const { createUsers, cancelCreateUsers, isSubmitting } = useBulkCreateUsers();
 
   const resetState = () => {
     setPreviewRows([]);
@@ -220,6 +241,12 @@ export default function BulkCreateDialog({
         const mapped = HEADER_MAP[normalizeHeader(header)];
         if (mapped) headerIndexes[mapped] = index;
       });
+      const departmentLookup = new Map(
+        departmentNames.map((departmentName) => [
+          normalizeDepartmentLookup(departmentName),
+          departmentName,
+        ]),
+      );
 
       const nextPreviewRows: BulkRow[] = [];
       const nextSkippedRows: SkippedPreviewRow[] = [];
@@ -239,9 +266,15 @@ export default function BulkCreateDialog({
         const initials = String(row[headerIndexes.initials ?? -1] || "")
           .trim()
           .slice(0, 3);
-        const department = visibleFields.department
-          ? String(row[headerIndexes.department ?? -1] || "").trim()
+        const rawDepartment = visibleFields.department
+          ? String(row[headerIndexes.department ?? -1] || "")
           : "";
+        const normalizedDepartment = normalizeDepartmentSpacing(rawDepartment);
+        const department =
+          visibleFields.department && normalizedDepartment
+            ? (departmentLookup.get(normalizeDepartmentLookup(normalizedDepartment)) ??
+              normalizedDepartment)
+            : "";
         const batch = visibleFields.batch
           ? String(row[headerIndexes.batch ?? -1] || "").trim()
           : "";
@@ -273,7 +306,11 @@ export default function BulkCreateDialog({
         if (!hasRoleScope && !normalizedRole) reasons.push("role wajib diisi");
         if (!hasRoleScope && rawRole && !normalizedRole) reasons.push("role tidak valid");
         if (requiresPassword && !password) reasons.push("password wajib diisi untuk guest");
-        if (department && departmentNames.length > 0 && !departmentNames.includes(department)) {
+        if (
+          normalizedDepartment &&
+          departmentLookup.size > 0 &&
+          !departmentLookup.has(normalizeDepartmentLookup(normalizedDepartment))
+        ) {
           reasons.push("department tidak sesuai opsi");
         }
         if (batch && !isValidBatchValue(batch)) {
@@ -331,18 +368,30 @@ export default function BulkCreateDialog({
       setErrorMessage("Pilih minimal satu baris valid untuk diproses.");
       return;
     }
+    setErrorMessage("");
     const selectedRows = previewRows.filter((row) =>
       selectedRowIndexes.includes(row.index),
     );
     const bulkResults = await createUsers(selectedRows, setResults);
     const successCount = bulkResults.filter((row) => row.status === "success").length;
+    const failedRowIndexes = bulkResults
+      .filter((row) => row.status === "error")
+      .map((row) => row.index);
+
+    setSelectedRowIndexes(failedRowIndexes);
+
     if (successCount > 0) {
       onCompleted();
-      onOpenChange(false);
-      resetState();
-      toast.success(`${successCount} akun/profile berhasil dibuat.`);
+      toast.success(
+        scopedRoleLabel
+          ? `${successCount} ${scopedRoleLabel.toLowerCase()} berhasil dibuat.`
+          : `${successCount} akun/profile berhasil dibuat.`,
+      );
     }
   };
+
+  const successCount = results.filter((row) => row.status === "success").length;
+  const failedCount = results.filter((row) => row.status === "error").length;
 
   const allRowsSelected =
     previewRows.length > 0 && selectedRowIndexes.length === previewRows.length;
@@ -362,7 +411,7 @@ export default function BulkCreateDialog({
       open={open}
       onOpenChange={onOpenChange}
       onReset={resetState}
-      title="Bulk Tambah Akun/Profile"
+      title={resolvedBulkTitle}
       description={
         <>
           Upload file Excel dengan kolom wajib: nama lengkap, email
@@ -373,6 +422,11 @@ export default function BulkCreateDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFile}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        cancelCreateUsers();
+        setErrorMessage("Proses bulk import dihentikan oleh pengguna.");
+      }}
       error={
         errorMessage ? (
           <InlineErrorAlert>{errorMessage}</InlineErrorAlert>
@@ -380,9 +434,14 @@ export default function BulkCreateDialog({
       }
       contentClassName={USER_MODAL_WIDTH_CLASS}
       footer={
-        <Button type="button" onClick={() => void handleSubmitBulk()} disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}>
-            {isSubmitting ? "Memproses..." : "Buat Akun/Profile"}
-        </Button>
+        <>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Tutup
+          </Button>
+          <Button type="button" onClick={() => void handleSubmitBulk()} disabled={!previewRows.length || !selectedRowIndexes.length || isSubmitting}>
+            {isSubmitting ? "Memproses..." : resolvedBulkSubmitLabel}
+          </Button>
+        </>
       }
     >
       {previewRows.length ? (
@@ -472,14 +531,32 @@ export default function BulkCreateDialog({
         </div>
       ) : null}
 
-      {results.length ? (
+      {results.length || isSubmitting ? (
         <div className="space-y-2 rounded-md border p-3">
-          <p className="text-xs font-medium">Hasil proses</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <p className="font-medium">Hasil proses</p>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700">
+              Sukses: {successCount}
+            </span>
+            <span className="rounded-full bg-rose-100 px-2.5 py-1 font-medium text-rose-700">
+              Gagal: {failedCount}
+            </span>
+          </div>
           <div className="max-h-40 space-y-1 overflow-y-auto text-xs">
             {results.map((row) => (
-              <p key={`${row.index}-${row.status}`} className={row.status === "success" ? "text-emerald-700" : "text-destructive"}>
-                Baris {row.index}: {row.message}
-              </p>
+              <div
+                key={`${row.index}-${row.email}-${row.status}`}
+                className={
+                  row.status === "success"
+                    ? "rounded-md border border-emerald-200 bg-emerald-50/70 px-2 py-1.5 text-emerald-800"
+                    : "rounded-md border border-rose-200 bg-rose-50/70 px-2 py-1.5 text-rose-800"
+                }
+              >
+                <p className="font-medium">
+                  Baris {row.index}: {row.email}
+                </p>
+                <p>{row.message}</p>
+              </div>
             ))}
           </div>
         </div>

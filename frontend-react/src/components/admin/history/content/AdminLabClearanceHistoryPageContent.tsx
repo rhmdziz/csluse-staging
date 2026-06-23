@@ -68,8 +68,7 @@ import {
   type LabClearanceDetail,
   type LabClearanceListItem,
 } from "@/services/lab-clearance";
-
-const PAGE_SIZE = 20;
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Semua status" },
@@ -94,6 +93,7 @@ function isApprovedStatus(status: string) {
 export default function AdminLabClearanceHistoryPageContent() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -138,7 +138,7 @@ export default function AdminLabClearanceHistoryPageContent() {
 
   const { items, totalCount, isLoading, hasLoadedOnce, error } = useLabClearanceList(
     page,
-    PAGE_SIZE,
+    pageSize,
     "all",
     reloadKey,
     {
@@ -171,7 +171,7 @@ export default function AdminLabClearanceHistoryPageContent() {
   }, [selectedIds, visibleItems]);
 
   const selectedCount = selectedIds.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const allVisibleSelected =
     visibleItems.length > 0 && visibleItems.every((item) => selectedIds.includes(String(item.id)));
   const someVisibleSelected =
@@ -650,10 +650,15 @@ export default function AdminLabClearanceHistoryPageContent() {
             page={page}
             totalPages={totalPages}
             totalCount={totalCount}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="surat bebas lab"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
 
           <ConfirmDeleteDialog

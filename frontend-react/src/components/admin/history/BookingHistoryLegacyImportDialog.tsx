@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 
 import * as XLSX from "xlsx";
 
@@ -147,6 +147,7 @@ export default function BookingHistoryLegacyImportDialog({
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const resetState = () => {
     setPreviewRows([]);
@@ -283,9 +284,14 @@ export default function BookingHistoryLegacyImportDialog({
 
     setIsSubmitting(true);
     setResults([]);
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
-      const response = await bookingRoomsService.legacyBulkImport(previewRows);
+      const response = await bookingRoomsService.legacyBulkImport(
+        previewRows,
+        abortController.signal,
+      );
       const payload = (response.data ?? {}) as {
         detail?: string;
         success_count?: number;
@@ -317,11 +323,17 @@ export default function BookingHistoryLegacyImportDialog({
         onOpenChange(false);
       }
     } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       const message =
         error instanceof Error ? error.message : "Gagal import riwayat peminjaman lab.";
       setErrorMessage(message);
       toast.error(message);
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsSubmitting(false);
     }
   };
@@ -336,6 +348,11 @@ export default function BookingHistoryLegacyImportDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFileChange}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        abortControllerRef.current?.abort();
+        setErrorMessage("Proses import legacy dihentikan oleh pengguna.");
+      }}
       error={errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : null}
       footer={
         <Button type="button" onClick={() => void handleSubmit()} disabled={!previewRows.length || isSubmitting}>

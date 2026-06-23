@@ -103,7 +103,7 @@ export default function MaterialBulkImportByRoomDialog({
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const { createMaterials, isSubmitting } = useBulkCreateMaterials();
+  const { createMaterials, cancelCreateMaterials, isSubmitting } = useBulkCreateMaterials();
   const {
     rooms,
     isLoading: isLoadingRooms,
@@ -276,6 +276,11 @@ export default function MaterialBulkImportByRoomDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFile}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        cancelCreateMaterials();
+        setErrorMessage("Proses bulk import bahan dihentikan oleh pengguna.");
+      }}
       error={
         errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : undefined
       }

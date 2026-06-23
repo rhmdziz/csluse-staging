@@ -48,6 +48,7 @@ import {
   API_BORROWS_BULK_DELETE,
   API_BORROWS_EXPORT,
 } from "@/constants/api";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { useEquipmentOptions } from "@/hooks/shared/resources/equipments";
 import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
@@ -86,7 +87,6 @@ import { REQUEST_PURPOSE_OPTIONS } from "@/constants/request-purpose";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
-const PAGE_SIZE = 20;
 const STATUS_OPTIONS = BORROW_STATUS_OPTIONS;
 const ORDERING_OPTIONS = [
   { value: "newest", label: "Terbaru" },
@@ -105,6 +105,7 @@ export default function AdminEquipmentBorrowHistoryPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const { departmentNames } = useDepartmentOptions();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -165,7 +166,7 @@ export default function AdminEquipmentBorrowHistoryPage() {
   const { borrows, totalCount, aggregates, isLoading, hasLoadedOnce, error } =
     useBorrows(
       page,
-      PAGE_SIZE,
+      pageSize,
       {
         status,
         purpose,
@@ -209,9 +210,9 @@ export default function AdminEquipmentBorrowHistoryPage() {
     () =>
       Math.max(
         1,
-        Math.ceil((totalCount || filteredBorrows.length) / PAGE_SIZE),
+        Math.ceil((totalCount || filteredBorrows.length) / pageSize),
       ),
-    [totalCount, filteredBorrows.length],
+    [pageSize, totalCount, filteredBorrows.length],
   );
 
   const selectedCount = selectedIds.length;
@@ -678,10 +679,15 @@ export default function AdminEquipmentBorrowHistoryPage() {
             page={page}
             totalPages={totalPages}
             totalCount={totalCount || filteredBorrows.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="peminjaman alat"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
 
           <ConfirmDeleteDialog

@@ -67,6 +67,7 @@ import { useDeleteRecord } from "@/hooks/use-delete-record";
 import { SAMPLE_TESTING_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
 import { formatDateKey, toEndOfDay, toStartOfDay } from "@/lib/date";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import {
   getStatusBadgeClass,
@@ -78,7 +79,6 @@ import {
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
-const PAGE_SIZE = 20;
 const STATUS_OPTIONS = SAMPLE_TESTING_STATUS_OPTIONS;
 const ORDERING_OPTIONS = [
   { value: "newest", label: "Terbaru" },
@@ -109,6 +109,7 @@ export default function AdminSampleTestingHistoryPage() {
   const departmentParam = searchParams.get("department") ?? "";
   const orderingParam = searchParams.get("ordering") ?? "newest";
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState(queryParam);
   const [debouncedSearch, setDebouncedSearch] = useState(queryParam);
   const [status, setStatus] = useState(statusParam);
@@ -193,7 +194,7 @@ export default function AdminSampleTestingHistoryPage() {
     error,
   } = useSampleTestingList(
     page,
-    PAGE_SIZE,
+    pageSize,
     {
       q: debouncedSearch,
       status,
@@ -241,8 +242,8 @@ export default function AdminSampleTestingHistoryPage() {
   }, [sampleTestings, selectedIds]);
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
-    [totalCount],
+    () => Math.max(1, Math.ceil(totalCount / pageSize)),
+    [pageSize, totalCount],
   );
   const summaryAggregates = showEmptySummary
     ? EMPTY_SAMPLE_TESTING_AGGREGATES
@@ -705,10 +706,15 @@ export default function AdminSampleTestingHistoryPage() {
             page={page}
             totalPages={totalPages}
             totalCount={totalCount}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="pengujian sampel"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
 
           <ConfirmDeleteDialog

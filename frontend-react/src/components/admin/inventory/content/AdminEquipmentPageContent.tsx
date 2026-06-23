@@ -46,6 +46,7 @@ import {
 } from "@/constants/equipments";
 
 import { API_EQUIPMENTS_EXPORT } from "@/constants/api";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
@@ -66,8 +67,6 @@ import { useRoomOptions } from "@/hooks/shared/resources/rooms";
 import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { EQUIPMENT_EXPORT_COLUMNS } from "@/lib/admin/export-config";
-
-const PAGE_SIZE = 20;
 
 const STATUS_STYLES: Record<string, string> = {
   available: "bg-emerald-500/10 text-emerald-600",
@@ -113,6 +112,7 @@ function FilterSelectField({
 export default function AdminEquipmentsPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -159,7 +159,7 @@ export default function AdminEquipmentsPage() {
   const { equipments, totalCount, isLoading, hasLoadedOnce, error } =
     useEquipments(
       page,
-      PAGE_SIZE,
+      pageSize,
       {
         search: debouncedSearch,
         status,
@@ -174,8 +174,8 @@ export default function AdminEquipmentsPage() {
 
   const totalEquipments = totalCount || equipments.length;
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || equipments.length) / PAGE_SIZE)),
-    [totalCount, equipments.length],
+    () => Math.max(1, Math.ceil((totalCount || equipments.length) / pageSize)),
+    [pageSize, totalCount, equipments.length],
   );
 
   const selectedCount = selectedIds.length;
@@ -627,10 +627,15 @@ export default function AdminEquipmentsPage() {
             page={page}
             totalPages={totalPages}
             totalCount={totalEquipments}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="peralatan"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
         </div>
       </div>

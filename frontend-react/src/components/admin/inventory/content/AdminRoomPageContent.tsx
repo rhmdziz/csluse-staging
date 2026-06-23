@@ -32,6 +32,7 @@ import { AdminHistoryExportActions as AdminRecordExportActions } from "@/compone
 import { Button, Input } from "@/components/ui";
 
 import { API_ROOMS_EXPORT } from "@/constants/api";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
@@ -43,11 +44,10 @@ import { useAssignedPicUsers } from "@/hooks/shared/resources/users";
 
 import { ROOM_EXPORT_COLUMNS } from "@/lib/admin/export-config";
 
-const PAGE_SIZE = 20;
-
 export default function AdminRoomsPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [floor, setFloor] = useState("");
@@ -77,7 +77,7 @@ export default function AdminRoomsPage() {
 
   const { rooms, totalCount, isLoading, hasLoadedOnce, error } = useRooms(
     page,
-    PAGE_SIZE,
+    pageSize,
     {
       floor,
       pic,
@@ -88,8 +88,8 @@ export default function AdminRoomsPage() {
 
   const totalRooms = totalCount || rooms.length;
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || rooms.length) / PAGE_SIZE)),
-    [totalCount, rooms.length],
+    () => Math.max(1, Math.ceil((totalCount || rooms.length) / pageSize)),
+    [pageSize, totalCount, rooms.length],
   );
 
   const selectedCount = selectedIds.length;
@@ -420,10 +420,15 @@ export default function AdminRoomsPage() {
             page={page}
             totalPages={totalPages}
             totalCount={totalRooms}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="ruangan"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
         </div>
       </div>

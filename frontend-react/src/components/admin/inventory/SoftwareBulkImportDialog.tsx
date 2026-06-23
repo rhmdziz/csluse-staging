@@ -141,7 +141,7 @@ export default function SoftwareBulkImportDialog({
   >({});
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const { createSoftwares, isSubmitting } = useBulkCreateSoftwares();
+  const { createSoftwares, cancelCreateSoftwares, isSubmitting } = useBulkCreateSoftwares();
   const {
     equipments,
     isLoading: isLoadingEquipments,
@@ -346,6 +346,11 @@ export default function SoftwareBulkImportDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFile}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        cancelCreateSoftwares();
+        setErrorMessage("Proses bulk import software dihentikan oleh pengguna.");
+      }}
       error={
         errorMessage ? (
           <InlineErrorAlert>{errorMessage}</InlineErrorAlert>

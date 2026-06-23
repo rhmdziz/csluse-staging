@@ -180,7 +180,7 @@ export default function ScheduleBulkCreateDialog({
   const [results, setResults] = useState<
     { index: number; status: "success" | "error"; message: string }[]
   >([]);
-  const { createSchedules, isSubmitting } = useBulkCreateSchedules();
+  const { createSchedules, cancelCreateSchedules, isSubmitting } = useBulkCreateSchedules();
 
   const resetState = () => {
     setPreviewRows([]);
@@ -379,6 +379,11 @@ export default function ScheduleBulkCreateDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFile}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        cancelCreateSchedules();
+        setErrorMessage("Proses bulk jadwal dihentikan oleh pengguna.");
+      }}
       error={errorMessage ? <InlineErrorAlert>{errorMessage}</InlineErrorAlert> : undefined}
       footer={
         <Button

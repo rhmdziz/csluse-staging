@@ -204,10 +204,11 @@ export const softwaresService = {
     return parseMutationResponse(response);
   },
 
-  async bulkCreate(rows: BulkSoftwareRow[]) {
+  async bulkCreate(rows: BulkSoftwareRow[], signal?: AbortSignal) {
     const response = await authFetch(API_SOFTWARES_BULK_CREATE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         rows: rows.map((row) => ({
           index: row.index,

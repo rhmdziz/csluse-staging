@@ -86,10 +86,10 @@ import {
 } from "@/lib/request";
 
 import { REQUEST_PURPOSE_OPTIONS } from "@/constants/request-purpose";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { useAdminRecordExport } from "@/hooks/admin";
 
-const PAGE_SIZE = 20;
 const STATUS_OPTIONS = REQUEST_STATUS_OPTIONS;
 const ORDERING_OPTIONS = [
   { value: "newest", label: "Terbaru" },
@@ -109,6 +109,7 @@ export default function AdminRoomBookingHistoryPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const { departmentNames } = useDepartmentOptions();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -183,7 +184,7 @@ export default function AdminRoomBookingHistoryPage() {
 
   const { bookings, totalCount, aggregates, isLoading, hasLoadedOnce, error } = useBookings(
     page,
-    PAGE_SIZE,
+    pageSize,
     {
       q: debouncedSearch,
       status,
@@ -233,8 +234,8 @@ export default function AdminRoomBookingHistoryPage() {
   }, [bookings, selectedIds]);
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
-    [totalCount],
+    () => Math.max(1, Math.ceil(totalCount / pageSize)),
+    [pageSize, totalCount],
   );
   const summaryAggregates = showEmptySummary ? EMPTY_BOOKING_AGGREGATES : aggregates;
   const selectedCount = selectedIds.length;
@@ -735,10 +736,15 @@ export default function AdminRoomBookingHistoryPage() {
             page={page}
             totalPages={totalPages}
             totalCount={totalCount}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             itemLabel="peminjaman lab"
             isLoading={isLoading}
             onPageChange={setPage}
+            pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1);
+              setPageSize(nextPageSize);
+            }}
           />
 
           <ConfirmDeleteDialog

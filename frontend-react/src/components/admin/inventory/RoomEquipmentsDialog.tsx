@@ -6,10 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Boxes, Loader2 } from "lucide-react";
 
 import { AdminDetailDialogShell, DataPagination, InlineErrorAlert } from "@/components/shared";
+import { DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE_OPTIONS } from "@/constants/pagination";
 
 import { useEquipments } from "@/hooks/shared/resources/equipments";
-
-const PAGE_SIZE = 10;
 
 type RoomEquipmentsDialogProps = {
   roomId: string | number | null;
@@ -25,6 +24,7 @@ export default function RoomEquipmentsDialog({
   onOpenChange,
 }: RoomEquipmentsDialogProps) {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     if (open) {
@@ -34,14 +34,14 @@ export default function RoomEquipmentsDialog({
 
   const { equipments, totalCount, isLoading, hasLoadedOnce, error } = useEquipments(
     page,
-    PAGE_SIZE,
+    pageSize,
     { room: roomId ? String(roomId) : "" },
     0,
   );
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((totalCount || equipments.length) / PAGE_SIZE)),
-    [equipments.length, totalCount],
+    () => Math.max(1, Math.ceil((totalCount || equipments.length) / pageSize)),
+    [equipments.length, pageSize, totalCount],
   );
 
   return (
@@ -102,10 +102,15 @@ export default function RoomEquipmentsDialog({
           page={page}
           totalPages={totalPages}
           totalCount={totalCount}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           itemLabel="peralatan"
           isLoading={isLoading}
           onPageChange={setPage}
+          pageSizeOptions={[...DEFAULT_PAGE_SIZE_OPTIONS]}
+          onPageSizeChange={(nextPageSize) => {
+            setPage(1);
+            setPageSize(nextPageSize);
+          }}
         />
       </div>
     </AdminDetailDialogShell>

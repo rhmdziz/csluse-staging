@@ -283,10 +283,11 @@ export const roomsService = {
     return parseMutationResponse(response);
   },
 
-  async bulkCreate(rows: BulkRoomRow[]) {
+  async bulkCreate(rows: BulkRoomRow[], signal?: AbortSignal) {
     const response = await authFetch(API_ROOMS_BULK_CREATE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         rows: rows.map((row) => ({
           index: row.index,

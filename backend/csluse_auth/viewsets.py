@@ -15,7 +15,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from csluse.models import Booking, Borrow, Equipment, Material, Pengujian, Room, Software
-from csluse.viewsets import DefaultPagination
+from csluse.viewsets import (
+    DefaultPagination,
+    _exclude_legacy_bookings,
+    _exclude_legacy_pengujians,
+)
 
 from .audit import log_admin_action
 from .models import Department, Profile
@@ -218,8 +222,9 @@ class AdminDepartmentViewSet(viewsets.ModelViewSet):
                 DELETION,
                 "Deleted department via CSL Admin (user management bulk).",
             )
+            deleted_department_id = str(department.pk)
             department.delete()
-            deleted_ids.append(str(department.pk))
+            deleted_ids.append(deleted_department_id)
 
         response_status = status.HTTP_200_OK if deleted_ids else status.HTTP_400_BAD_REQUEST
         return Response(
@@ -613,10 +618,11 @@ class UserWithProfileViewSet(AdminProvisioningThrottleBypassMixin, viewsets.Mode
                 continue
 
             try:
+                profile_id = str(profile.pk)
                 self._ensure_user_deletable(profile)
                 self._delete_user_instance(profile)
-                deleted_ids.append(str(profile.pk))
-                processed_profile_ids.add(str(profile.pk))
+                deleted_ids.append(profile_id)
+                processed_profile_ids.add(profile_id)
             except PermissionDenied:
                 failed_ids.append(user_id)
 
@@ -899,8 +905,8 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
-def _status_breakdown(model):
-    rows = model.objects.values("status").annotate(n=Count("id"))
+def _status_breakdown(queryset):
+    rows = queryset.values("status").annotate(n=Count("id"))
     return {row["status"]: row["n"] for row in rows}
 
 
@@ -911,22 +917,25 @@ class AdminDashboardViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Profile.objects.none()
 
     def _build_dashboard_data(self):
+        bookings_qs = _exclude_legacy_bookings(Booking.objects.all())
+        pengujians_qs = _exclude_legacy_pengujians(Pengujian.objects.all())
+
         return {
             "total_users": Profile.objects.count(),
             "total_rooms": Room.objects.count(),
             "total_equipments": Equipment.objects.count(),
             "total_materials": Material.objects.count(),
             "total_software": Software.objects.count(),
-            "total_bookings": Booking.objects.count(),
+            "total_bookings": bookings_qs.count(),
             "total_borrows": Borrow.objects.count(),
-            "total_pengujians": Pengujian.objects.count(),
+            "total_pengujians": pengujians_qs.count(),
             "users_by_role": {
                 row["role"]: row["n"]
                 for row in Profile.objects.filter(role__isnull=False).values("role").annotate(n=Count("id"))
             },
-            "bookings_by_status": _status_breakdown(Booking),
-            "borrows_by_status": _status_breakdown(Borrow),
-            "pengujians_by_status": _status_breakdown(Pengujian),
+            "bookings_by_status": _status_breakdown(bookings_qs),
+            "borrows_by_status": _status_breakdown(Borrow.objects.all()),
+            "pengujians_by_status": _status_breakdown(pengujians_qs),
         }
 
     def list(self, request, *args, **kwargs):

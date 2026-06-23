@@ -13,7 +13,7 @@ import { Button, Input, DialogFooter } from "@/components/ui";
 
 import { BATCH_OPTIONS } from "@/constants/batches";
 
-import { ROLE_FILTER_OPTIONS, ROLE_OPTIONS, ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
+import { ROLE_FILTER_OPTIONS, ROLE_LABELS, ROLE_OPTIONS, ROLE_VALUES, normalizeRoleValue } from "@/constants/roles";
 
 import { useCreateUser } from "@/hooks/shared/resources/users";
 import { useDepartmentOptions } from "@/hooks/shared/resources/departments";
@@ -46,6 +46,10 @@ export default function CreateUserDialog({
     const normalizedRole = normalizeRoleValue(roleParam);
     return (ROLE_FILTER_OPTIONS as readonly string[]).includes(normalizedRole) ? normalizedRole : "";
   })();
+  const scopedRoleLabel = normalizedRoleParam
+    ? ROLE_LABELS[normalizedRoleParam as keyof typeof ROLE_LABELS]
+    : "";
+  const createEntityLabel = scopedRoleLabel || undefined;
 
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -87,8 +91,12 @@ export default function CreateUserDialog({
     resetState();
     toast.success(
       useDirectUserProvisioning
-        ? "Akun berhasil dibuat."
-        : "Profile internal berhasil dibuat. User akan terhubung saat login Microsoft pertama.",
+        ? createEntityLabel
+          ? `${createEntityLabel} berhasil dibuat.`
+          : "Akun berhasil dibuat."
+        : createEntityLabel
+          ? `Profile ${createEntityLabel.toLowerCase()} berhasil dibuat. User akan terhubung saat login Microsoft pertama.`
+          : "Profile internal berhasil dibuat. User akan terhubung saat login Microsoft pertama.",
     );
   };
 
@@ -97,11 +105,23 @@ export default function CreateUserDialog({
       open={open}
       onOpenChange={onOpenChange}
       onCloseReset={resetState}
-      title={useDirectUserProvisioning ? "Buat Akun" : "Buat Profile Internal"}
+      title={
+        useDirectUserProvisioning
+          ? createEntityLabel
+            ? `Buat ${createEntityLabel}`
+            : "Buat Akun"
+          : createEntityLabel
+            ? `Buat Profile ${createEntityLabel}`
+            : "Buat Profile Internal"
+      }
       description={
         useDirectUserProvisioning
-          ? "Tambahkan akun baru dan lengkapi password awal yang dibutuhkan."
-          : "Siapkan profile terlebih dahulu. User akan dibuat saat login Microsoft pertama."
+          ? createEntityLabel
+            ? `Tambahkan ${createEntityLabel.toLowerCase()} baru dan lengkapi password awal yang dibutuhkan.`
+            : "Tambahkan akun baru dan lengkapi password awal yang dibutuhkan."
+          : createEntityLabel
+            ? `Siapkan profile ${createEntityLabel.toLowerCase()} terlebih dahulu. User akan dibuat saat login Microsoft pertama.`
+            : "Siapkan profile terlebih dahulu. User akan dibuat saat login Microsoft pertama."
       }
       icon={<UserPlus className="h-5 w-5" />}
       contentClassName={`${USER_MODAL_WIDTH_CLASS} gap-0 p-0 [--primary:#0048B4] [--primary-foreground:#FFFFFF] [--ring:#3B82F6]`}
@@ -262,7 +282,15 @@ export default function CreateUserDialog({
         <DialogFooter>
           <Button type="submit" disabled={isSubmitting} className="gap-2">
             <UserPlus className="h-4 w-4" />
-            {isSubmitting ? "Menyimpan..." : useDirectUserProvisioning ? "Buat Akun" : "Buat Profile"}
+            {isSubmitting
+              ? "Menyimpan..."
+              : useDirectUserProvisioning
+                ? createEntityLabel
+                  ? `Buat ${createEntityLabel}`
+                  : "Buat Akun"
+                : createEntityLabel
+                  ? `Buat Profile ${createEntityLabel}`
+                  : "Buat Profile"}
           </Button>
         </DialogFooter>
       </form>

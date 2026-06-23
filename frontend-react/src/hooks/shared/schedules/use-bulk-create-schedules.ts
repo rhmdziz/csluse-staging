@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { API_SCHEDULES_BULK_CREATE } from "@/constants/api";
 import { authFetch } from "@/lib/auth";
@@ -25,17 +25,21 @@ type BulkScheduleResult = {
 
 export function useBulkCreateSchedules() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const createSchedules = async (
     rows: BulkScheduleRow[],
     onProgress?: (results: BulkScheduleResult[]) => void,
   ) => {
     setIsSubmitting(true);
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       const response = await authFetch(API_SCHEDULES_BULK_CREATE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
         body: JSON.stringify({
           rows: rows.map((row) => ({
             index: row.index,
@@ -89,6 +93,9 @@ export function useBulkCreateSchedules() {
       onProgress?.(results);
       return results;
     } catch (error) {
+      if (abortController.signal.aborted) {
+        return [];
+      }
       const message =
         error instanceof Error ? error.message : "Terjadi kesalahan.";
       const results = rows.map((row) => ({
@@ -99,11 +106,18 @@ export function useBulkCreateSchedules() {
       onProgress?.(results);
       return results;
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsSubmitting(false);
     }
   };
 
-  return { createSchedules, isSubmitting };
+  const cancelCreateSchedules = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  return { createSchedules, cancelCreateSchedules, isSubmitting };
 }
 
 export default useBulkCreateSchedules;

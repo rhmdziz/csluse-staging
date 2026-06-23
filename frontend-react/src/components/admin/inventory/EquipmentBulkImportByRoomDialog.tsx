@@ -150,7 +150,7 @@ export default function EquipmentBulkImportByRoomDialog({
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const { createEquipments, isSubmitting } = useBulkCreateEquipments();
+  const { createEquipments, cancelCreateEquipments, isSubmitting } = useBulkCreateEquipments();
   const {
     rooms,
     isLoading: isLoadingRooms,
@@ -367,6 +367,11 @@ export default function EquipmentBulkImportByRoomDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFile}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        cancelCreateEquipments();
+        setErrorMessage("Proses bulk import peralatan dihentikan oleh pengguna.");
+      }}
       error={
         errorMessage ? (
           <InlineErrorAlert>{errorMessage}</InlineErrorAlert>

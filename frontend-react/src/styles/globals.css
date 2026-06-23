@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 html {
-  @apply text-[13px] leading-normal antialiased;
+  @apply text-sm antialiased;
 }
 
 @theme inline {

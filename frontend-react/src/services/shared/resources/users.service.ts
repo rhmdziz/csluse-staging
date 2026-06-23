@@ -421,20 +421,22 @@ export const usersService = {
     return (await response.json()) as ApiAdminProfile;
   },
 
-  async create(payload: CreateUserPayload) {
+  async create(payload: CreateUserPayload, signal?: AbortSignal) {
     const response = await authFetch(API_AUTH_REGISTER, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify(payload),
     });
 
     return parseMutationResponse(response);
   },
 
-  async createProfile(payload: CreateProfilePayload) {
+  async createProfile(payload: CreateProfilePayload, signal?: AbortSignal) {
     const response = await authFetch(API_AUTH_ADMIN_PROFILE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify(payload),
     });
 

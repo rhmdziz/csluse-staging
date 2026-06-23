@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { extractApiErrorMessage } from "@/lib/core";
 import {
   roomsService,
@@ -12,15 +12,18 @@ export type { BulkRoomResult, BulkRoomRow };
 
 export function useBulkCreateRooms() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const createRooms = async (
     rows: BulkRoomRow[],
     onProgress?: (results: BulkRoomResult[]) => void,
   ) => {
     setIsSubmitting(true);
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
-      const result = await roomsService.bulkCreate(rows);
+      const result = await roomsService.bulkCreate(rows, abortController.signal);
 
       const data = (result.data ?? {}) as {
         results?: { index?: number; status?: "success" | "error"; message?: unknown }[];
@@ -52,6 +55,9 @@ export function useBulkCreateRooms() {
       onProgress?.(results);
       return results;
     } catch (error) {
+      if (abortController.signal.aborted) {
+        return [];
+      }
       const message =
         error instanceof Error ? error.message : "Terjadi kesalahan.";
       const results = rows.map((row) => ({
@@ -62,11 +68,18 @@ export function useBulkCreateRooms() {
       onProgress?.(results);
       return results;
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsSubmitting(false);
     }
   };
 
-  return { createRooms, isSubmitting };
+  const cancelCreateRooms = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  return { createRooms, cancelCreateRooms, isSubmitting };
 }
 
 export default useBulkCreateRooms;

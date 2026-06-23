@@ -1120,3 +1120,44 @@ class AdminDashboardKpisTests(AuthBaseTestMixin, APITestCase):
         self.assertEqual(response.data["total_bookings"], 1)
         self.assertEqual(response.data["total_borrows"], 1)
         self.assertEqual(response.data["total_pengujians"], 1)
+
+    def test_admin_dashboard_kpis_exclude_legacy_booking_and_pengujian(self):
+        requester = Profile.objects.get(email="requester@example.com")
+        room = Room.objects.get(name="Lab A")
+
+        start_time = timezone.localtime(timezone.now()).replace(
+            hour=13,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        if start_time <= timezone.localtime(timezone.now()):
+            start_time = start_time + timedelta(days=1)
+        end_time = start_time + timedelta(hours=2)
+
+        Booking.objects.create(
+            code="EX-PL0000457",
+            requested_by=requester,
+            room=room,
+            room_name=room.name,
+            start_time=start_time,
+            end_time=end_time,
+            status="Completed",
+            purpose="Penelitian",
+        )
+        Pengujian.objects.create(
+            code="EX-PS0000456",
+            requested_by=requester,
+            name="Legacy Sample Request",
+            email="legacy-dashboard@example.com",
+            sample_type="Liquid",
+            status="Completed",
+        )
+
+        response = self.client.get("/api/admin/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["total_bookings"], 1)
+        self.assertEqual(response.data["total_pengujians"], 1)
+        self.assertEqual(response.data["bookings_by_status"], {"Pending": 1})
+        self.assertEqual(response.data["pengujians_by_status"], {"Pending": 1})

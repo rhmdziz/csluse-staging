@@ -221,10 +221,11 @@ export const materialsService = {
     return parseMutationResponse(response);
   },
 
-  async bulkCreate(rows: BulkMaterialRow[]) {
+  async bulkCreate(rows: BulkMaterialRow[], signal?: AbortSignal) {
     const response = await authFetch(API_MATERIALS_BULK_CREATE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         rows: rows.map((row) => ({
           index: row.index,

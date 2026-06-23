@@ -325,10 +325,11 @@ export const equipmentsService = {
     return parseMutationResponse(response);
   },
 
-  async bulkCreate(rows: BulkEquipmentRow[]) {
+  async bulkCreate(rows: BulkEquipmentRow[], signal?: AbortSignal) {
     const response = await authFetch(API_EQUIPMENTS_BULK_CREATE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({
         rows: rows.map((row) => ({
           index: row.index,

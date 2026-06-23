@@ -17,6 +17,8 @@ type DataPaginationProps = {
   itemLabel: string;
   isLoading?: boolean;
   onPageChange: (page: number) => void;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (pageSize: number) => void;
 };
 
 type PaginationItem =
@@ -63,10 +65,13 @@ export function DataPagination({
   itemLabel,
   isLoading = false,
   onPageChange,
+  pageSizeOptions,
+  onPageSizeChange,
 }: DataPaginationProps) {
   const visibleItems = buildPaginationItems(page, totalPages);
   const startItem = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const endItem = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
+  const hasPageSizeControl = Boolean(onPageSizeChange && pageSizeOptions?.length);
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -80,6 +85,28 @@ export function DataPagination({
           Halaman <span className="text-slate-900">{page}</span> /{" "}
           <span className="text-slate-900">{totalPages}</span>
         </div>
+        {hasPageSizeControl ? (
+          <>
+            <div className="h-6 w-px bg-border" />
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="px-2.5 py-1 text-sm text-slate-600">Per halaman</span>
+              {pageSizeOptions?.map((option) => (
+                <Button
+                  key={option}
+                  type="button"
+                  variant={option === pageSize ? "default" : "ghost"}
+                  size="sm"
+                  className="min-w-12 px-2"
+                  disabled={isLoading}
+                  onClick={() => onPageSizeChange?.(option)}
+                  aria-label={`Tampilkan ${option} item per halaman`}
+                >
+                  {option}
+                </Button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
       <div className="flex w-fit max-w-full self-start flex-wrap items-center gap-1 rounded-lg border bg-card p-1">
         <Button

@@ -121,7 +121,7 @@ export default function RoomBulkImportDialog({
   >({});
   const [fileName, setFileName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const { createRooms, isSubmitting } = useBulkCreateRooms();
+  const { createRooms, cancelCreateRooms, isSubmitting } = useBulkCreateRooms();
   const {
     picUsers,
     isLoading: isLoadingPics,
@@ -318,6 +318,11 @@ export default function RoomBulkImportDialog({
       onDownloadTemplate={handleDownloadTemplate}
       onFileChange={handleFile}
       fileName={fileName}
+      isProcessing={isSubmitting}
+      onStopProcessing={() => {
+        cancelCreateRooms();
+        setErrorMessage("Proses bulk import ruangan dihentikan oleh pengguna.");
+      }}
       error={
         errorMessage ? (
           <InlineErrorAlert>{errorMessage}</InlineErrorAlert>
