@@ -165,6 +165,17 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
         self.assertEqual(response.data["purpose"], "Penelitian")
 
+    def test_lecturer_can_retrieve_own_booking_outside_pic_rooms(self):
+        booking = self.create_booking_for_room(self.lecturer_profile, self.room)
+
+        self.client.force_authenticate(user=self.lecturer_user)
+        response = self.client.get(f"/api/bookings/{booking.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], str(booking.id))
+        self.assertEqual(response.data["requested_by_detail"]["id"], str(self.lecturer_profile.id))
+        self.assertEqual(response.data["room_detail"]["id"], str(self.room.id))
+
     def test_booking_request_requires_h_plus_2_start_date(self):
         start, end = self.future_window(days=1, start_hour=9)
         self.client.force_authenticate(user=self.lecturer_user)
@@ -574,6 +585,65 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(
             response.data["recent_activities"][0]["code"],
             active_booking.code,
+        )
+
+    def test_dashboard_overview_lecturer_uses_requester_detail_for_own_booking_and_borrow(self):
+        own_booking = self.create_booking(self.lecturer_profile, status="Approved")
+        review_booking = self.create_booking_for_room(self.student_profile, self.other_room)
+        review_booking.status = "Approved"
+        review_booking.save(update_fields=["status", "updated_at"])
+
+        own_borrow = self.create_borrow_for_equipment(
+            self.lecturer_profile,
+            self.equipment,
+            status="Approved",
+        )
+        review_borrow = self.create_borrow_for_equipment(
+            self.student_profile,
+            self.other_equipment,
+            status="Approved",
+        )
+
+        self.client.force_authenticate(user=self.lecturer_user)
+        response = self.client.get("/api/dashboard-overview/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        recent_by_code = {
+            item["code"]: item["href"]
+            for item in response.data["recent_activities"]
+        }
+        upcoming_by_id = {
+            item["id"]: item["href"]
+            for item in response.data["upcoming_approved"]
+        }
+
+        self.assertEqual(recent_by_code[own_booking.code], f"/booking-rooms/{own_booking.id}")
+        self.assertEqual(
+            recent_by_code[review_booking.code],
+            f"/booking-rooms/approval/{review_booking.id}",
+        )
+        self.assertEqual(recent_by_code[own_borrow.code], f"/borrow-equipment/{own_borrow.id}")
+        self.assertEqual(
+            recent_by_code[review_borrow.code],
+            f"/borrow-equipment/approval/{review_borrow.id}",
+        )
+
+        self.assertEqual(
+            upcoming_by_id[f"booking-{own_booking.id}"],
+            f"/booking-rooms/{own_booking.id}",
+        )
+        self.assertEqual(
+            upcoming_by_id[f"booking-{review_booking.id}"],
+            f"/booking-rooms/approval/{review_booking.id}",
+        )
+        self.assertEqual(
+            upcoming_by_id[f"borrow-{own_borrow.id}"],
+            f"/borrow-equipment/{own_borrow.id}",
+        )
+        self.assertEqual(
+            upcoming_by_id[f"borrow-{review_borrow.id}"],
+            f"/borrow-equipment/approval/{review_borrow.id}",
         )
 
     def test_booking_request_can_cross_weekend_when_within_three_months(self):
@@ -1605,6 +1675,28 @@ class CsluseWorkflowRegressionTests(APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["title"], f"Peminjaman Lab {booking.code} disetujui")
         self.assertEqual(response.data["results"][0]["target_path"], f"/booking-rooms/{booking.id}")
+
+    def test_notifications_endpoint_maps_historical_booking_review_notification_to_approval_path(self):
+        booking = self.create_booking_for_room(self.student_profile, self.other_room)
+        Notification.objects.create(
+            recipient=self.lecturer_profile,
+            title=f"Pengajuan Peminjaman Lab baru {booking.code}",
+            category="General",
+            message=(
+                f"Terdapat pengajuan peminjaman lab baru dari Student User "
+                f"dengan ID {booking.code} yang membutuhkan tindak lanjut."
+            ),
+        )
+
+        self.client.force_authenticate(self.lecturer_user)
+        response = self.client.get("/api/notifications/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["target_path"],
+            f"/booking-rooms/approval/{booking.id}",
+        )
 
     def test_notifications_endpoint_returns_null_target_for_unmapped_notification(self):
         Notification.objects.create(

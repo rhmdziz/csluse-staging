@@ -1537,14 +1537,33 @@ class BookingViewSet(BulkImportThrottleBypassMixin, BulkDeleteMixin, viewsets.Mo
         if profile is None:
             return qs.none()
 
+        _BOOKING_LIST_ACTIONS = {'list', 'all', 'export_all', 'requester_options'}
+        _BOOKING_REQUESTER_ACTIONS = {
+            'retrieve',
+            'update',
+            'partial_update',
+            'destroy',
+            'cancel',
+            'review_check',
+        }
+
         # Admin: bypass filter PIC untuk action detail/aksi (retrieve, approve, dll)
         # atau jika halaman admin mengirim ?unscoped=1.
-        _BOOKING_LIST_ACTIONS = {'list', 'all', 'export_all', 'requester_options'}
         if self._can_manage_all_bookings() and (
             self.request.query_params.get('unscoped') == '1'
             or self.action not in _BOOKING_LIST_ACTIONS
         ):
             return self._apply_list_filters(qs, allow_requester_filter=True)
+
+        # Reviewer non-admin seperti Lecturer tetap harus bisa membuka dan mengelola
+        # booking miliknya sendiri dari scope requester.
+        if self.action in _BOOKING_REQUESTER_ACTIONS:
+            qs = qs.filter(
+                Q(requested_by_id=profile.id)
+                | Q(room__pics__id=profile.id)
+                | Q(requester_mentor_profile_id=profile.id)
+            ).distinct()
+            return self._apply_list_filters(qs, allow_requester_filter=False)
 
         # Semua reviewer (termasuk admin di halaman dashboard): hanya tampilkan
         # booking di mana mereka adalah PIC ruangan atau dosen pembimbing pemohon.
@@ -3270,9 +3289,39 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
 
         now = timezone.now()
         is_pic_scope_role = is_reviewer_or_above(request.user)
+        include_requester_items = is_pic_scope_role and not is_administrator_or_above(request.user)
+
+        def _merge_unique_by_id(*collections):
+            merged = []
+            seen = set()
+            for collection in collections:
+                for item in collection:
+                    item_id = getattr(item, "id", None)
+                    if item_id in seen:
+                        continue
+                    seen.add(item_id)
+                    merged.append(item)
+            return merged
+
+        def _request_href(kind, item):
+            if kind == "booking":
+                requester_href = f"/booking-rooms/{item.id}"
+                approval_href = f"/booking-rooms/approval/{item.id}"
+            elif kind == "borrow":
+                requester_href = f"/borrow-equipment/{item.id}"
+                approval_href = f"/borrow-equipment/approval/{item.id}"
+            else:
+                requester_href = f"/sample-testing/{item.id}"
+                approval_href = f"/sample-testing/approval/{item.id}"
+
+            if getattr(item, "requested_by_id", None) == profile.id:
+                return requester_href
+            if kind == "pengujian":
+                return approval_href if is_pic_scope_role and is_administrator_or_above(request.user) else requester_href
+            return approval_href if is_pic_scope_role else requester_href
 
         if is_pic_scope_role:
-            bookings = list(
+            reviewer_bookings = list(
                 _exclude_legacy_bookings(
                     Booking.objects
                 )
@@ -3281,13 +3330,32 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 .distinct()
                 .order_by("-created_at")
             )
-            borrows = list(
+            reviewer_borrows = list(
                 Borrow.objects
                 .filter(equipment__room__pics__id=profile.id)
                 .select_related("equipment", "equipment__room", "requested_by")
                 .distinct()
                 .order_by("-created_at")
             )
+            requester_bookings = []
+            requester_borrows = []
+            if include_requester_items:
+                requester_bookings = list(
+                    _exclude_legacy_bookings(
+                        Booking.objects
+                    )
+                    .filter(requested_by=profile)
+                    .select_related("room", "requested_by")
+                    .order_by("-created_at")
+                )
+                requester_borrows = list(
+                    Borrow.objects
+                    .filter(requested_by=profile)
+                    .select_related("equipment", "equipment__room", "requested_by")
+                    .order_by("-created_at")
+                )
+            bookings = _merge_unique_by_id(reviewer_bookings, requester_bookings)
+            borrows = _merge_unique_by_id(reviewer_borrows, requester_borrows)
             if is_administrator_or_above(request.user):
                 pengujians = list(
                     _exclude_legacy_pengujians(
@@ -3336,7 +3404,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                     "requester_name": _profile_display_name(getattr(item, "requested_by", None)) or "",
                     "start_time": item.start_time,
                     "end_time": item.end_time,
-                    "href": f"/booking-rooms/approval/{item.id}" if is_pic_scope_role else f"/booking-rooms/{item.id}",
+                    "href": _request_href("booking", item),
                 })
 
         for item in borrows:
@@ -3348,7 +3416,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                     "requester_name": _profile_display_name(getattr(item, "requested_by", None)) or "",
                     "start_time": item.start_time,
                     "end_time": item.end_time,
-                    "href": f"/borrow-equipment/approval/{item.id}" if is_pic_scope_role else f"/borrow-equipment/{item.id}",
+                    "href": _request_href("borrow", item),
                 })
 
         upcoming_items.sort(key=lambda item: item["start_time"])
@@ -3364,7 +3432,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 "type": "Booking Ruangan",
                 "status": item.status,
                 "created_at": item.created_at,
-                "href": f"/booking-rooms/approval/{item.id}" if is_pic_scope_role else f"/booking-rooms/{item.id}",
+                "href": _request_href("booking", item),
             })
 
         for item in borrows:
@@ -3375,7 +3443,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 "type": "Peminjaman Alat",
                 "status": item.status,
                 "created_at": item.created_at,
-                "href": f"/borrow-equipment/approval/{item.id}" if is_pic_scope_role else f"/borrow-equipment/{item.id}",
+                "href": _request_href("borrow", item),
             })
 
         for item in pengujians:
@@ -3386,11 +3454,7 @@ class DashboardOverviewViewSet(viewsets.ViewSet):
                 "type": "Pengujian Sampel",
                 "status": item.status,
                 "created_at": item.created_at,
-                "href": (
-                    f"/sample-testing/approval/{item.id}"
-                    if is_pic_scope_role and is_administrator_or_above(request.user)
-                    else f"/sample-testing/{item.id}"
-                ),
+                "href": _request_href("pengujian", item),
             })
 
         recent_activities.sort(key=lambda item: item["created_at"], reverse=True)
