@@ -473,14 +473,14 @@ export const usersService = {
     return parseMutationResponse(response);
   },
 
-  async bulkRemove(userIds: Array<number | string>) {
+  async bulkRemove(identifiers: Array<number | string>) {
     const response = await authFetch(API_AUTH_USERS_BULK_DELETE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ids: userIds
-          .map((id) => String(id).trim())
-          .filter((id) => Boolean(id)),
+        ids: identifiers
+          .map((identifier) => String(identifier).trim())
+          .filter((identifier) => Boolean(identifier)),
       }),
     });
     return parseMutationResponse(response);

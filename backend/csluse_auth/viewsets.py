@@ -578,11 +578,19 @@ class UserWithProfileViewSet(AdminProvisioningThrottleBypassMixin, viewsets.Mode
         if not normalized:
             return None
 
+        if "@" in normalized:
+            return queryset.filter(
+                models.Q(email__iexact=normalized)
+                | models.Q(user__email__iexact=normalized)
+            ).first()
+
         try:
-            uuid.UUID(normalized)
-            return queryset.filter(pk=normalized).first()
+            parsed_uuid = uuid.UUID(normalized)
+            return queryset.filter(pk=parsed_uuid).first()
         except ValueError:
-            return queryset.filter(models.Q(pk=normalized) | models.Q(user_id=normalized)).first()
+            if normalized.isdigit():
+                return queryset.filter(user_id=int(normalized)).first()
+            return None
 
     @extend_schema(request=UserBulkDeleteSerializer)
     @action(detail=False, methods=["post"], url_path="bulk-delete")

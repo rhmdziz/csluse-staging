@@ -386,7 +386,7 @@ class UserBulkDeleteSerializer(serializers.Serializer):
         child=serializers.CharField(allow_blank=False, trim_whitespace=True),
         allow_empty=False,
         error_messages={
-            "empty": "Pilih minimal satu user untuk dihapus.",
+            "empty": "Pilih minimal satu user atau email untuk dihapus.",
         },
     )
 
@@ -397,14 +397,14 @@ class UserBulkDeleteSerializer(serializers.Serializer):
         for item in value:
             normalized = str(item).strip()
             if not normalized:
-                raise serializers.ValidationError("Terdapat ID user yang kosong.")
+                raise serializers.ValidationError("Terdapat identifier user yang kosong.")
             if normalized in seen:
                 continue
             seen.add(normalized)
             unique_ids.append(normalized)
 
         if len(unique_ids) != len(value):
-            raise serializers.ValidationError("Terdapat ID user yang duplikat.")
+            raise serializers.ValidationError("Terdapat identifier user yang duplikat.")
         return unique_ids
 
 

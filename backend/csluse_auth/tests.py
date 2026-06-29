@@ -545,6 +545,45 @@ class UserWithProfileViewSetTests(AuthBaseTestMixin, APITestCase):
             1,
         )
 
+    def test_bulk_delete_can_resolve_profiles_by_email(self):
+        linked_user = self.create_user(
+            email="bulk-email-linked@example.com",
+            full_name="Bulk Email Linked",
+            role="Student",
+            batch="2024",
+        )
+        standalone_profile = self.create_profile(
+            email="bulk-email-standalone@example.com",
+            full_name="Bulk Email Standalone",
+            role="Guest",
+        )
+
+        response = self.client.post(
+            "/api/admin/users/bulk-delete/",
+            {
+                "ids": [
+                    "bulk-email-linked@example.com",
+                    "bulk-email-standalone@example.com",
+                    "missing-bulk-email@example.com",
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["deleted_count"], 2)
+        self.assertEqual(response.data["failed_count"], 1)
+        self.assertCountEqual(
+            response.data["deleted_ids"],
+            [str(linked_user.profile.pk), str(standalone_profile.pk)],
+        )
+        self.assertEqual(
+            response.data["failed_ids"],
+            ["missing-bulk-email@example.com"],
+        )
+        self.assertFalse(User.objects.filter(pk=linked_user.pk).exists())
+        self.assertFalse(Profile.objects.filter(pk=standalone_profile.pk).exists())
+
     def test_destroy_deletes_linked_user_and_profile(self):
         target_user = self.create_user(
             email="destroy-target@example.com",

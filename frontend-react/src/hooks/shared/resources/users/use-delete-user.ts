@@ -108,7 +108,70 @@ export function useDeleteUser() {
     }
   };
 
-  return { deleteUser, deleteUsers, isDeleting, errorMessage, setErrorMessage };
+  const deleteUsersByIdentifiers = async (identifiers: Array<number | string>) => {
+    if (!identifiers.length) {
+      return { ok: false, message: "Data kosong", deletedIds: [], failedIds: [] };
+    }
+
+    setIsDeleting(true);
+    setErrorMessage("");
+
+    try {
+      const normalizedIdentifiers = identifiers
+        .map((identifier) => String(identifier).trim())
+        .filter((identifier) => Boolean(identifier));
+
+      if (!normalizedIdentifiers.length) {
+        return { ok: false, message: "Identifier kosong", deletedIds: [], failedIds: [] };
+      }
+
+      const result = await usersService.bulkRemove(normalizedIdentifiers);
+      const data = (result.data ?? {}) as {
+        detail?: string;
+        deleted_ids?: Array<number | string>;
+        failed_ids?: Array<number | string>;
+        deleted_count?: number;
+        failed_count?: number;
+      };
+
+      if (!result.ok) {
+        const message =
+          (typeof data.detail === "string" && data.detail.trim()) ||
+          `Gagal menghapus akun/profile (${result.status})`;
+        setErrorMessage(message);
+        return { ok: false, message, deletedIds: [], failedIds: [] };
+      }
+
+      const deletedIds = Array.isArray(data.deleted_ids) ? data.deleted_ids : [];
+      const failedIds = Array.isArray(data.failed_ids) ? data.failed_ids : [];
+
+      return {
+        ok: deletedIds.length > 0,
+        deletedCount:
+          typeof data.deleted_count === "number" ? data.deleted_count : deletedIds.length,
+        failedCount:
+          typeof data.failed_count === "number" ? data.failed_count : failedIds.length,
+        deletedIds,
+        failedIds,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Terjadi kesalahan jaringan.";
+      setErrorMessage(message);
+      return { ok: false, message, deletedIds: [], failedIds: [] };
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return {
+    deleteUser,
+    deleteUsers,
+    deleteUsersByIdentifiers,
+    isDeleting,
+    errorMessage,
+    setErrorMessage,
+  };
 }
 
 export default useDeleteUser;

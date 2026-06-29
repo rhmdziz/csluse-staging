@@ -22,6 +22,7 @@ type BulkImportDialogShellProps = {
   onReset: () => void;
   title: string;
   description: ReactNode;
+  topContent?: ReactNode;
   onDownloadTemplate: () => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   fileName: string;
@@ -43,6 +44,7 @@ export default function BulkImportDialogShell({
   onReset,
   title,
   description,
+  topContent,
   onDownloadTemplate,
   onFileChange,
   fileName,
@@ -72,6 +74,7 @@ export default function BulkImportDialogShell({
 
         <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <p className="text-xs text-muted-foreground">{description}</p>
+          {topContent}
 
           <label className="group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-4 py-6 text-center transition hover:border-primary/50 hover:bg-muted/50">
             <input
